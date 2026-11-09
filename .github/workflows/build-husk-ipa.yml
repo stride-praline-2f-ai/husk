@@ -50,6 +50,7 @@ jobs:
           git bundle verify "$RUNNER_TEMP/husk-source.bundle"
           git bundle unbundle "$RUNNER_TEMP/husk-source.bundle"
           export HUSK_SOURCE=$(cat "$RUNNER_TEMP/husk-source-sha")
+          git fetch --no-tags origin "$HUSK_SOURCE"
           git checkout --detach "$HUSK_SOURCE"
           test "$(git rev-parse HEAD^{tree})" = "$(cat "$RUNNER_TEMP/husk-source-tree")"
           mkdir -p build/logs
