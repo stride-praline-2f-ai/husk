@@ -9,7 +9,7 @@ class DuoAutomaticTests(unittest.TestCase):
  def setUpClass(cls):
   cls.tmp=tempfile.TemporaryDirectory();cls.addClassCleanup(cls.tmp.cleanup);p=Path(cls.tmp.name)
   settings=(ROOT/'src/app/Husk/TLAppSettings.swift').read_text().split('// MARK: - The settings page')[0].replace('import SwiftUI','').replace('import UIKit','')
-  (p/'Settings.swift').write_text(settings)
+  (p/'Settings.swift').write_text('import Foundation\nimport CoreGraphics\n'+settings)
   (p/'Facades.swift').write_text('''import Foundation
 import CoreGraphics
 struct FakeReport { var nativeEngine: FakeEngine }
@@ -24,6 +24,7 @@ extension DuoDisplayPolicy { @MainActor static func metrics(screen:UIScreen)->Me
 ''')
   (p/'main.swift').write_text(r'''import Foundation
 import CoreGraphics
+@main struct PolicyTest { @MainActor static func main() throws {
 let mode=CommandLine.arguments[1]
 let portrait=DuoDisplayPolicy.Metrics(pointWidth:669,pointHeight:951,nativeWidth:1878,nativeHeight:2670,phoneHardware:true)
 let landscape=DuoDisplayPolicy.Metrics(pointWidth:951,pointHeight:669,nativeWidth:2670,nativeHeight:1878,phoneHardware:true)
@@ -71,9 +72,10 @@ if mode=="geometry" {
  assert(!settings.spatialUpscaling && settings.efficientFrameRate == .smooth && settings.workerScheduling == .balanced)
 } else {fatalError("unknown case")}
 print("PASS",mode)
+}}
 ''')
   subprocess.run(['cc','-c',str(ROOT/'src/translation-layer-next/husk-tl-ue4-graphics.c'),'-o',str(p/'graphics.o')],check=True)
-  cls.exe=p/'test';subprocess.run(['swiftc','-swift-version','5',str(ROOT/'src/app/Husk/HuskExecutionOptions.swift'),str(ROOT/'src/app/Husk/DuoDisplayPolicy.swift'),str(p/'Facades.swift'),str(p/'Settings.swift'),str(p/'main.swift'),str(p/'graphics.o'),'-o',str(cls.exe)],check=True)
+  cls.exe=p/'test';subprocess.run(['swiftc','-swift-version','5','-parse-as-library',str(ROOT/'src/app/Husk/HuskExecutionOptions.swift'),str(ROOT/'src/app/Husk/DuoDisplayPolicy.swift'),str(p/'Facades.swift'),str(p/'Settings.swift'),str(p/'main.swift'),str(p/'graphics.o'),'-o',str(cls.exe)],check=True)
  def case(self,name):subprocess.run([str(self.exe),name],check=True)
  def test_two_stage_geometry_uses_physical_panel_and_is_orientation_independent(self):self.case('geometry')
  def test_outer_unknown_nonphone_and_invalid_metrics_stay_out(self):self.case('guards')
