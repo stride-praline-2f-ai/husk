@@ -26,7 +26,13 @@ jobs:
         run: |
           set -euo pipefail
           cp .github/ci/write_status.py "$RUNNER_TEMP/husk-build-status.py"
-          cp vendor/HuskMoltenVK-verified.zip "$RUNNER_TEMP/husk-driver.zip"
+          python3 - <<'DRIVER'
+          import base64,hashlib,os
+          from pathlib import Path
+          data=base64.b64decode(Path('vendor/HuskMoltenVK-verified.zip.b64').read_text().strip(),validate=True)
+          assert hashlib.sha256(data).hexdigest()=='c47037417ac9b9a08b643cc0df97e7666fcb188435f90df9c95710796a6c8ccc'
+          Path(os.environ['RUNNER_TEMP'],'husk-driver.zip').write_bytes(data)
+          DRIVER
           python3 - <<'PYCODE'
           import base64,hashlib,json,os
           from pathlib import Path
