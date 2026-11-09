@@ -2,6 +2,7 @@
 import Foundation
 #if canImport(UIKit)
 import UIKit
+import Metal
 #endif
 
 /// A conservative launch profile, not a measured visual/energy optimum.
@@ -40,7 +41,20 @@ enum DuoDisplayPolicy {
     static let worker = 2 // Balanced: preserves critical roles, no core affinity.
     static let submission = 0 // Driver Default.
 
+    /// Runtime-matched A20 Pro only. A worker allowance is not P-core affinity.
+    static func fastWorkerBudget(gpuName: String, cpuCount: Int, enabled: Bool = true) -> Int {
+        let name = gpuName.lowercased().filter { $0.isLetter || $0.isNumber }
+        return enabled && cpuCount == 6 && ["applea20progpu", "applea20pro"].contains(name) ? 2 : 0
+    }
+    static func workerPolicy(gpuName: String, cpuCount: Int, enabled: Bool = true) -> Int {
+        fastWorkerBudget(gpuName: gpuName, cpuCount: cpuCount, enabled: enabled) > 0 ? 4 : worker
+    }
+
 #if canImport(UIKit)
+    @MainActor static var detectedGPUName: String { MTLCreateSystemDefaultDevice()?.name ?? "" }
+    @MainActor static var supportsA20Workers: Bool {
+        fastWorkerBudget(gpuName: detectedGPUName, cpuCount: ProcessInfo.processInfo.processorCount) > 0
+    }
     @MainActor static func metrics(screen: UIScreen) -> Metrics {
         Metrics(pointWidth: Double(screen.bounds.width), pointHeight: Double(screen.bounds.height),
                 nativeWidth: Double(screen.nativeBounds.width), nativeHeight: Double(screen.nativeBounds.height),
