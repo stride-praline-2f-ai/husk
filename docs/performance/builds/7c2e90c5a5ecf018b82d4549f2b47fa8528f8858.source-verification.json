@@ -1,0 +1,47 @@
+{
+  "source": "7c2e90c5a5ecf018b82d4549f2b47fa8528f8858",
+  "tree": "f187be16781e835649418d3fdfd0d2f0c07215fd",
+  "files": [
+    {
+      "path": ".github/workflows/build-husk-ipa.yml",
+      "sha": "ddf3d28c3a3861eeea5b9a9afd63e0a9934630fe",
+      "passed": true
+    },
+    {
+      "path": "PROJECT_PLAN.md",
+      "sha": "c7fa14944e0b3aa9704fc7136e94346100e5aa78",
+      "passed": true
+    },
+    {
+      "path": "docs/performance/41-duo-automatic-mac.md",
+      "sha": "176c423e88cf738e1fb7dacb55512475adfafe3b",
+      "passed": true
+    },
+    {
+      "path": "scripts/mac_build_preflight.py",
+      "sha": "9582946972be2da8a004db9e9ff20f2f77075911",
+      "passed": true
+    },
+    {
+      "path": "scripts/prepare_mac_build_tools.sh",
+      "sha": "3d7e31029964fcf4941c92a28a290baad74c75aa",
+      "passed": true
+    },
+    {
+      "path": "scripts/run_mac_regressions.py",
+      "sha": "26528014513583dffaff948aa02de332dc24af6d",
+      "passed": true
+    },
+    {
+      "path": "scripts/stage_verified_shaders.py",
+      "sha": "8b96b189f658f298aafc3e8aa92106498628d383",
+      "passed": true
+    },
+    {
+      "path": "tests/translation-layer/test_duo_automatic.py",
+      "sha": "5db1a77ea19ba9edbe653a65a3a023d6f8a44b2b",
+      "passed": true
+    }
+  ],
+  "runtime_files_changed_from_initial_Duo_build": false
+}
