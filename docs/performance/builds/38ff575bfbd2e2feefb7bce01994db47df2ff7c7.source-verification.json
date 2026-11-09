@@ -1,0 +1,19 @@
+{
+  "source": "38ff575bfbd2e2feefb7bce01994db47df2ff7c7",
+  "tree": "9668f1aada5a5f2b5433a5802c573fb4991bbcde",
+  "repository": "polyproaa/Husk",
+  "branch": "optimized",
+  "verified_remote_fetch_matches_local_tree": true,
+  "upstream": "afe83d45b31194c4cc9f7b3db7ec2c757db8346e",
+  "fork_parent": "27f8f3885e123f99eaeb0bbab822a53d6044da2d",
+  "unchanged_paths": [
+    "src/translation-layer-next/husk-tl-audio.c",
+    "src/translation-layer-next/husk-tl-audio.h",
+    "src/translation-layer-next/husk-tl-vulkan.m",
+    "src/translation-layer-next/husk-tl-ue4-graphics.c",
+    "src/translation-layer-next/husk-tl-pipeline-store.c",
+    "src/translation-layer-next/husk-tl-thread-policy.c",
+    "src/app/Husk/NativeTouchCoordinates.swift",
+    "src/app/Husk/NativeGameLifecycle.swift"
+  ]
+}

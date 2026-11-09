@@ -272,3 +272,6 @@ Inspection-fix final source`e9835d95ec530da3efd515ac298200b6d386f46e`,[run405100
 ###2026-10-27 —M6/M8 runtime completion and repairs
 
 User requested actual whole-plan implementation and outstanding fixes before further diagnostic cycles. [Runtime batch and every M0–M10 dependency](37-runtime-completion.md), [42c92f2 handover](builds/42c92f297979435a6d193257dab51ce35fddf202.md). Audio ring/PCM allocation work, AudioQueue locking/failure/recovery, controller duplicate/held-state/disconnect, optional Vulkan dispatch and fixed-surface touch geometry are implemented. Local373checks pass/16Apple-deferred;11audio UBSan scenarios pass. FirstApple0e7dcbc failed two Swift helper tests for missing CoreGraphics; corrected42c92f2 exactApple40561530921 passes397checks/45suites/zero skips,app/driver/SDK/IPA and independent package verification. Protected settings/compiler archive contract preserved. No new device/energy pass, no general run requested, fixed31.11/I79.80/32of39/M4-only34.57/Duo0 unchanged. Temporal/live engine inputs, real Duo and physical attribution remain explicitly unimplemented/unavailable as applicable, not fabricated.
+
+
+2026-11-09 — [Husk3.4/build150 verified delivery](builds/38ff575bfbd2e2feefb7bce01994db47df2ff7c7.md):source/Apple399checks/SDK31-96/driver/app/IPA/download validated. Device/energy unverified; no new logging campaign.

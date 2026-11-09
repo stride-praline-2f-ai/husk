@@ -1,0 +1,20 @@
+{
+  "run": 42597170536,
+  "attempts": [
+    {
+      "attempt": 1,
+      "job": 129092532118,
+      "conclusion": "failure",
+      "reason": "Actions token cannot publish workflow-containing branch. Exact source bundle restoration/tree verification succeeded; no app compilation attempted. Connected GitHub branch creation published the already-uploaded exact source; then reran."
+    },
+    {
+      "attempt": 2,
+      "job": 129092996464,
+      "conclusion": "success",
+      "tests": 399,
+      "suites": 47,
+      "apple_skips": 0,
+      "app_driver_sdk_package_upload": "passed"
+    }
+  ]
+}
