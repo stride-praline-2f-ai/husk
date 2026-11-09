@@ -46,5 +46,9 @@ if [ ! -d "$VK_HEADERS/.git" ]; then
 fi
 test "$(git -C "$VK_HEADERS" rev-parse HEAD)" = "$VK_PIN"
 mkdir -p third_party/build/mvk-abi/External
-ln -s "$VK_HEADERS" third_party/build/mvk-abi/External/Vulkan-Headers
+HEADER_STAGE=third_party/build/mvk-abi/External/Vulkan-Headers
+# Python 3.9 Path.glob does not recurse through directory symlinks.
+if [ -L "$HEADER_STAGE" ]; then rm "$HEADER_STAGE"; fi
+mkdir -p "$HEADER_STAGE/include"
+cp -R "$VK_HEADERS/include/." "$HEADER_STAGE/include/"
 python3 scripts/verify_vulkan_observer_abi.py third_party/build/mvk-abi --ios
