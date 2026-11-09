@@ -1,0 +1,33 @@
+{
+  "source": "7c2e90c5a5ecf018b82d4549f2b47fa8528f8858",
+  "tree": "f187be16781e835649418d3fdfd0d2f0c07215fd",
+  "run_id": 42647780958,
+  "job_id": 129265618652,
+  "workflow_revision": "ac9f530383bf8a2c07f6559f058701e8696ade48",
+  "conclusion": "success",
+  "suites": 49,
+  "checks": 410,
+  "skipped": 0,
+  "font_paths": "pass",
+  "setup_groups": {
+    "platform": "success",
+    "regressions": "success",
+    "tools": "success",
+    "shaders": "success",
+    "resources": "success",
+    "driver": "success",
+    "pairing": "success",
+    "project": "success"
+  },
+  "sdk_structures": 31,
+  "sdk_offsets": 96,
+  "driver_exports": 11,
+  "driver": "reused exact verified build150 driver",
+  "shaders": "exact unchanged official3.4 compiled library",
+  "app": "fresh source build",
+  "artifact_id": 13690016165,
+  "expires_at": "2026-11-16T16:03:03Z",
+  "zip_sha256": "7b065930b016b514767a4946e0d08a940c343ba56ff80b24c624dc77e9206dff",
+  "ipa_sha256": "6aa5d14fc7784b6b23ebcbe307c3df4b88b3deb24f13e9b7859539b58325477a",
+  "environment": "owner ARM64 Mac, Xcode27.2/27B52, iPhoneOS27.2, Swift6.4.2, four build jobs"
+}
