@@ -132,6 +132,7 @@ struct TLAppSettings: Codable, Equatable {
     var pipelineIdentification = false
     var pipelineFeedback = false
     var automaticDuoProfile = true
+    var a20EfficiencyWorkers = true
     var spatialUpscaling = false
     var spatialInputPercent = 80
     var renderTargetInventory = false
@@ -239,6 +240,7 @@ struct TLAppSettings: Codable, Equatable {
         pipelineIdentification = try c.decodeIfPresent(Bool.self, forKey: .pipelineIdentification) ?? false
         pipelineFeedback = try c.decodeIfPresent(Bool.self, forKey: .pipelineFeedback) ?? false
         automaticDuoProfile = try c.decodeIfPresent(Bool.self, forKey: .automaticDuoProfile) ?? true
+        a20EfficiencyWorkers = try c.decodeIfPresent(Bool.self, forKey: .a20EfficiencyWorkers) ?? true
         spatialUpscaling = try c.decodeIfPresent(Bool.self, forKey: .spatialUpscaling) ?? false
         let inputPercent = try c.decodeIfPresent(Int.self, forKey: .spatialInputPercent) ?? 80
         spatialInputPercent = [80, 85, 90, 95].contains(inputPercent) ? inputPercent : 80
@@ -358,7 +360,12 @@ struct TLAppSettingsView: View {
                         if DuoDisplayPolicy.metrics(screen: .main).isInner {
                             Toggle("Automatic Duo Inner Screen", isOn: $settings.automaticDuoProfile)
                             if settings.duoAutomaticActive(for: app) {
-                                Text("Reduced inner-screen output, MetalFX 80%, 60 FPS, Balanced and Driver Default. Advanced trials and profiling stay off. Turn this off for manual settings. Restart required.")
+                                if DuoDisplayPolicy.supportsA20Workers {
+                                    Toggle("A20 Pro Efficiency Workers", isOn: $settings.a20EfficiencyWorkers)
+                                    Text("Keeps two normal-priority worker slots; extra eligible workers use lower priority only after stable gameplay. Turn off to restore Balanced without changing resolution or MetalFX. Restart required.")
+                                        .font(.footnote).foregroundStyle(.secondary)
+                                }
+                                Text("Reduced inner-screen output, MetalFX 80%, 60 FPS and Driver Default. A20 Pro can favour efficiency cores for extra workers with automatic performance rollback; other chips retain Balanced. Detailed profiling stays off. Restart required.")
                                     .font(.footnote).foregroundStyle(.secondary)
                             }
                         }
