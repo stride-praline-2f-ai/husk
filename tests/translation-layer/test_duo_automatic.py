@@ -36,6 +36,15 @@ if mode=="geometry" {
  assert(target(portrait).0==w && target(portrait).1==h)
  assert((w*DuoDisplayPolicy.inputPercent/100) & ~7==1448 && (h*DuoDisplayPolicy.inputPercent/100) & ~7==1024)
  assert(portrait.scale(percent:100)! < 3)
+} else if mode=="a20" {
+ assert(DuoDisplayPolicy.fastWorkerBudget(gpuName:"Apple A20 Pro GPU",cpuCount:6)==2)
+ assert(DuoDisplayPolicy.workerPolicy(gpuName:"Apple A20 Pro GPU",cpuCount:6)==4)
+ for name in ["Apple M4 GPU","Apple A19 Pro GPU","Apple GPU",""] {
+  assert(DuoDisplayPolicy.fastWorkerBudget(gpuName:name,cpuCount:6)==0)
+  assert(DuoDisplayPolicy.workerPolicy(gpuName:name,cpuCount:6)==2)
+ }
+ for count in [-1,0,5,8] {assert(DuoDisplayPolicy.fastWorkerBudget(gpuName:"Apple A20 Pro GPU",cpuCount:count)==0)}
+ assert(DuoDisplayPolicy.workerPolicy(gpuName:"Apple A20 Pro GPU",cpuCount:6,enabled:false)==2)
 } else if mode=="guards" {
  var m=portrait;m.phoneHardware=false;assert(!m.isInner && m.scale()==nil)
  m=portrait;m.nativeWidth=1398;m.nativeHeight=2034;assert(!m.isInner)
@@ -50,12 +59,12 @@ if mode=="geometry" {
 } else if mode=="decode" {
  let original=Data("{\"spatialUpscaling\":false,\"efficientResolution\":65,\"customResolutionPercent\":71}".utf8)
  let settings=try JSONDecoder().decode(TLAppSettings.self,from:original)
- assert(settings.automaticDuoProfile && !settings.spatialUpscaling && settings.efficientResolution == .performance && settings.customResolutionPercent==71)
+ assert(settings.automaticDuoProfile && settings.a20EfficiencyWorkers && !settings.spatialUpscaling && settings.efficientResolution == .performance && settings.customResolutionPercent==71)
  assert(settings.supportsDuoAutomatic(for:game))
  assert(!settings.supportsDuoAutomatic(for:TLApp(label:"Other game",packageName:nil,report:FakeReport(nativeEngine:.ue4))))
- var manual=settings;manual.automaticDuoProfile=false
+ var manual=settings;manual.automaticDuoProfile=false;manual.a20EfficiencyWorkers=false
  let roundtrip=try JSONDecoder().decode(TLAppSettings.self,from:JSONEncoder().encode(manual))
- assert(!roundtrip.automaticDuoProfile && roundtrip.customResolutionPercent==71 && !roundtrip.spatialUpscaling)
+ assert(!roundtrip.automaticDuoProfile && !roundtrip.a20EfficiencyWorkers && roundtrip.customResolutionPercent==71 && !roundtrip.spatialUpscaling)
 } else if mode=="duo-settings" {
  var settings=TLAppSettings();settings.efficientResolution = .native
  UIDevice.current.userInterfaceIdiom = .pad // inner-screen UI idiom must not accidentally select the iPad budget
@@ -78,6 +87,7 @@ print("PASS",mode)
   cls.exe=p/'test';subprocess.run(['swiftc','-swift-version','5','-parse-as-library',str(ROOT/'src/app/Husk/HuskExecutionOptions.swift'),str(ROOT/'src/app/Husk/DuoDisplayPolicy.swift'),str(p/'Facades.swift'),str(p/'Settings.swift'),str(p/'main.swift'),str(p/'graphics.o'),'-o',str(cls.exe)],check=True)
  def case(self,name):subprocess.run([str(self.exe),name],check=True)
  def test_two_stage_geometry_uses_physical_panel_and_is_orientation_independent(self):self.case('geometry')
+ def test_a20_runtime_match_fallback_and_independent_worker_opt_out(self):self.case('a20')
  def test_outer_unknown_nonphone_and_invalid_metrics_stay_out(self):self.case('guards')
  def test_opt_out_window_and_other_game_do_not_apply_profile(self):self.case('admission')
  def test_old_settings_migrate_without_overwriting_manual_values_and_opt_out_roundtrips(self):self.case('decode')
