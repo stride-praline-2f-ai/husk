@@ -3,7 +3,7 @@
   "attempt": 1,
   "runner": "aaqibs-Virtual-Machine",
   "architecture": "ARM64",
-  "status": "running",
+  "status": "success",
   "source": "7c2e90c5a5ecf018b82d4549f2b47fa8528f8858",
-  "artifact_id": ""
+  "artifact_id": "13690016165"
 }
