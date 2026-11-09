@@ -60,6 +60,35 @@ int main(void){
 }
 ''',['husk-tl-lifecycle.c'])
 
+    def test_heartbeat_map_scans_are_bounded_and_pause_pressure_clock_safe(self):
+        helper=function((TL/'husk-tl-unity-app.c').read_text(),'static bool heartbeat_map_due(')
+        self.run_c(r'''
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
+#include <assert.h>
+/* POLICY */
+static int scans(size_t available) {
+ int count=0;int64_t sampled=0;bool have=false;
+ for(int t=1;t<=120;t++) {
+  int64_t now=(int64_t)t*500000000LL;
+  if(heartbeat_map_due(now,sampled,have,false,available)){count++;sampled=now;have=true;}
+ }
+ return count;
+}
+int main(void) {
+ assert(scans((size_t)1024<<20)==2); // 120 cheap heartbeats, only two full map walks
+ assert(scans((size_t)128<<20)==12); // pressure stays bounded at one walk per five seconds
+ for(int i=0;i<120;i++)assert(!heartbeat_map_due((int64_t)i*1000000000LL,1,true,true,0));
+ assert(!heartbeat_map_due(0,1,true,false,0));
+ assert(!heartbeat_map_due(1,1000000000LL,true,false,0));
+ assert(heartbeat_map_due(120000000000LL,1,true,false,(size_t)1024<<20));
+ assert(heartbeat_map_due(0,0,false,false,0)); // first sample can still be taken if clock unavailable
+ assert(!heartbeat_map_due(0,0,true,false,0)); // clock failure cannot become repeated full scans
+ return 0;
+}
+'''.replace('/* POLICY */',helper),[])
+
     def test_actual_activity_delivery_is_serial_on_owner_and_runs_callbacks_without_mailbox_lock(self):
         delivery=function((TL/'husk-tl-nativeactivity.c').read_text(),'static void deliver_lifecycle(void)')
         self.run_c(r'''
