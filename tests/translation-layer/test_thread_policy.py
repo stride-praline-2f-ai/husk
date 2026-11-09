@@ -128,6 +128,7 @@ void exercise_naming(int path, const char *name, int failure) {
                         '-I'+str(ROOT/'src/translation-layer-next'), str(path), '-o', str(library)], check=True)
         cls.lib = ctypes.CDLL(str(library))
         cls.lib.reset_fake.argtypes = [ctypes.c_uint, ctypes.c_int, ctypes.c_int, ctypes.c_char_p]
+        cls.lib.husk_ue4_set_fast_worker_budget.restype = ctypes.c_bool
         cls.lib.tl_thread_policy_named.argtypes = [ctypes.c_char_p]
         cls.lib.tl_thread_policy_role.argtypes = [ctypes.c_char_p]
         cls.lib.current_qos.restype = ctypes.c_uint
@@ -149,6 +150,29 @@ void exercise_naming(int path, const char *name, int failure) {
     def admit(self):
         self.sample(10); self.sample(20)
         self.assertTrue(self.lib.tl_thread_policy_trial_active())
+
+    def test_a20_two_worker_allowance_preserves_critical_threads_and_rolls_back(self):
+        self.reset(qos=NORMAL,mode=4)
+        self.assertTrue(self.lib.husk_ue4_set_fast_worker_budget(2))
+        self.name(b'TaskGraphNP 2'); self.admit()
+        self.lib.tl_thread_policy_checkpoint(); self.assertEqual(self.lib.current_qos(),UTILITY)
+        self.lib.tl_thread_policy_frame(21000000000,60000000)
+        self.lib.tl_thread_policy_checkpoint(); self.assertEqual(self.lib.current_qos(),NORMAL)
+        for name in (b'TaskGraphNP 0',b'TaskGraphNP 1',b'RenderThread',b'RHIThread',b'AudioThread',b'EventWorker'):
+            self.reset(qos=NORMAL,mode=4); self.lib.husk_ue4_set_fast_worker_budget(2)
+            self.name(name); self.admit(); self.lib.tl_thread_policy_checkpoint()
+            self.assertEqual(self.lib.current_qos(),NORMAL)
+
+    def test_worker_allowance_rejects_invalid_and_resets_each_launch(self):
+        self.reset(mode=4)
+        self.assertTrue(self.lib.husk_ue4_set_fast_worker_budget(2))
+        for value in (-1,0,5,7):
+            self.assertFalse(self.lib.husk_ue4_set_fast_worker_budget(value))
+            self.assertEqual(self.lib.tl_thread_policy_fast_worker_budget(),2)
+        self.lib.husk_ue4_set_worker_capacity(6)
+        self.assertEqual(self.lib.tl_thread_policy_fast_worker_budget(),1)
+        self.lib.husk_ue4_set_worker_capacity(0)
+        self.assertFalse(self.lib.husk_ue4_set_fast_worker_budget(1))
 
     def test_adaptive_capacity_hint_and_guarded_admission(self):
         for cpu_count, name, expected in ((10,b'TaskGraphNP 1',NORMAL),(6,b'TaskGraphNP 1',UTILITY),(10,b'TaskGraphNP 2',UTILITY)):
