@@ -277,3 +277,5 @@ User requested actual whole-plan implementation and outstanding fixes before fur
 2026-11-09 — [Husk3.4/build150 verified delivery](builds/38ff575bfbd2e2feefb7bce01994db47df2ff7c7.md):source/Apple399checks/SDK31-96/driver/app/IPA/download validated. Device/energy unverified; no new logging campaign.
 
 2026-11-09 DUO-AUTO-v1: [verified owner-Mac3.4/build151](builds/7c2e90c5a5ecf018b82d4549f2b47fa8528f8858.md),410Apple checks/49suites/zero skips,font,SDK31/96,8setup groups,fresh app/IPA,independent download/source/hash/library verification. No new physical Duo/M4 or energy evidence; no logs requested. Failed setup attempts preserved in companion ci-attempts JSON.
+
+2026-11-09 [E-DUO-001](runs/E-DUO-001.md):actual Duo-like A20Pro runtime reports1448x1024guest ->1816x1280drawable;user likes visuals but reports heat/battery drain. Long pipeline creation and constrained process-memory headroom observed;no numeric power,causal attribution or complete identity. Source review documents frequent Mach-VM diagnostic scans and blocking limiter sleeps. No runtime change/new build/logging request;unresolved energy remains explicit.
