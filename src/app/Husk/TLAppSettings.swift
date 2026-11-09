@@ -131,6 +131,7 @@ struct TLAppSettings: Codable, Equatable {
     var execution = HuskExecutionOptions()
     var pipelineIdentification = false
     var pipelineFeedback = false
+    var automaticDuoProfile = true
     var spatialUpscaling = false
     var spatialInputPercent = 80
     var renderTargetInventory = false
@@ -169,10 +170,25 @@ struct TLAppSettings: Codable, Equatable {
         usesSharpGraphics(for: app) && (unrealGraphics == .automatic || unrealGraphics == .efficientHigh)
     }
 
+    func supportsDuoAutomatic(for app: TLApp) -> Bool {
+        let name = app.label.lowercased()
+        return automaticDuoProfile && usesEfficientGraphics(for: app)
+            && ((name.contains("minecraft") && name.contains("dungeons"))
+                || (app.packageName?.lowercased().contains("dungeons") ?? false))
+    }
+    @MainActor func duoAutomaticActive(for app: TLApp) -> Bool {
+        supportsDuoAutomatic(for: app) && DuoDisplayPolicy.metrics(screen: .main).isInner
+    }
+
     @MainActor func renderScale(for app: TLApp) -> CGFloat {
         guard usesSharpGraphics(for: app) else { return resolution.scale }
         let screen = UIScreen.main
         guard usesEfficientGraphics(for: app) else { return screen.scale }
+        let percent = efficientResolution == .custom ? customResolutionPercent : efficientResolution.rawValue
+        let duo = DuoDisplayPolicy.metrics(screen: screen)
+        if let scale = duo.scale(percent: duoAutomaticActive(for: app) ? 0 : percent) {
+            return CGFloat(scale)
+        }
         let fraction = tl_ue4_resolution_fraction(
             Int32((screen.bounds.width * screen.scale).rounded()),
             Int32((screen.bounds.height * screen.scale).rounded()),
@@ -222,6 +238,7 @@ struct TLAppSettings: Codable, Equatable {
         nativePipelineArchiveMode = [0,1,2].contains(archiveMode) ? archiveMode : 0
         pipelineIdentification = try c.decodeIfPresent(Bool.self, forKey: .pipelineIdentification) ?? false
         pipelineFeedback = try c.decodeIfPresent(Bool.self, forKey: .pipelineFeedback) ?? false
+        automaticDuoProfile = try c.decodeIfPresent(Bool.self, forKey: .automaticDuoProfile) ?? true
         spatialUpscaling = try c.decodeIfPresent(Bool.self, forKey: .spatialUpscaling) ?? false
         let inputPercent = try c.decodeIfPresent(Int.self, forKey: .spatialInputPercent) ?? 80
         spatialInputPercent = [80, 85, 90, 95].contains(inputPercent) ? inputPercent : 80
@@ -338,18 +355,33 @@ struct TLAppSettingsView: View {
                     }
                     LabeledContent("Active Preset", value: settings.usesEfficientGraphics(for: app) ? "Sharp / Efficient" : (settings.usesSharpGraphics(for: app) ? "Sharp / High Quality" : "Game Default"))
                     if settings.usesEfficientGraphics(for: app) {
-                        Picker("Rendering Resolution", selection: $settings.efficientResolution) {
-                            ForEach(TLAppSettings.EfficientResolution.allCases) { Text($0.title).tag($0) }
+                        if DuoDisplayPolicy.metrics(screen: .main).isInner {
+                            Toggle("Automatic Duo Inner Screen", isOn: $settings.automaticDuoProfile)
+                            if settings.duoAutomaticActive(for: app) {
+                                Text("Reduced inner-screen output, MetalFX 80%, 60 FPS, Balanced and Driver Default. Advanced trials and profiling stay off. Turn this off for manual settings. Restart required.")
+                                    .font(.footnote).foregroundStyle(.secondary)
+                            }
                         }
-                        if settings.efficientResolution == .custom {
+                        if settings.duoAutomaticActive(for: app) {
+                            LabeledContent("Rendering Resolution", value: "Automatic · Reduced Resolution")
+                        } else {
+                            Picker("Rendering Resolution", selection: $settings.efficientResolution) {
+                                ForEach(TLAppSettings.EfficientResolution.allCases) { Text($0.title).tag($0) }
+                            }
+                        }
+                        if settings.efficientResolution == .custom && !settings.duoAutomaticActive(for: app) {
                             LabeledContent("Render Scale", value: "\(settings.customResolutionPercent)%")
                             Slider(value: Binding(get: { Double(settings.customResolutionPercent) },
                                                   set: { settings.customResolutionPercent = Int($0.rounded()) }),
                                    in: 65...100, step: 1)
                         }
                         LabeledContent("Fullscreen Target", value: settings.fullscreenResolutionEstimate(for: app))
-                        Picker("Frame Limit", selection: $settings.efficientFrameRate) {
-                            ForEach(TLAppSettings.EfficientFrameRate.allCases) { Text($0.title).tag($0) }
+                        if settings.duoAutomaticActive(for: app) {
+                            LabeledContent("Frame Limit", value: "60 FPS · Smoother")
+                        } else {
+                            Picker("Frame Limit", selection: $settings.efficientFrameRate) {
+                                ForEach(TLAppSettings.EfficientFrameRate.allCases) { Text($0.title).tag($0) }
+                            }
                         }
                     }
                     Button("Device Graphics Profiles") { profilesSheet = true }
@@ -364,7 +396,7 @@ struct TLAppSettingsView: View {
 
                 Section {
                     NavigationLink {
-                        TLGameAdvancedSettingsView(settings: $settings, appID: app.id)
+                        TLGameAdvancedSettingsView(settings: $settings, appID: app.id, automaticDuoActive: settings.duoAutomaticActive(for: app))
                     } label: {
                         Label("Advanced Graphics & Diagnostics", systemImage: "slider.horizontal.3")
                     }
@@ -519,6 +551,7 @@ struct TLAppSettingsView: View {
 private struct TLGameAdvancedSettingsView: View {
     @Binding var settings: TLAppSettings
     let appID: String
+    let automaticDuoActive: Bool
 
     @State private var efficiencySheet = false
     @State private var metricKitSheet = false
@@ -610,6 +643,7 @@ private struct TLGameAdvancedSettingsView: View {
             }
         }
         .huskForm()
+        .disabled(automaticDuoActive)
         .navigationTitle("Advanced & Diagnostics")
         .onChange(of: settings) { $0.save(appID) }
     }

@@ -61,8 +61,12 @@ else
     echo "==> xcodegen not installed; using the checked-in project as-is" >&2
 fi
 
+BUILD_PARALLEL_ARGS=()
+if [[ "${HUSK_XCODE_JOBS:-}" =~ ^[1-9][0-9]*$ ]]; then
+    BUILD_PARALLEL_ARGS=(-jobs "$HUSK_XCODE_JOBS")
+fi
 echo "==> building"
-xcodebuild -project "$HUSK_ROOT/src/app/Husk.xcodeproj" -scheme Husk \
+xcodebuild "${BUILD_PARALLEL_ARGS[@]}" -project "$HUSK_ROOT/src/app/Husk.xcodeproj" -scheme Husk \
     -sdk iphoneos -configuration Release -derivedDataPath "$DD" \
     CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
     build 2>&1 | tee "$DD/build.log" | grep -E "error:|BUILD (SUCCEEDED|FAILED)" || true

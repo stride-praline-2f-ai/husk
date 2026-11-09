@@ -1,5 +1,8 @@
 # Husk master development plan
 
+**2026-11-09 owner-Mac Duo build:** User requests automatic inner-screen reduced output then80%MetalFX and the retained efficiency work. [DUO-AUTO-v1](docs/performance/41-duo-automatic-mac.md) adds display-matched reversible launch settings using physical pixels, preservesM4/manual/cache/compiler/audio baselines and uses verified ARM64/Xcode27.2 owner runner in private stride-praline-2f-ai/husk. Build151 source in progress; actual Apple checks/app/IPA pending. No more gameplay logging campaign. Automatic is a conservative starting policy, not a measured optimum; physical/energy gates remain unearned.
+
+
 **2026-11-09 active delivery:** user requests latest-source optimized IPA, ends logging campaign. [HUSK34-DELIVERY-v1](docs/performance/40-husk34-delivery.md) merges official afe83d4/3.4 with latest retained fork27f8f38, protects startup audio/JIT/driver/cache/settings and imports matching3.4 resources. New destination polyproaa/Husk. Apple399/399checks/47suites/zero skips, actual font test, SDK31structures96offsets, fresh pinned driver11exports, app/IPA/upload and independent downloaded package verification passed. [Build150 download and minimal installation](docs/performance/builds/38ff575bfbd2e2feefb7bce01994db47df2ff7c7.md). No new gameplay logs requested. Earlier42 remains withdrawn, physical startup fix and net energy unknown. The following older snapshot is historical context; current delivery is40-husk34-delivery.
 
 

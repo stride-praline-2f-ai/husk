@@ -31,7 +31,7 @@ class SettingsGroupingTests(unittest.TestCase):
         self.assertIn("settings.customResolutionPercent = Int($0.rounded())", GAME)
 
     def test_simple_page_and_advanced_page_are_separate(self):
-        self.assertIn("TLGameAdvancedSettingsView(settings: $settings, appID: app.id)", GAME)
+        self.assertIn("TLGameAdvancedSettingsView(settings: $settings, appID: app.id, automaticDuoActive: settings.duoAutomaticActive(for: app))", GAME)
         simple, advanced = GAME.split("private struct TLGameAdvancedSettingsView: View", 1)
         self.assertIn('Text("Game Graphics")', simple)
         self.assertIn('Text("Upscaling & Rendering")', advanced)
