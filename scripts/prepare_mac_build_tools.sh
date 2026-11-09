@@ -10,8 +10,18 @@ export CARGO_BUILD_JOBS="$TASK_JOBS"
 printf 'HUSK_XCODE_JOBS=%s\nCARGO_BUILD_JOBS=%s\n' "$TASK_JOBS" "$TASK_JOBS" >> "$GITHUB_ENV"
 echo "Mac build concurrency: $TASK_JOBS jobs"
 mkdir -p "$TASK_CACHE/rppairing-target"
-if [ ! -e src/rppairing-ios/target ]; then ln -s "$TASK_CACHE/rppairing-target" src/rppairing-ios/target; fi
+if [ ! -e src/rppairing-ios/target ] && [ ! -L src/rppairing-ios/target ]; then ln -s "$TASK_CACHE/rppairing-target" src/rppairing-ios/target; fi
 echo "HUSK_TOOL_CACHE=$TASK_CACHE" >> "$GITHUB_ENV"
+# Separate child shells keep errexit effective while reporting every independent setup failure.
+case "${1:-all}" in
+  all)
+    result=0
+    for phase in rust xcodegen sdk; do
+      if bash "$0" "$phase"; then echo "PASS tool setup: $phase"; else echo "FAIL tool setup: $phase"; result=1; fi
+    done
+    exit "$result"
+    ;;
+  rust)
 export CARGO_HOME="$TASK_CACHE/cargo" RUSTUP_HOME="$TASK_CACHE/rustup"
 if [ ! -x "$CARGO_HOME/bin/rustup" ]; then
     curl --proto '=https' --tlsv1.2 --fail --location --retry 3 https://sh.rustup.rs --output "$TASK_CACHE/rustup-init.sh"
@@ -22,6 +32,8 @@ rustup toolchain install stable --profile minimal
 rustup target add aarch64-apple-ios --toolchain stable
 printf 'CARGO_HOME=%s\nRUSTUP_HOME=%s\nRUSTUP_TOOLCHAIN=stable\n' "$CARGO_HOME" "$RUSTUP_HOME" >> "$GITHUB_ENV"
 echo "$CARGO_HOME/bin" >> "$GITHUB_PATH"
+    ;;
+  xcodegen)
 XCODEGEN_PIN=21ac9944b0ab546a07422dbed86f33dd2ebd76f8
 XCODEGEN="$TASK_CACHE/xcodegen-$XCODEGEN_PIN"
 if [ ! -d "$XCODEGEN/.git" ]; then
@@ -35,6 +47,8 @@ if [ ! -x "$XCODEGEN/.build/release/xcodegen" ]; then
     xcrun swift build --package-path "$XCODEGEN" --configuration release --product xcodegen --jobs "$TASK_JOBS"
 fi
 echo "$XCODEGEN/.build/release" >> "$GITHUB_PATH"
+    ;;
+  sdk)
 # Only Vulkan headers are needed to re-check the host observer ABI; the verified driver itself is unchanged.
 VK_PIN=e3b1eec08173d6b825cd3ac88c885a63b621504a
 VK_HEADERS="$TASK_CACHE/vulkan-headers-$VK_PIN"
@@ -52,3 +66,6 @@ if [ -L "$HEADER_STAGE" ]; then rm "$HEADER_STAGE"; fi
 mkdir -p "$HEADER_STAGE/include"
 cp -R "$VK_HEADERS/include/." "$HEADER_STAGE/include/"
 python3 scripts/verify_vulkan_observer_abi.py third_party/build/mvk-abi --ios
+    ;;
+  *) echo "Unknown setup phase" >&2; exit 2 ;;
+esac
