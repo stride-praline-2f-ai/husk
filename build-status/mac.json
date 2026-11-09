@@ -1,0 +1,7 @@
+{
+  "run_id": 42639412029,
+  "runner": "aaqibs-Virtual-Machine",
+  "architecture": "ARM64",
+  "toolchain_outcome": "success",
+  "log": "Runner: aaqibs-Virtual-Machine (ARM64)\n/Applications/Xcode.app/Contents/Developer\nXcode 27.2\nBuild version 27B52\n/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS27.2.sdk\nswift-driver version: 1.168.6 Apple Swift version 6.4.2 (swiftlang-6.4.2.1.9 clang-2100.4.1.1)\nTarget: arm64-apple-macosx27.2.0\ngit version 2.54.0 (Apple Git-157)\n/usr/bin/curl\n/usr/bin/unzip\n/usr/bin/make\nFilesystem      Size    Used   Avail Capacity iused ifree %iused  Mounted on\n/dev/disk3s5    59Gi    23Gi    12Gi    65%    244k  131M    0%   /System/Volumes/Data\n"
+}
