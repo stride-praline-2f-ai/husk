@@ -1,5 +1,7 @@
 # Husk master development plan
 
+**2026-11-09 consolidated owner-Mac repair:** DUO-AUTO-v1/M0/M6 delivery now collects every independent setup and all49 regression-suite failures before one strict app-build gate. Prior run42646592841 passed410checks/font/SDK31structures96offsets; Metal component downloaded but unavailable. Exact unchanged official3.4 shader-library reuse avoids that offline compiler dependency, guarded by donor/source/library hashes; no runtime improvements removed. New readiness workflow submitted next; fresh app/IPA and physical/energy validation still pending. See41-duo-automatic-mac.
+
 **2026-11-09 owner-Mac Duo build:** User requests automatic inner-screen reduced output then80%MetalFX and the retained efficiency work. [DUO-AUTO-v1](docs/performance/41-duo-automatic-mac.md) adds display-matched reversible launch settings using physical pixels, preservesM4/manual/cache/compiler/audio baselines and uses verified ARM64/Xcode27.2 owner runner in private stride-praline-2f-ai/husk. Build151 source in progress; actual Apple checks/app/IPA pending. No more gameplay logging campaign. Automatic is a conservative starting policy, not a measured optimum; physical/energy gates remain unearned.
 
 
