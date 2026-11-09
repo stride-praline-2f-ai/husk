@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "scope": "DUO-AUTO-v1",
+  "attempts": [
+    {
+      "run_id": 42642360883,
+      "job_id": 129246489806,
+      "source": "20a20d08480be8dbd0783c17cb7c22a6e49bbe44",
+      "conclusion": "failure",
+      "stage": "Duo Swift test facade compilation",
+      "cause": "CoreGraphics not imported in generated Facades.swift and main.swift; CGRect initializer unavailable",
+      "runtime_changes": false
+    },
+    {
+      "run_id": 42643854551,
+      "job_id": 129251704322,
+      "source": "15ac4d18d040c1382872eaabaead060c0bdb252f",
+      "source_tree": "5f06658c3fd550e53230197028b74a163f70c24e",
+      "conclusion": "failure",
+      "cause": "Extracted Settings.swift also needed explicit Foundation and CoreGraphics imports after removing SwiftUI/UIKit imports"
+    },
+    {
+      "run_id": 42644649991,
+      "job_id": 129254516624,
+      "source": "96f526f12a2a4aad575a3bd57b69f0635457065f",
+      "source_tree": "754bca02390f42dc901ffce5d5c5c5ee8e7c3955",
+      "regressions": "success",
+      "conclusion": "failure",
+      "checks": 410,
+      "suites": 49,
+      "skipped": 0,
+      "cause": "Python 3.9 Path.glob did not traverse symlinked Vulkan-Headers directory; XcodeGen/Rust setup succeeded and remains cached"
+    },
+    {
+      "run_id": 42646592841,
+      "source": "06b36b53003c1e5bac4960f7182be2f8a84f0c50",
+      "source_tree": "0bd99c9386835a74a6b04cbfc17cf87bc316a041",
+      "conclusion": "failure",
+      "job_id": 129261373013,
+      "checks": 410,
+      "suites": 49,
+      "skipped": 0,
+      "sdk": "31 structures / 96 field offsets passed",
+      "cause": "MetalToolchain27B47 downloaded, but xcrun still could not locate compiler"
+    },
+    {
+      "run_id": 42647780958,
+      "job_id": 129265618652,
+      "source": "7c2e90c5a5ecf018b82d4549f2b47fa8528f8858",
+      "source_tree": "f187be16781e835649418d3fdfd0d2f0c07215fd",
+      "scope": "all prerequisites collected; guarded exact unchanged donor shaders",
+      "conclusion": "success",
+      "checks": 410,
+      "suites": 49,
+      "skipped": 0,
+      "setup_groups_passed": 8,
+      "setup_groups_total": 8,
+      "app": "BUILD SUCCEEDED",
+      "artifact_id": 13690016165
+    }
+  ]
+}
