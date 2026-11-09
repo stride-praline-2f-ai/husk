@@ -1,9 +1,9 @@
 {
-  "run_id": 42647780958,
+  "run_id": 42694261267,
   "attempt": 1,
-  "runner": "aaqibs-Virtual-Machine",
+  "runner": "GitHub Actions 1000000002",
   "architecture": "ARM64",
-  "status": "success",
-  "source": "7c2e90c5a5ecf018b82d4549f2b47fa8528f8858",
-  "artifact_id": "13690016165"
+  "status": "running",
+  "source": "adff0fc402c1c0f7989455fb234addcbe3af8d28",
+  "artifact_id": ""
 }
