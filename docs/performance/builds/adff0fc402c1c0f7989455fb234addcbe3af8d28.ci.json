@@ -3,9 +3,9 @@
   "tree": "4f56ae7179e37e72b24c6c46f187e237c6c0f845",
   "version": "3.4",
   "build": 152,
-  "run_id": 42690026822,
-  "job_id": 129407012372,
-  "workflow_revision": "149479d615355e7137ea08f1b49df27105651211",
+  "run_id": 42694261267,
+  "job_id": 129421784044,
+  "workflow_revision": "5e11aac3ed0d4672a7f190e6653abc91b17c0a1f",
   "status": "queued",
   "artifact_id": null,
   "apple_checks": "pending; expected414tests/49suites plusfont/SDK31/96/driver11exports/all8setupgroups",
@@ -34,5 +34,15 @@
   "energy_gates": {
     "passed": 0,
     "total": 1
+  },
+  "runner_label": "xcode-27",
+  "runner_scope": "one-time GitHub-hosted ARM64; explicitly requested by user",
+  "future_default": "self-hosted macOS ARM64",
+  "default_restoration_commit": "e49f9dce4b22212cec7fdd936eada595b8fb3427",
+  "previous_attempt": {
+    "run_id": 42690026822,
+    "job_id": 129407012372,
+    "status": "cancelled",
+    "reason": "superseded by explicitly requested one-time cloud run"
   }
 }
