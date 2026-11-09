@@ -20,6 +20,7 @@
 #include <TargetConditionals.h>
 #if TARGET_OS_IPHONE
 #include <os/proc.h>
+#include <pthread/qos.h>
 #endif
 
 #include "husk-tl-bionic.h"
@@ -104,18 +105,50 @@ static void guest_exit(int status)
 
 /* Says every few seconds that the engine is alive, and how much memory the phone says is left: a silent death
  * leaves nothing else to tell a frozen game from a killed one, or a jetsam kill from a crash. */
+/* Full Mach-VM traversal is diagnostic work, not a frame/available-memory check.
+ * Keep snapshots fresh sooner under low headroom, never scan while UE4 is paused. */
+static bool heartbeat_map_due(int64_t now, int64_t sampled_at, bool have_sample, bool paused, size_t available)
+{
+    if (paused) return false;
+    if (!have_sample) return true;
+    if (now <= 0 || now < sampled_at) return false;
+    int64_t interval = available < ((size_t)512 << 20) ? 5000000000LL : 30000000000LL;
+    return now - sampled_at >= interval;
+}
 static void *heartbeat_thread(void *arg)
 {
     (void)arg;
     pthread_setname_np("husk-unity-hb");
     unsigned long last = 0;
+#if TARGET_OS_IPHONE
+    pthread_set_qos_class_self_np(QOS_CLASS_UTILITY, 0);
+    size_t guest_va = 0, va = 0;
+    int64_t map_sampled_at = 0;
+    bool have_map_sample = false;
+#endif
     for (int tick = 0;; tick++) {
         if (tick < 40) usleep(500000); else sleep(3);          /* twice a second for the first twenty seconds */
         unsigned long f = engine_frames();
 #if TARGET_OS_IPHONE
-        size_t guest_va = 0, va = tl_mm_address_space_used(&guest_va);
-        tl_log_line("unity: alive: %lu frames (+%lu), %zu MiB left before jetsam, %.1f GiB of address space mapped (%.1f GiB by the game)",
-                    f, f - last, os_proc_available_memory() >> 20, va / 1073741824.0, guest_va / 1073741824.0);
+        size_t available = os_proc_available_memory();
+        struct timespec sample_clock;
+        int64_t sample_now = clock_gettime(CLOCK_MONOTONIC, &sample_clock) == 0
+            ? (int64_t)sample_clock.tv_sec * 1000000000LL + sample_clock.tv_nsec : 0;
+        tl_lifecycle_stats lifecycle = {0};
+        if (A.engine == ENGINE_UE4) tl_lifecycle_snapshot(&lifecycle);
+        bool paused = lifecycle.ready && (lifecycle.requested_paused || lifecycle.applied_paused);
+        if (heartbeat_map_due(sample_now, map_sampled_at, have_map_sample, paused, available)) {
+            va = tl_mm_address_space_used(&guest_va);
+            map_sampled_at = sample_now; have_map_sample = true;
+        }
+        if (have_map_sample) {
+            double age = sample_now > 0 && map_sampled_at > 0 && sample_now >= map_sampled_at
+                ? (sample_now - map_sampled_at) / 1e9 : -1;
+            tl_log_line("unity: alive: %lu frames (+%lu), %zu MiB left before jetsam, %.1f GiB of address space mapped (%.1f GiB by the game); VA sample age %.1f s (-1 unavailable)",
+                        f, f - last, available >> 20, va / 1073741824.0, guest_va / 1073741824.0, age);
+        } else {
+            tl_log_line("unity: alive: %lu frames (+%lu), %zu MiB left before jetsam; address-space sample unavailable while paused", f, f - last, available >> 20);
+        }
 #else
         tl_log_line("unity: alive: %lu frames (+%lu)", f, f - last);
 #endif
