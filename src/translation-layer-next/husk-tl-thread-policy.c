@@ -96,6 +96,13 @@ void husk_ue4_set_worker_capacity(int cpu_count)
     atomic_store(&capacity_cpus, cpu_count > 0 ? cpu_count : 0);
     atomic_store(&fast_workers, cpu_count >= 10 ? 2 : 1);
 }
+bool husk_ue4_set_fast_worker_budget(int count)
+{
+    int capacity = atomic_load(&capacity_cpus);
+    if (count < 1 || count > 4 || capacity < 1 || count > capacity) return false;
+    atomic_store(&fast_workers, count);
+    return true;
+}
 int tl_thread_policy_fast_worker_budget(void) { return atomic_load(&fast_workers); }
 bool tl_thread_policy_trial_active(void) { return atomic_load(&trial_active); }
 static void set_trial(bool enabled, const char *reason)
