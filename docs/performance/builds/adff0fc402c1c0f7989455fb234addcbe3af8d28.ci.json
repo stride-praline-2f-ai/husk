@@ -1,0 +1,38 @@
+{
+  "source": "adff0fc402c1c0f7989455fb234addcbe3af8d28",
+  "tree": "4f56ae7179e37e72b24c6c46f187e237c6c0f845",
+  "version": "3.4",
+  "build": 152,
+  "run_id": 42690026822,
+  "job_id": 129407012372,
+  "workflow_revision": "149479d615355e7137ea08f1b49df27105651211",
+  "status": "queued",
+  "artifact_id": null,
+  "apple_checks": "pending; expected414tests/49suites plusfont/SDK31/96/driver11exports/all8setupgroups",
+  "local_checks": {
+    "suites": 49,
+    "reported": 406,
+    "apple_deferred": 28,
+    "failures": 0,
+    "worker_tests_passed": 38
+  },
+  "energy": "unmeasured",
+  "checklist": "A20-QOS-v1",
+  "implementation_build_gates": {
+    "passed": 1,
+    "total": 4,
+    "pending": [
+      "full Apple execution/SDK",
+      "fresh app/sign/package/upload",
+      "independent IPA verification"
+    ]
+  },
+  "device_gates": {
+    "passed": 0,
+    "total": 2
+  },
+  "energy_gates": {
+    "passed": 0,
+    "total": 1
+  }
+}
