@@ -65,6 +65,7 @@ jobs:
           set -euo pipefail
           mkdir -p build/logs
           {
+            python3 tests/translation-layer/test_duo_automatic.py -v
             python3 tests/translation-layer/test_ue4_graphics.py -v
             python3 tests/translation-layer/test_ue4_resolution_hook.py -v
             python3 tests/translation-layer/test_source_efficiency.py -v
@@ -112,7 +113,6 @@ jobs:
             python3 tests/translation-layer/test_husk31_integration.py -v
             python3 tests/translation-layer/test_crash_diagnostics.py -v
             python3 tests/translation-layer/test_settings_grouping.py -v
-            python3 tests/translation-layer/test_duo_automatic.py -v
             python3 tests/translation-layer/test_reused_driver.py -v
             sh tests/translation-layer/run_font_paths.sh
           } 2>&1 | tee build/logs/regressions.log
