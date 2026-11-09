@@ -9,6 +9,9 @@ void husk_ue4_set_thread_policy(int mode);
 void tl_thread_policy_activate(const char *project);
 void tl_thread_policy_named(const char *name);
 void husk_ue4_set_worker_capacity(int cpu_count);
+/* Before workers start: validated normal-priority allowance, not CPU affinity.
+ * The existing capacity setter resets this override on every launch. */
+bool husk_ue4_set_fast_worker_budget(int count);
 /* Conservative host-cost/cadence heuristics, not job-deadline or GPU attribution.
  * Permit <=2 ms individual pipeline calls and <=0.5% aggregate host pipeline
  * time in a healthy window; these are trial guards, not measured optima. */
