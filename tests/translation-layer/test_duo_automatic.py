@@ -11,6 +11,7 @@ class DuoAutomaticTests(unittest.TestCase):
   settings=(ROOT/'src/app/Husk/TLAppSettings.swift').read_text().split('// MARK: - The settings page')[0].replace('import SwiftUI','').replace('import UIKit','')
   (p/'Settings.swift').write_text(settings)
   (p/'Facades.swift').write_text('''import Foundation
+import CoreGraphics
 struct FakeReport { var nativeEngine: FakeEngine }
 enum FakeEngine { case ue4, unity }
 struct TLApp { var label: String; var packageName: String?; var report: FakeReport? }
@@ -22,6 +23,7 @@ extension DuoDisplayPolicy { @MainActor static func metrics(screen:UIScreen)->Me
 @_silgen_name("tl_ue4_resolution_fraction") func tl_ue4_resolution_fraction(_ w:Int32,_ h:Int32,_ tablet:Bool,_ percent:Int32)->Double
 ''')
   (p/'main.swift').write_text(r'''import Foundation
+import CoreGraphics
 let mode=CommandLine.arguments[1]
 let portrait=DuoDisplayPolicy.Metrics(pointWidth:669,pointHeight:951,nativeWidth:1878,nativeHeight:2670,phoneHardware:true)
 let landscape=DuoDisplayPolicy.Metrics(pointWidth:951,pointHeight:669,nativeWidth:2670,nativeHeight:1878,phoneHardware:true)
