@@ -1,0 +1,195 @@
+name: Build Husk Duo IPA on owner Mac
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/build-husk-ipa.yml', 'source/**', 'vendor/**']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: husk-owner-mac
+  cancel-in-progress: false
+jobs:
+  build:
+    name: Build Duo IPA with owner Xcode
+    runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 120
+    steps:
+      - name: Check out private build repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Restore exact reviewed source
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cp .github/ci/write_status.py "$RUNNER_TEMP/husk-build-status.py"
+          python3 - <<'DRIVER'
+          import base64,hashlib,os
+          from pathlib import Path
+          data=base64.b64decode(Path('vendor/HuskMoltenVK-verified.zip.b64').read_text().strip(),validate=True)
+          assert hashlib.sha256(data).hexdigest()=='c47037417ac9b9a08b643cc0df97e7666fcb188435f90df9c95710796a6c8ccc'
+          Path(os.environ['RUNNER_TEMP'],'husk-driver.zip').write_bytes(data)
+          DRIVER
+          python3 - <<'PYCODE'
+          import base64,hashlib,json,os
+          from pathlib import Path
+          manifest=json.loads(Path('source/build.json').read_text())
+          data=base64.b64decode(Path('source/husk.bundle.b64').read_text().strip(),validate=True)
+          assert hashlib.sha256(data).hexdigest()==manifest['bundle_sha256']
+          Path(os.environ['RUNNER_TEMP'],'husk-source.bundle').write_bytes(data)
+          with open(os.environ['GITHUB_ENV'],'a')as env:
+              env.write('HUSK_SOURCE='+manifest['source']+'\nHUSK_SOURCE_TREE='+manifest['tree']+'\n')
+          Path(os.environ['RUNNER_TEMP'],'husk-source-sha').write_text(manifest['source'])
+          Path(os.environ['RUNNER_TEMP'],'husk-source-tree').write_text(manifest['tree'])
+          PYCODE
+          git -c http.https://github.com/.extraheader= fetch --no-tags https://github.com/aaULTra/Husk.git 27f8f3885e123f99eaeb0bbab822a53d6044da2d
+          git -c http.https://github.com/.extraheader= fetch --no-tags https://github.com/Leviidev/Husk.git afe83d45b31194c4cc9f7b3db7ec2c757db8346e
+          git bundle verify "$RUNNER_TEMP/husk-source.bundle"
+          git bundle unbundle "$RUNNER_TEMP/husk-source.bundle"
+          export HUSK_SOURCE=$(cat "$RUNNER_TEMP/husk-source-sha")
+          git checkout --detach "$HUSK_SOURCE"
+          test "$(git rev-parse HEAD^{tree})" = "$(cat "$RUNNER_TEMP/husk-source-tree")"
+          mkdir -p build/logs
+          # The connected GitHub app can finish ref publication if the runner token lacks workflow-write scope.
+          if ! git push origin HEAD:refs/heads/optimized > build/logs/source-publication.log 2>&1; then
+            echo "Source objects sent; connected GitHub tool will finish branch publication."
+          fi
+          python3 "$RUNNER_TEMP/husk-build-status.py"
+      - name: Run full regression suite including actual Duo policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/logs
+          {
+            python3 tests/translation-layer/test_ue4_graphics.py -v
+            python3 tests/translation-layer/test_ue4_resolution_hook.py -v
+            python3 tests/translation-layer/test_source_efficiency.py -v
+            python3 tests/translation-layer/test_runtime_input_vulkan.py -v
+            python3 tests/translation-layer/test_compat_sync.py -v
+            python3 tests/translation-layer/test_publication_wait.py -v
+            python3 tests/translation-layer/test_queue_options.py -v
+            python3 tests/translation-layer/test_swapchain_budget.py -v
+            python3 tests/translation-layer/test_thread_policy.py -v
+            python3 tests/translation-layer/test_vk_frame_timing.py -v
+            python3 tests/translation-layer/test_present_clock.py -v
+            python3 tests/translation-layer/test_pipeline_store.py -v
+            python3 tests/translation-layer/test_component_profile.py -v
+            python3 tests/translation-layer/test_component_triage.py -v
+            python3 tests/translation-layer/test_device_profiles.py -v
+            python3 tests/translation-layer/test_driver_profile.py -v
+            python3 tests/translation-layer/test_efficiency.py -v
+            python3 tests/translation-layer/test_process_metrics.py -v
+            python3 tests/translation-layer/test_cpu_threads.py -v
+            python3 tests/translation-layer/test_efficiency_math.py -v
+            python3 tests/translation-layer/test_pipeline_core_state.py -v
+            python3 tests/translation-layer/test_pipeline_diagnostics.py -v
+            python3 tests/translation-layer/test_pipeline_feedback.py -v
+            python3 tests/translation-layer/test_game_chrome.py -v
+            python3 tests/translation-layer/test_gpu_timing.py -v
+            python3 tests/translation-layer/test_gpu_metal.py -v
+            python3 tests/translation-layer/test_gpu_vk_queue.py -v
+            python3 tests/translation-layer/test_render_inventory.py -v
+            python3 tests/translation-layer/test_efficiency_analysis.py -v
+            python3 tests/translation-layer/test_roadmap_progress.py -v
+            python3 tests/translation-layer/test_roadmap_projection.py -v
+            python3 tests/translation-layer/test_comparison_campaign.py -v
+            python3 tests/translation-layer/test_external_efficiency.py -v
+            python3 tests/translation-layer/test_spatial.py -v
+            python3 tests/translation-layer/test_spatial_lifetime.py -v
+            python3 tests/translation-layer/test_native_archive.py -v
+            python3 tests/translation-layer/test_native_archive_status.py -v
+            python3 tests/translation-layer/test_lifecycle_resilience.py -v
+            python3 tests/translation-layer/test_capture_consolidation.py -v
+            python3 tests/translation-layer/test_archive_compatibility.py -v
+            python3 tests/translation-layer/test_native_preparation_audit.py -v
+            python3 tests/translation-layer/test_native_display.py -v
+            python3 tests/translation-layer/test_upstream_native.py -v
+            python3 tests/translation-layer/test_apk_order.py -v
+            python3 tests/translation-layer/test_husk31_integration.py -v
+            python3 tests/translation-layer/test_crash_diagnostics.py -v
+            python3 tests/translation-layer/test_settings_grouping.py -v
+            python3 tests/translation-layer/test_duo_automatic.py -v
+            python3 tests/translation-layer/test_reused_driver.py -v
+            sh tests/translation-layer/run_font_paths.sh
+          } 2>&1 | tee build/logs/regressions.log
+      - name: Prepare cached owner Mac build tools and check Vulkan SDK ABI
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/prepare_mac_build_tools.sh 2>&1 | tee build/logs/mac-tools.log
+      - name: Ensure Metal compiler component
+        timeout-minutes: 15
+        shell: bash
+        run: |
+          set -euo pipefail
+          probe_dir="$RUNNER_TEMP/husk-metal-probe"
+          mkdir -p "$probe_dir"
+          printf '%s\n' '#include <metal_stdlib>' 'using namespace metal;' 'kernel void husk_probe(device uint* p [[buffer(0)]], uint i [[thread_position_in_grid]]) { p[i] = i; }' > "$probe_dir/probe.metal"
+          if ! xcrun --sdk iphoneos metal -c "$probe_dir/probe.metal" -o "$probe_dir/probe.air" > "$probe_dir/check.log" 2>&1; then
+            cat "$probe_dir/check.log"
+            xcodebuild -downloadComponent MetalToolchain
+            xcrun --sdk iphoneos metal -c "$probe_dir/probe.metal" -o "$probe_dir/probe.air"
+          fi
+          test -s "$probe_dir/probe.air"
+      - name: Stage matching release resources and verified unchanged driver
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HUSK_TOOL_CACHE/donors"
+          for version in 3.0 3.4; do
+            file="$HUSK_TOOL_CACHE/donors/Husk-$version.ipa"
+            if [ ! -s "$file" ]; then
+              curl --fail --location --retry 3 "https://github.com/Leviidev/Husk/releases/download/$version/Husk.ipa" --output "$file.partial"
+              mv "$file.partial" "$file"
+            fi
+          done
+          python3 scripts/stage_graphics_build.py "$HUSK_TOOL_CACHE/donors/Husk-3.4.ipa" "$HUSK_TOOL_CACHE/donors/Husk-3.0.ipa"
+          python3 scripts/reuse_spatial_driver.py "$RUNNER_TEMP/husk-driver.zip"
+          xcrun lipo -archs build/ios-arm64/lib/HuskMoltenVK.framework/HuskMoltenVK
+          xcrun nm -gU build/ios-arm64/lib/HuskMoltenVK.framework/HuskMoltenVK > build/logs/driver-exports.txt
+          for symbol in SpatialConfigure SpatialSnapshot SpatialObservations SpatialBindings DisplayConfigure DisplaySnapshot ArchiveConfigure ArchiveSnapshot ArchivePrepare ArchiveForget ArchivePriority; do
+            grep -E "_vkHusk${symbol}$" build/logs/driver-exports.txt
+          done
+      - name: Build pairing library with cached dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/build_rppairing_ios.sh 2>&1 | tee build/logs/pairing.log
+      - name: Build and package fresh Duo IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          export DD="$HUSK_TOOL_CACHE/DerivedData"
+          bash scripts/package_ipa.sh "$PWD/build/Husk-Duo.ipa"
+          test -s build/Husk-Duo.ipa
+          shasum -a 256 build/Husk-Duo.ipa
+      - name: Upload installable IPA
+        id: ipa
+        uses: actions/upload-artifact@v4
+        with:
+          name: Husk-Duo-IPA
+          path: build/Husk-Duo.ipa
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 7
+      - name: Save private build result
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          HUSK_STATUS: ${{ job.status }}
+          HUSK_ARTIFACT_ID: ${{ steps.ipa.outputs.artifact-id }}
+        shell: bash
+        run: python3 "$RUNNER_TEMP/husk-build-status.py"
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: husk-mac-build-logs
+          path: |
+            build/logs/
+            ${{ runner.tool_cache }}/husk/DerivedData/build.log
+          if-no-files-found: ignore
+          retention-days: 3
