@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+import Darwin
 import SwiftUI
+import UniformTypeIdentifiers
+import os
 
 /// Settings, as the iOS Settings app lays them out: a card for the app up top, then groups of rows that each
 /// push a page of their own. What belongs to the app, what belongs to the emulator, and what the thing is.
@@ -20,12 +23,9 @@ struct SettingsTab: View {
                     }
                 }
 
-                Section {
+                Section("JIT") {
                     row(JITSettings(), "bolt.fill", .yellow, "JIT & Sideload", "StikJIT is built in — the recommended way")
-                } header: {
-                    Text("JIT")
-                } footer: {
-                    Text("Android and Translation Layer games need JIT. StikJIT, built into Husk, turns it on without a computer.")
+                    row(JITLessSettings(), "bolt.slash.fill", .mint, "Play without JIT", "No debugger")
                 }
 
                 Section("General") {
@@ -103,9 +103,6 @@ struct SettingsTab: View {
                     row(SavedMachineSettings(), "externaldrive.fill", .teal, "Saved Machine", "Snapshots and automatic saving")
                 } header: {
                     Text("Android Emulator")
-                } footer: {
-                    Text("Full Android runs in an emulator, for the apps the Translation Layer can't run yet. It is experimental: slow, "
-                       + "and it can freeze or crash.")
                 }
             }
             .listStyle(.insetGrouped)
@@ -295,6 +292,19 @@ struct FontSettings: View {
 
 // MARK: - Performance
 
+/// Whether this install was really signed with an entitlement: signing can drop them, and iOS gives no other sign that it did.
+/// nil when the system does not answer.
+private func huskHasEntitlement(_ name: String) -> Bool? {
+    typealias Create = @convention(c) (UnsafeRawPointer?) -> UnsafeMutableRawPointer?
+    typealias Copy = @convention(c) (UnsafeMutableRawPointer, CFString, UnsafeMutableRawPointer?) -> Unmanaged<CFTypeRef>?
+    let all = UnsafeMutableRawPointer(bitPattern: -2)      // RTLD_DEFAULT
+    guard let c = dlsym(all, "SecTaskCreateFromSelf"), let v = dlsym(all, "SecTaskCopyValueForEntitlement"),
+          let task = unsafeBitCast(c, to: Create.self)(nil) else { return nil }
+    defer { Unmanaged<AnyObject>.fromOpaque(task).release() }
+    guard let value = unsafeBitCast(v, to: Copy.self)(task, name as CFString, nil)?.takeRetainedValue() else { return false }
+    return (value as? Bool) ?? false
+}
+
 struct PerformanceSettings: View {
     @ObservedObject private var runner = QemuRunner.shared
     @State private var gpuMode =
@@ -303,8 +313,22 @@ struct PerformanceSettings: View {
     @State private var soundDevice =
         UserDefaults.standard.object(forKey: "husk.soundDevice") as? Bool ?? true
 
+    private func entitlementRow(_ title: String, _ name: String) -> some View {
+        let on = huskHasEntitlement(name)
+        return LabeledContent(title, value: on == nil ? "Unknown" : on! ? "On" : "Off")
+    }
+
     var body: some View {
         HuskForm {
+            Section {
+                entitlementRow("Increased memory limit", "com.apple.developer.kernel.increased-memory-limit")
+                entitlementRow("Extended address space", "com.apple.developer.kernel.extended-virtual-addressing")
+                LabeledContent("Memory available now", value: ByteCountFormatter.string(fromByteCount: Int64(os_proc_available_memory()), countStyle: .memory))
+            } header: {
+                Text("Memory")
+            } footer: {
+                Text("What this install was signed with. If one is Off, big games can close early: sign Husk with a method that keeps these entitlements.")
+            }
             Section {
                 Picker("Renderer", selection: $gpuMode) {
                     Text("GPU").tag(true)
@@ -551,6 +575,93 @@ struct NetworkSettings: View {
         }
         .huskForm()
         .navigationTitle("Network")
+    }
+}
+
+// MARK: - Play without JIT
+
+struct JITLessSettings: View {
+    @AppStorage(JITLess.key) private var jitless = false
+    @ObservedObject private var certificate = SigningCertificate.shared
+    @State private var pickedP12: Data?
+    @State private var p12Password = ""
+    @State private var cacheBytes = JITLess.cacheBytes
+
+    var body: some View {
+        HuskForm {
+            Section {
+                Toggle("Play without JIT", isOn: $jitless)
+                if cacheBytes > 0 {
+                    DetailRow(label: "Converted games", value: ByteCountFormatter.string(fromByteCount: cacheBytes, countStyle: .file), mono: false)
+                    Button(role: .destructive) {
+                        JITLess.clearCache(); cacheBytes = JITLess.cacheBytes
+                    } label: { Label("Remove Converted Games", systemImage: "trash") }
+                }
+            }
+            .onAppear { cacheBytes = JITLess.cacheBytes }
+
+            Section {
+                if let info = certificate.info {
+                    DetailRow(label: "Team", value: info.teamID)
+                    DetailRow(label: "Expires", value: info.expires.formatted(date: .abbreviated, time: .shortened), mono: false)
+                    if info.expires < Date() {
+                        Text("This certificate has expired. Refresh Husk in your store, then import its certificate again.")
+                            .font(.caption).foregroundStyle(.orange)
+                    }
+                } else {
+                    DetailRow(label: "Certificate", value: "not imported", mono: false)
+                }
+                ForEach(SigningCertificate.Store.allCases) { store in
+                    Button {
+                        certificate.requestFromStore(store)
+                    } label: { Label("Import from \(store.title)", systemImage: "arrow.down.circle") }
+                }
+                Button {
+                    HuskFilePicker.present(types: [.pkcs12, .data], multiple: false, asCopy: true, onPick: { urls in
+                        guard let url = urls.first else { return }
+                        let scoped = url.startAccessingSecurityScopedResource()
+                        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                        guard let data = try? Data(contentsOf: url) else { certificate.lastError = "That file could not be read."; return }
+                        p12Password = ""
+                        pickedP12 = data
+                    }, onFail: { certificate.lastError = $0 })
+                } label: { Label("Import .p12 File", systemImage: "doc.badge.plus") }
+                if certificate.info != nil {
+                    Button(role: .destructive) { certificate.remove() } label: { Label("Remove Certificate", systemImage: "trash") }
+                }
+                if let why = certificate.lastError {
+                    Text(why).font(.caption).foregroundStyle(.orange)
+                }
+            } header: {
+                Text("Certificate")
+            }
+        }
+        .huskForm()
+        .navigationTitle("Play without JIT")
+        .sheet(isPresented: Binding(get: { pickedP12 != nil }, set: { if !$0 { pickedP12 = nil } })) {
+            NavigationView {
+                Form {
+                    Section {
+                        SecureField("Password", text: $p12Password)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                    } footer: {
+                        Text("Enter the password for the private key. Leave it blank if no password is required.")
+                    }
+                }
+                .navigationTitle("Certificate Password")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { pickedP12 = nil } }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Import") {
+                            if let data = pickedP12 { certificate.importP12(data, password: p12Password) }
+                            pickedP12 = nil
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

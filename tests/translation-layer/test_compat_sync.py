@@ -41,27 +41,41 @@ static int relative_wait(pthread_cond_t*cv,pthread_mutex_t*mu,const struct times
 '''+futex+once+r'''
 int deadline_case(int absolute){
  fake_time=true;waits=0;fake_ns=10000000000LL;uint32_t word=7;
- struct timespec t={absolute?10:0,50000000};long r=futex_call(&word,absolute?9:0,7,&t,UINT32_MAX);fake_time=false;
+ struct timespec t={absolute?10:0,50000000};long r=futex_call(&word,absolute?9:0,7,&t,NULL,UINT32_MAX);fake_time=false;
  return r==-110&&waits==2&&remaining[0]==50000000&&remaining[1]==40000000?0:1;
 }
 int invalid_case(void){
  uint32_t word=7;struct timespec bad={0,1000000000},past={0,1};
- if(futex_call(NULL,0,7,NULL,0)!=-14||futex_call((void*)((char*)&word+1),0,7,NULL,0)!=-22)return 1;
- if(futex_call(&word,9,7,NULL,0)!=-22||futex_call(&word,10,1,NULL,0)!=-22)return 2;
- if(futex_call(&word,1,UINT32_MAX,NULL,0)!=-22||futex_call(&word,0,7,&bad,0)!=-22)return 3;
- if(futex_call(&word,0,8,&past,0)!=-11||futex_call(&word,9,7,&past,UINT32_MAX)!=-110)return 4;
+ if(futex_call(NULL,0,7,NULL,NULL,0)!=-14||futex_call((void*)((char*)&word+1),0,7,NULL,NULL,0)!=-22)return 1;
+ if(futex_call(&word,9,7,NULL,NULL,0)!=-22||futex_call(&word,10,1,NULL,NULL,0)!=-22)return 2;
+ if(futex_call(&word,1,UINT32_MAX,NULL,NULL,0)!=-22||futex_call(&word,0,7,&bad,NULL,0)!=-22)return 3;
+ if(futex_call(&word,0,8,&past,NULL,0)!=-11||futex_call(&word,9,7,&past,NULL,UINT32_MAX)!=-110)return 4;
  return 0;
 }
 typedef struct{uint32_t*word;uint32_t mask;long result;} request;
-static void *waiter(void *raw){request*r=raw;struct timespec abs;clock_gettime(CLOCK_MONOTONIC,&abs);abs.tv_sec+=2;r->result=futex_call(r->word,9,7,&abs,r->mask);return NULL;}
+static void *waiter(void *raw){request*r=raw;struct timespec abs;clock_gettime(CLOCK_MONOTONIC,&abs);abs.tv_sec+=2;r->result=futex_call(r->word,9,7,&abs,NULL,r->mask);return NULL;}
 int real_waiters(void){
  uint32_t words[257]={0};words[0]=words[256]=7;request requests[]={{words,1,-999},{words,2,-999},{words+256,1,-999}};pthread_t threads[3];
  for(unsigned i=0;i<3;i++)if(pthread_create(&threads[i],NULL,waiter,&requests[i]))return 1;
  size_t h=((uintptr_t)words>>2)%FUT_BUCKETS;bool queued=false;
  for(unsigned n=0;n<10000;n++){pthread_mutex_lock(&g_fut[h].m);unsigned length=0;for(fut_waiter*w=g_fut[h].head;w;w=w->next)length++;pthread_mutex_unlock(&g_fut[h].m);if(length==3){queued=true;break;}usleep(100);}
- long a=futex_call(words,10,1,NULL,1),b=futex_call(words,10,1,NULL,2),c=futex_call(words+256,1,1,NULL,0);
+ long a=futex_call(words,10,1,NULL,NULL,1),b=futex_call(words,10,1,NULL,NULL,2),c=futex_call(words+256,1,1,NULL,NULL,0);
  for(unsigned i=0;i<3;i++)pthread_join(threads[i],NULL);
  return queued&&a==1&&b==1&&c==1&&!requests[0].result&&!requests[1].result&&!requests[2].result?0:2;
+}
+int upstream_ops_case(void){
+ uint32_t word=7,other=8;uint32_t encoded=(1u<<28)|(1u<<12)|8u;
+ if(futex_call(&word,5,1,NULL,&other,encoded)!=0||other!=9)return 1;
+ if(futex_call(&word,4,1,NULL,&other,6)!=-11)return 2;
+ if(futex_call(&word,3,1,NULL,&other,0)!=0)return 3;
+ return 0;
+}
+int upstream_validation_case(void){
+ uint32_t word=7,other=8;
+ if(futex_call(&word,5,1,NULL,NULL,0)!=-14)return 1;
+ if(futex_call(&word,3,1,NULL,(uint32_t*)((char*)&other+1),0)!=-22)return 2;
+ if(futex_call(&word,5,1,NULL,&other,(6u<<24))!=-38||other!=8)return 3;
+ return 0;
 }
 static _Atomic int once_word,init_count;static int initialized_value;
 static void initializer(void){atomic_fetch_add(&init_count,1);usleep(10000);initialized_value=12345;}
@@ -80,6 +94,8 @@ int once_case_mode(int parking){
  def test_spurious_wake_preserves_absolute_monotonic_deadline(self):self.assertEqual(self.lib.deadline_case(1),0)
  def test_validation_and_value_mismatch_before_expired_deadline(self):self.assertEqual(self.lib.invalid_case(),0)
  def test_actual_waiters_filter_bits_and_colliding_addresses(self):self.assertEqual(self.lib.real_waiters(),0)
+ def test_upstream_wake_op_and_requeue_coexist_with_masks(self):self.assertEqual(self.lib.upstream_ops_case(),0)
+ def test_upstream_ops_validate_before_mutating(self):self.assertEqual(self.lib.upstream_validation_case(),0)
  def test_once_initializes_once_and_publishes_to_all_waiters(self):self.assertEqual(self.lib.once_case_mode(0),0)
  def test_parked_once_publishes_to_all_waiters(self):self.assertEqual(self.lib.once_case_mode(1),0)
 if __name__=='__main__':unittest.main()

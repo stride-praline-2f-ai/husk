@@ -91,6 +91,8 @@ if [ -f "$JRT/husk-framework.dex" ]; then
     echo "==> java runtime: $(stat -f '%z bytes, %Sm' "$JRT/husk-framework.dex")"
 fi
 [ -d "$APP" ] || { echo "no app bundle at $APP" >&2; exit 1; }
+# Do not copy build/aot/*.dylib into the IPA. Those are converted Android game
+# libraries from local testing; shipping them is distributing the game.
 
 # Stamp the build's identity into the bundle so its logs can name themselves.
 # A log from a stale install is otherwise indistinguishable from a log proving a

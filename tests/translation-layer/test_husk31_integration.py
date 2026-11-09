@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Execute3.1 resource staging and actual Swift bundle import with protected defaults."""
+"""Execute3.4 resource staging and actual Swift bundle import with protected defaults."""
 import hashlib,importlib.util,io,json,os,shutil,struct,subprocess,tempfile,unittest,zipfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
@@ -11,15 +11,15 @@ class StagingTests(unittest.TestCase):
   project=self.p/'src/app/project.yml';project.parent.mkdir(parents=True);project.write_text('dependency: ../../build/ios-arm64/lib/MoltenVK.xcframework\n    preBuildScripts:\n      old\n    postBuildScripts:\n      retained\n')
   self.new=self.p/'new.ipa';self.old_ipa=self.p/'old.ipa'
   with zipfile.ZipFile(self.new,'w') as z:
-   for name in ['libqemu-aarch64-softmmu.dylib','libANGLE-shared.dylib','libhuskps4.dylib','MoltenVK.framework/MoltenVK']:z.writestr('Payload/Husk.app/Frameworks/'+name,b'new-'+name.encode())
-   z.writestr('Payload/Husk.app/java-runtime/husk-framework.dex',b'3.1-java');z.writestr('Payload/Husk.app/Husk',b'donor-executable')
+   for name in ['libFilePickerFix.dylib','libqemu-aarch64-softmmu.dylib','libANGLE-shared.dylib','libhuskps4.dylib','MoltenVK.framework/MoltenVK']:z.writestr('Payload/Husk.app/Frameworks/'+name,b'new-'+name.encode())
+   z.writestr('Payload/Husk.app/java-runtime/husk-framework.dex',b'3.4-java');z.writestr('Payload/Husk.app/Husk',b'donor-executable')
   with zipfile.ZipFile(self.old_ipa,'w')as z:z.writestr('Payload/Husk.app/Frameworks/libqemu-aarch64-softmmu.dylib',b'protected-qemu')
   stage.SHA256=hashlib.sha256(self.new.read_bytes()).hexdigest();stage.QEMU_BASE_SHA256=hashlib.sha256(self.old_ipa.read_bytes()).hexdigest()
  def restore(self):stage.ROOT,stage.SHA256,stage.QEMU_BASE_SHA256=self.old
  def test_matching_resources_and_protected_qemu_are_staged(self):
   stage.stage(self.new,self.old_ipa)
   self.assertEqual((self.p/'build/ios-arm64/lib/libqemu-aarch64-softmmu.dylib').read_bytes(),b'protected-qemu')
-  self.assertEqual((self.p/'build/graphics-base/Payload/Husk.app/java-runtime/husk-framework.dex').read_bytes(),b'3.1-java')
+  self.assertEqual((self.p/'build/graphics-base/Payload/Husk.app/java-runtime/husk-framework.dex').read_bytes(),b'3.4-java')
   project=(self.p/'src/app/project.yml').read_text();self.assertIn('--exclude=Husk ',project);self.assertIn('postBuildScripts:\n      retained',project)
  def test_wrong_primary_release_is_rejected_before_staging(self):
   stage.SHA256='0'*64

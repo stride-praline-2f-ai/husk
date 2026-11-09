@@ -144,6 +144,10 @@ static inline NSString * _Nullable husk_livecontainer_host_scheme(void) {
     return [value isKindOfClass:[NSString class]] ? value : nil;
 }
 #endif
+/* Husk 3.2's JIT-less mode (JITLess.swift, SigningCertificate.swift): libraries made into signed dylibs ahead of time. */
+void tl_ld_set_aot_dir(const char *dir);
+#include "../../translation-layer-next/husk-tl-aot.h"
+#include "../../translation-layer-next/husk-tl-codesign.h"
 
 #endif /* HUSK_BRIDGE_H */
 

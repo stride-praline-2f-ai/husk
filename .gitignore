@@ -25,3 +25,6 @@ third_party/gpu/
 
 # Python audit/test bytecode
 __pycache__/
+# local notes and editor rules, never part of the repo
+/Husk_*.MD
+/.cursor/

@@ -1,0 +1,331 @@
+[
+  {
+    "suite": "tests/translation-layer/test_ue4_graphics.py",
+    "rc": 0,
+    "checks": 18,
+    "skipped": 0,
+    "seconds": 0.2
+  },
+  {
+    "suite": "tests/translation-layer/test_ue4_resolution_hook.py",
+    "rc": 0,
+    "checks": 6,
+    "skipped": 0,
+    "seconds": 0.1
+  },
+  {
+    "suite": "tests/translation-layer/test_source_efficiency.py",
+    "rc": 0,
+    "checks": 6,
+    "skipped": 0,
+    "seconds": 0.4
+  },
+  {
+    "suite": "tests/translation-layer/test_runtime_input_vulkan.py",
+    "rc": 0,
+    "checks": 7,
+    "skipped": 0,
+    "seconds": 0.3
+  },
+  {
+    "suite": "tests/translation-layer/test_compat_sync.py",
+    "rc": 0,
+    "checks": 8,
+    "skipped": 0,
+    "seconds": 0.4
+  },
+  {
+    "suite": "tests/translation-layer/test_publication_wait.py",
+    "rc": 0,
+    "checks": 8,
+    "skipped": 0,
+    "seconds": 0.6
+  },
+  {
+    "suite": "tests/translation-layer/test_queue_options.py",
+    "rc": 0,
+    "checks": 5,
+    "skipped": 0,
+    "seconds": 0.1
+  },
+  {
+    "suite": "tests/translation-layer/test_swapchain_budget.py",
+    "rc": 0,
+    "checks": 11,
+    "skipped": 0,
+    "seconds": 0.2
+  },
+  {
+    "suite": "tests/translation-layer/test_thread_policy.py",
+    "rc": 0,
+    "checks": 36,
+    "skipped": 0,
+    "seconds": 0.2
+  },
+  {
+    "suite": "tests/translation-layer/test_vk_frame_timing.py",
+    "rc": 0,
+    "checks": 11,
+    "skipped": 0,
+    "seconds": 0.7
+  },
+  {
+    "suite": "tests/translation-layer/test_present_clock.py",
+    "rc": 0,
+    "checks": 8,
+    "skipped": 0,
+    "seconds": 0.3
+  },
+  {
+    "suite": "tests/translation-layer/test_pipeline_store.py",
+    "rc": 0,
+    "checks": 9,
+    "skipped": 0,
+    "seconds": 0.2
+  },
+  {
+    "suite": "tests/translation-layer/test_component_profile.py",
+    "rc": 0,
+    "checks": 7,
+    "skipped": 0,
+    "seconds": 0.5
+  },
+  {
+    "suite": "tests/translation-layer/test_component_triage.py",
+    "rc": 0,
+    "checks": 1,
+    "skipped": 1,
+    "seconds": 0.1
+  },
+  {
+    "suite": "tests/translation-layer/test_device_profiles.py",
+    "rc": 0,
+    "checks": 1,
+    "skipped": 1,
+    "seconds": 0.1
+  },
+  {
+    "suite": "tests/translation-layer/test_driver_profile.py",
+    "rc": 0,
+    "checks": 10,
+    "skipped": 0,
+    "seconds": 0.2
+  },
+  {
+    "suite": "tests/translation-layer/test_efficiency.py",
+    "rc": 0,
+    "checks": 15,
+    "skipped": 0,
+    "seconds": 0.2
+  },
+  {
+    "suite": "tests/translation-layer/test_process_metrics.py",
+    "rc": 0,
+    "checks": 8,
+    "skipped": 0,
+    "seconds": 0.1
+  },
+  {
+    "suite": "tests/translation-layer/test_cpu_threads.py",
+    "rc": 0,
+    "checks": 1,
+    "skipped": 1,
+    "seconds": 0.1
+  },
+  {
+    "suite": "tests/translation-layer/test_efficiency_math.py",
+    "rc": 0,
+    "checks": 1,
+    "skipped": 1,
+    "seconds": 0.1
+  },
+  {
+    "suite": "tests/translation-layer/test_pipeline_core_state.py",
+    "rc": 0,
+    "checks": 15,
+    "skipped": 0,
+    "seconds": 0.3
+  },
+  {
+    "suite": "tests/translation-layer/test_pipeline_diagnostics.py",
+    "rc": 0,
+    "checks": 11,
+    "skipped": 0,
+    "seconds": 0.2
+  },
+  {
+    "suite": "tests/translation-layer/test_pipeline_feedback.py",
+    "rc": 0,
+    "checks": 13,
+    "skipped": 0,
+    "seconds": 0.1
+  },
+  {
+    "suite": "tests/translation-layer/test_game_chrome.py",
+    "rc": 0,
+    "checks": 1,
+    "skipped": 1,
+    "seconds": 0.1
+  },
+  {
+    "suite": "tests/translation-layer/test_gpu_timing.py",
+    "rc": 0,
+    "checks": 10,
+    "skipped": 0,
+    "seconds": 0.1
+  },
+  {
+    "suite": "tests/translation-layer/test_gpu_metal.py",
+    "rc": 0,
+    "checks": 1,
+    "skipped": 1,
+    "seconds": 0.1
+  },
+  {
+    "suite": "tests/translation-layer/test_gpu_vk_queue.py",
+    "rc": 0,
+    "checks": 3,
+    "skipped": 0,
+    "seconds": 0.1
+  },
+  {
+    "suite": "tests/translation-layer/test_render_inventory.py",
+    "rc": 0,
+    "checks": 6,
+    "skipped": 0,
+    "seconds": 0.1
+  },
+  {
+    "suite": "tests/translation-layer/test_efficiency_analysis.py",
+    "rc": 0,
+    "checks": 23,
+    "skipped": 0,
+    "seconds": 0.4
+  },
+  {
+    "suite": "tests/translation-layer/test_roadmap_progress.py",
+    "rc": 0,
+    "checks": 6,
+    "skipped": 0,
+    "seconds": 0.1
+  },
+  {
+    "suite": "tests/translation-layer/test_roadmap_projection.py",
+    "rc": 0,
+    "checks": 7,
+    "skipped": 0,
+    "seconds": 0.2
+  },
+  {
+    "suite": "tests/translation-layer/test_comparison_campaign.py",
+    "rc": 0,
+    "checks": 27,
+    "skipped": 0,
+    "seconds": 0.4
+  },
+  {
+    "suite": "tests/translation-layer/test_external_efficiency.py",
+    "rc": 0,
+    "checks": 30,
+    "skipped": 0,
+    "seconds": 0.3
+  },
+  {
+    "suite": "tests/translation-layer/test_spatial.py",
+    "rc": 0,
+    "checks": 5,
+    "skipped": 1,
+    "seconds": 0.4
+  },
+  {
+    "suite": "tests/translation-layer/test_spatial_lifetime.py",
+    "rc": 0,
+    "checks": 1,
+    "skipped": 1,
+    "seconds": 0.1
+  },
+  {
+    "suite": "tests/translation-layer/test_native_archive.py",
+    "rc": 0,
+    "checks": 3,
+    "skipped": 1,
+    "seconds": 0.2
+  },
+  {
+    "suite": "tests/translation-layer/test_native_archive_status.py",
+    "rc": 0,
+    "checks": 1,
+    "skipped": 1,
+    "seconds": 0.1
+  },
+  {
+    "suite": "tests/translation-layer/test_lifecycle_resilience.py",
+    "rc": 0,
+    "checks": 6,
+    "skipped": 3,
+    "seconds": 0.3
+  },
+  {
+    "suite": "tests/translation-layer/test_capture_consolidation.py",
+    "rc": 0,
+    "checks": 3,
+    "skipped": 2,
+    "seconds": 0.1
+  },
+  {
+    "suite": "tests/translation-layer/test_archive_compatibility.py",
+    "rc": 0,
+    "checks": 5,
+    "skipped": 0,
+    "seconds": 0.1
+  },
+  {
+    "suite": "tests/translation-layer/test_native_preparation_audit.py",
+    "rc": 0,
+    "checks": 8,
+    "skipped": 0,
+    "seconds": 0.2
+  },
+  {
+    "suite": "tests/translation-layer/test_native_display.py",
+    "rc": 0,
+    "checks": 12,
+    "skipped": 0,
+    "seconds": 0.6
+  },
+  {
+    "suite": "tests/translation-layer/test_upstream_native.py",
+    "rc": 0,
+    "checks": 6,
+    "skipped": 0,
+    "seconds": 0.2
+  },
+  {
+    "suite": "tests/translation-layer/test_apk_order.py",
+    "rc": 0,
+    "checks": 0,
+    "skipped": 1,
+    "seconds": 0.1
+  },
+  {
+    "suite": "tests/translation-layer/test_husk31_integration.py",
+    "rc": 0,
+    "checks": 7,
+    "skipped": 4,
+    "seconds": 0.1
+  },
+  {
+    "suite": "tests/translation-layer/test_crash_diagnostics.py",
+    "rc": 0,
+    "checks": 1,
+    "skipped": 1,
+    "seconds": 0.1
+  },
+  {
+    "suite": "tests/translation-layer/test_settings_grouping.py",
+    "rc": 0,
+    "checks": 3,
+    "skipped": 0,
+    "seconds": 0.1
+  }
+]

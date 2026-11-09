@@ -31,6 +31,7 @@ static tl_jclass cls={.name="Example"};
 tl_jclass *tl_jni_class(const char *name){assert(!strcmp(name,cls.name));return &cls;}
 bool tl_dvm_declares(tl_jclass *c,const char *name,const char *sig){(void)c;(void)name;(void)sig;return true;}
 #define TRACE(...) ((void)0)
+static void tl_log_line(const char *fmt,...){(void)fmt;}
 static unsigned symbol_queries;static void *exported;
 static void *tl_ld_sym(void *library,const char *name){(void)library;(void)name;symbol_queries++;return exported;}
 typedef struct{tl_jclass *cls;const char *name,*sig;void *jni;bool jni_looked;unsigned jni_gen;}dvm_method;

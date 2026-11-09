@@ -4,15 +4,15 @@ name: Build Husk IPA
 # Avoids recompiling WebKit ANGLE (which fails on the hosted compiler).
 on:
   push:
-    branches: [codex/dungeons-efficient-native, codex/husk31-compatible]
+    branches: [optimized]
   pull_request:
-    branches: [codex/husk31-compatible]
+    branches: [optimized]
   workflow_dispatch:
     inputs:
       source_ref:
         description: "Source branch/tag/SHA (must include the Dungeons sharp and efficiency changes)"
         required: true
-        default: codex/dungeons-efficient-native
+        default: optimized
         type: string
 
 permissions:
@@ -134,10 +134,10 @@ jobs:
             https://github.com/Leviidev/Husk/releases/download/3.0/Husk.ipa \
             --output build/Husk-3.0-base.ipa
           curl --fail --location --retry 3 \
-            https://github.com/Leviidev/Husk/releases/download/3.1/Husk.ipa \
-            --output build/Husk-3.1-base.ipa
-          # Pin3.1 resources while retaining the tested3.0 QEMU/JIT library.
-          python3 scripts/stage_graphics_build.py build/Husk-3.1-base.ipa build/Husk-3.0-base.ipa
+            https://github.com/Leviidev/Husk/releases/download/3.4/Husk.ipa \
+            --output build/Husk-3.4-base.ipa
+          # Pin3.4 resources while retaining the tested3.0 QEMU/JIT library.
+          python3 scripts/stage_graphics_build.py build/Husk-3.4-base.ipa build/Husk-3.0-base.ipa
 
       - name: Install Rust iOS target
         shell: bash
@@ -196,7 +196,7 @@ jobs:
           path: build/Husk.ipa
           if-no-files-found: error
           compression-level: 0
-          retention-days: 7
+          retention-days: 30
 
       - name: Upload compiler log on failure
         if: failure()
@@ -207,4 +207,4 @@ jobs:
             /tmp/husk_ipa/build.log
             build/logs/
           if-no-files-found: ignore
-          retention-days: 7
+          retention-days: 30

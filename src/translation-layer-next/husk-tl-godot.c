@@ -208,9 +208,22 @@ void tl_godot_key(int keycode, bool down) { enqueue((event){ .kind = EV_KEY, .ke
 static void send_touch(const event *e)
 {
     typedef void (*touch_fn)(void *env, void *cls, int ev, int pointer, int count, void *pos, uint8_t dbl);
-    static touch_fn fn;
-    if (!fn) fn = (touch_fn)native_of("dispatchTouchEvent", "(III[FZ)V");
-    if (!fn) return;
+    /* Godot 3 has touch(inputDevice, event, pointer, count, positions, ...) instead, overloaded, so under its long JNI names */
+    typedef void (*touch3a_fn)(void *env, void *cls, int dev, int ev, int pointer, int count, void *pos);
+    typedef void (*touch3b_fn)(void *env, void *cls, int dev, int ev, int pointer, int count, void *pos, int buttons);
+    typedef void (*touch3c_fn)(void *env, void *cls, int dev, int ev, int pointer, int count, void *pos, int buttons, float vf, float hf);
+    static touch_fn fn; static touch3a_fn fn3a; static touch3b_fn fn3b; static touch3c_fn fn3c; static bool looked;
+    if (!looked) {
+        looked = true;
+        tl_lib *lib = tl_ld_find_lib("libgodot_android.so");
+        if (lib) {
+            fn3a = (touch3a_fn)tl_ld_sym(lib, "Java_org_godotengine_godot_GodotLib_touch__IIII_3F");
+            fn3b = (touch3b_fn)tl_ld_sym(lib, "Java_org_godotengine_godot_GodotLib_touch__IIII_3FI");
+            fn3c = (touch3c_fn)tl_ld_sym(lib, "Java_org_godotengine_godot_GodotLib_touch__IIII_3FIFF");
+        }
+        if (!fn3a && !fn3b && !fn3c) fn = (touch_fn)native_of("dispatchTouchEvent", "(III[FZ)V");
+    }
+    if (!fn && !fn3a && !fn3b && !fn3c) return;
     int idx = -1;
     for (int i = 0; i < T.n; i++) if (T.ids[i] == e->id) idx = i;
     int action;
@@ -235,7 +248,10 @@ static void send_touch(const event *e)
         p[i * per] = (float)T.ids[i]; p[i * per + 1] = T.x[i]; p[i * per + 2] = T.y[i];
         if (per == 6) { p[i * per + 3] = 1.f; p[i * per + 4] = 0.f; p[i * per + 5] = 0.f; }
     }
-    fn(tl_jni_env(), tl_jni_class_object(LIB), action, e->id, T.n, pos, 0);
+    if (fn) fn(tl_jni_env(), tl_jni_class_object(LIB), action, e->id, T.n, pos, 0);
+    else if (fn3a) fn3a(tl_jni_env(), tl_jni_class_object(LIB), 0x1002 /* SOURCE_TOUCHSCREEN */, action, e->id, T.n, pos);
+    else if (fn3b) fn3b(tl_jni_env(), tl_jni_class_object(LIB), 0x1002, action, e->id, T.n, pos, 0);
+    else fn3c(tl_jni_env(), tl_jni_class_object(LIB), 0x1002, action, e->id, T.n, pos, 0, 0.f, 0.f);
     tl_jni_unref(pos);
     if (e->phase >= 2) {
         if (e->phase == 3) T.n = 0;
@@ -396,4 +412,9 @@ void tl_godot_quit(void) { tl_log_line("godot: the game asked to quit"); atomic_
 void tl_godot_set_paused(bool paused) { atomic_store(&U.paused, paused); }
 unsigned long tl_godot_frames(void) { return atomic_load(&U.frames); }
 bool tl_godot_ended(void) { return atomic_load(&U.ended); }
-void tl_godot_stop(void) { atomic_store(&U.stop, true); if (U.thread_started) pthread_join(U.thread, NULL); }
+void tl_godot_stop(void)
+{
+    atomic_store(&U.stop, true);
+    if (U.thread_started) { pthread_join(U.thread, NULL); U.thread_started = false; }
+    atomic_store(&U.stop, false);
+}

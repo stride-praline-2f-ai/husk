@@ -2,6 +2,7 @@
 """Regression test: fatal crash record survives a terminated process on the macOS CI host."""
 import os
 import signal
+import platform
 import subprocess
 import tempfile
 import unittest
@@ -31,6 +32,7 @@ int main(int argc, char **argv) {
 }
 """
 
+@unittest.skipUnless(platform.system() == "Darwin", "Darwin signal handler requires the macOS IPA runner")
 class CrashDiagnosticsTest(unittest.TestCase):
     def test_fatal_signal_writes_independent_durable_record(self):
         with tempfile.TemporaryDirectory() as directory:

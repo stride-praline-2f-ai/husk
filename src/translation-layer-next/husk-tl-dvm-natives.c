@@ -519,7 +519,19 @@ NAT(VMR_properties)
     *ret = L(string_array(v, (int)(sizeof(v) / sizeof(v[0]))));
     return true;
 }
-NAT(VMR_getRuntime) { UNUSED; return true; }
+NAT(VMR_getRuntime)
+{
+    UNUSED;
+    static jobj *rt;
+    if (!rt) {
+        tl_jclass *jc = dvm_class_named("dalvik/system/VMRuntime");
+        if (!jc) { *ret = L(NULL); return true; }
+        rt = dvm_new_object(jc);
+        rt->refs = 1u << 30;
+    }
+    *ret = L(rt);
+    return true;
+}
 NAT(VMR_zero) { UNUSED; ret->j = 0; return true; }
 NAT(VMR_true) { UNUSED; *ret = Z(true); return true; }
 NAT(VMR_isa) { UNUSED; *ret = L(dvm_new_string_utf8("arm64")); return true; }
@@ -755,10 +767,23 @@ NAT(Thread_nativeCreate)
     dvm_field *pf = s->thread ? thread_peer(s->thread) : NULL;
     if (pf) dvm_slots(s->thread)[pf->slot].j = (int64_t)(uintptr_t)s->thread;     /* alive from here (before it runs: start() then isAlive() is true) */
     pthread_attr_t at; pthread_attr_init(&at);
-    pthread_attr_setstacksize(&at, 32u << 20);
     pthread_attr_setdetachstate(&at, PTHREAD_CREATE_DETACHED);
     pthread_t th;
-    if (pthread_create(&th, &at, thread_main, s) != 0) { free(s); return dvm_throw("java/lang/OutOfMemoryError", "pthread_create"); }
+    /* 32 MiB of stack for deep interpreted calls, but that is address space, and an install without extended virtual addressing has
+       only a few GiB (Flutter's heap reservation and TikTok's many threads used it up: OutOfMemoryError: pthread_create). When it is
+       refused, a smaller stack, and the same for the threads after it; dvm_call's overflow check goes by the thread's real stack. */
+    static _Atomic size_t stack = 32u << 20;
+    int rc;
+    for (;;) {
+        size_t sz = atomic_load(&stack);
+        pthread_attr_setstacksize(&at, sz);
+        rc = pthread_create(&th, &at, thread_main, s);
+        if (rc == 0 || sz <= (1u << 20)) break;
+        tl_log_line("dvm: a thread with a %zu MiB stack was refused (%d); trying a smaller one", sz >> 20, rc);
+        atomic_store(&stack, sz / 4 < (1u << 20) ? (1u << 20) : sz / 4);
+    }
+    pthread_attr_destroy(&at);
+    if (rc != 0) { free(s); return dvm_throw("java/lang/OutOfMemoryError", "pthread_create"); }
     return true;
 }
 
@@ -1898,6 +1923,17 @@ static const entry k_natives[] = {
     { "java/lang/System", "setOut0", "(Ljava/io/PrintStream;)V", System_setStream },
     { "java/lang/System", "setErr0", "(Ljava/io/PrintStream;)V", System_setStream },
 
+    { "dalvik/system/VMRuntime", "getRuntime", "()Ldalvik/system/VMRuntime;", VMR_getRuntime },
+    { "dalvik/system/VMRuntime", "setHiddenApiExemptions", "([Ljava/lang/String;)V", Native_noop },
+    { "dalvik/system/VMRuntime", "setHiddenApiExemptionsNative", "([Ljava/lang/String;)V", Native_noop },
+    { "dalvik/system/VMRuntime", "setTargetSdkVersionNative", "(I)V", Native_noop },
+    { "dalvik/system/VMRuntime", "disableJitCompilation", "()V", Native_noop },
+    { "dalvik/system/VMRuntime", "registerNativeAllocation", "(J)V", Native_noop },
+    { "dalvik/system/VMRuntime", "registerNativeFree", "(J)V", Native_noop },
+    { "dalvik/system/VMRuntime", "notifyNativeAllocationsInternal", "()V", Native_noop },
+    { "dalvik/system/VMRuntime", "preloadDexCaches", "()V", Native_noop },
+    { "dalvik/system/VMRuntime", "updateProcessState", "(I)V", Native_noop },
+    { "dalvik/system/VMRuntime", "isJavaDebuggable", "()Z", VMR_zero },
     { "dalvik/system/VMRuntime", "properties", "()[Ljava/lang/String;", VMR_properties },
     { "dalvik/system/VMRuntime", "is64Bit", "()Z", VMR_true },
     { "dalvik/system/VMRuntime", "vmInstructionSet", "()Ljava/lang/String;", VMR_isa },
@@ -1968,6 +2004,8 @@ static const entry k_natives[] = {
 
     { "java/lang/Class", "getNameNative", "()Ljava/lang/String;", Class_getNameNative },
     { "java/lang/Class", "classForName", "(Ljava/lang/String;ZLjava/lang/ClassLoader;)Ljava/lang/Class;", Class_classForName },
+    /* Unity (newer players) asks for a class by its three-argument forName; ART hands that to the same native lookup */
+    { "java/lang/Class", "forName", "(Ljava/lang/String;ZLjava/lang/ClassLoader;)Ljava/lang/Class;", Class_classForName },
     { "java/lang/Class", "getPrimitiveClass", "(Ljava/lang/String;)Ljava/lang/Class;", Class_getPrimitiveClass },
     { "java/lang/Class", "getInterfacesInternal", "()[Ljava/lang/Class;", Class_getInterfacesInternal },
     { "java/lang/Class", "newInstance", "()Ljava/lang/Object;", Class_newInstance },
@@ -2128,6 +2166,7 @@ dvm_native_fn dvm_intrinsic(const char *cls, const char *name, const char *sig)
     { dvm_native_fn dvm_dexfile_native(const char *, const char *, const char *); dvm_native_fn f = dvm_dexfile_native(cls, name, sig); if (f) return f; }
     /* Husk's Java framework (husk.Native, GLES20) */
     { dvm_native_fn dvm_android_native(const char *, const char *, const char *); dvm_native_fn f = dvm_android_native(cls, name, sig); if (f) return f; }
+    { dvm_native_fn dvm_binder_native(const char *, const char *, const char *); dvm_native_fn f = dvm_binder_native(cls, name, sig); if (f) return f; }
     /* the runtime's housekeeping (heap tuning, debugging hooks): nothing to do here, and zero is the quiet answer */
     if (!strcmp(cls, "dalvik/system/VMRuntime") || !strcmp(cls, "dalvik/system/VMDebug") || !strcmp(cls, "dalvik/system/ZygoteHooks"))
         return VMR_zero;
