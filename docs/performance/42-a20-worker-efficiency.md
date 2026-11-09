@@ -1,0 +1,31 @@
+# A20-QOS-v1 — A20 Pro worker adaptation and lower normal monitoring cost
+
+2026-11-09. User explicitly requests A20Pro/efficiency-core adaptation after E-DUO-001 positive visual but unsatisfactory heat/battery feedback, referencing CyPort. This authorizes the guarded A20-only automatic worker policy while preserving received visual target and60FPS. No core affinity,measured savings or completed device optimum claimed.
+
+M1/M7/M10 sequence:actual Duo geometry/subjective evidence(E-DUO-001) -> retain1816x1280output/1448x1024input/60FPS -> runtime-matched guarded worker split plus bounded housekeeping -> Apple build/sign/package verification -> ordinary use,with independent worker toggle and rollback. M4 graphics,worker defaults,audio,V4,lifecycle callbacks,cache/compiler contracts remain protected.
+
+## Primary comparison and limits
+
+The referenced change is [CyPort1.2](https://github.com/Thijs2004/CyPort/releases/tag/v1.2),not1.3. Source [MacShim.m lines1908–1934](https://github.com/Thijs2004/CyPort/blob/v1.2/shim/MacShim.m#L1908),blob19fb2cbe0d4e947d796a0e2016106a65b1009473:its Cyberpunk redDispatcher worker hook retains a small higher-QoS allowance and requests Utility for the rest. It uses public pthread QoS,not a physical-core pinning API. Release notes say the split had only short testing and long open-world sessions still throttle. Its REDengine streaming values,worker names,spin-loop observations and lower-FPS recommendations do not establish safe UE4 equivalents. No CyPort code or unverified game-engine patch copied.
+
+Apple [QoS and heterogeneous cores](https://developer.apple.com/news/?id=vk3m204o) documents QoS influencing placement;the OS selects cores. Apple's [iPhone comparison](https://www.apple.com/iphone/compare/) describes A20Pro's2super/4efficiency CPU arrangement. Our two normal-priority worker slots are a scheduling allowance,not two pinned cores or measured core residency. We do not promote all game threads or pretend name/QoS observations measure watts.
+
+## Implementation
+
+DuoDisplayPolicy matches normalized actual Metal GPU name AppleA20Pro[GPU] and runtime processorCount6. The existing inner-panel/iPhone/SharpEfficient/game/window/automatic-profile gates still apply first. Unknown GPU/different CPU count/other hardware/manual opt-out falls back to existing Balanced. No guessed machine identifier or private affinity API.
+
+On that eligible automatic launch,A20 Pro Efficiency Workers defaultsON (missing old JSON key migratestrue;explicitfalse roundtrips). This selects the existing mode4 baseline-relative guard,with a validated2-worker normal-priority allowance. Capacity setter resets the override each launch;invalid/out-of-capacity counts are rejected. During startup/loading/expensive shader compilation workers remain Balanced. After20seconds of acceptable steady cadence and bounded pipeline work,surplus identified normal TaskGraphNP workers request Utility;normal slots0–1remain at their baseline priority. Existing background Utility caps remain. Critical/unknown/render/audio/input/EventWorker/PoolThread roles are preserved. Already-lower priorities are never raised;unspecified/query/set failures retain prior safe behavior.
+
+Existing self-checkpoint rollback restores Balanced on cadence regression,large frame stalls,expensive pipeline completion,pause,power/thermal change,with cooldown. This is a safeguard,not a guarantee that every workload improves. The60FPS request and OS serious/critical thermal safeguards remain. No hidden40/30FPS selection,quality reduction,queue-option/driver update or native-preparation enablement.
+
+GameGraphics exposes an independent A20 Pro Efficiency Workers switch while automatic Duo is active. OFF+restart restores Balanced while retaining automatic resolution/MetalFX. Ordinary launch configuration records requested allowance/worker mode;no new per-frame capture campaign. Existing manual profiles remain unchanged.
+
+M1 housekeeping:heartbeat thread requests Utility. Cheap frame and current jetsam-headroom lines retain existing cadence,but full Mach-VM region walks are decoupled:30seconds normally,5seconds below512MiB process headroom,and none while UE4's lifecycle mailbox says paused. Cached virtual-address figures explicitly carry sample age;first/resume/clock-invalid/backward handling cannot create a scan loop. These figures remain virtual mappings,not resident memory. No guest lifecycle/audio ownership rewritten. Actual scan cost/battery contribution remains unmeasured;do not claim this fixes all reported heat.
+
+## Checks and predeclared acceptance
+
+Actual worker-policy tests add two scenarios:2-slot critical-role preservation and frame-stall rollback;invalid count rejection/per-launch reset. Existing admission/pipeline/thermal/pause/error/retry tests retained. Actual Swift policy/settings addsA20match/unknown/5core/opt-out coverage and old-decode/explicitfalse roundtrip. Actual extracted heartbeat helper test exercises120calls,normal/pressure scan budgets,pause,clockfailure/backward andresume gap. Local49suites:406reported/28Apple-deferred/zero failures. Apple execution of all required cases plusfresh app compilation is still mandatory. Expected414Apple tests/49suites plus actualfont,SDK31/96,driver11exports,all8setupgroups.
+
+A20-QOS-v1 build gates4,defined before device delivery:(1)source/reference/preservation/manual-fallback audit,(2)fullApple tests/SDK,(3)freshMacapp/sign/package/upload,(4)independentdownloadedIPA/resources/source/driver/shader verification. Initially0/4. Device0/2(functional sustained profile/rollback and received visuals/controls maintained),energy0/1unknown. Fixed HUSK-ROADMAP-v1/whole-milestones-1 remains31.11%,existing weightedI79.795918%(32/39),M4-only34.5667%,Duo0 until unchanged gates earn complete evidence. No gate weights/criteria weakened.
+
+On delivery:updateexistingLiveContainerHusk slot,preservegame/saves/caches,launchinnerdisplay;automatic profile selects recognizedA20guard. No logs/export/long playthrough requested. If new stutter/input/startup trouble appears,disableonlyA20 Pro Efficiency Workers+restart;keepresolution/MetalFX. Previousbuild151 remains rollback. Actual heat/battery benefit unverified;source and desktop passes do not predict a savings percentage.
