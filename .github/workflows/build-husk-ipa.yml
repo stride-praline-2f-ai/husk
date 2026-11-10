@@ -12,7 +12,7 @@ concurrency:
 jobs:
   build:
     name: Build Duo IPA with owner Xcode
-    runs-on: xcode-27
+    runs-on: [self-hosted, macOS, ARM64]
     timeout-minutes: 120
     steps:
       - name: Check out private build repository
