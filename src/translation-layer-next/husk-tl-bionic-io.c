@@ -20,6 +20,7 @@ bool tl_ld_covers(const void *addr, size_t bytes);
 #include "husk-tl-codewrite.h"
 #include "husk-tl-xmem.h"
 #include "husk-tl-binder.h"
+#include "husk-tl-memory-reserve.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -139,7 +140,11 @@ static const char *synth_content(const char *path, char *buf, size_t n)
         return buf;
     }
     if (!strcmp(path, "/proc/meminfo")) {
-        snprintf(buf, n, "MemTotal:       11722000 kB\nMemFree:         3000000 kB\nMemAvailable:    5000000 kB\nBuffers:           10000 kB\nCached:          2000000 kB\nSwapTotal:             0 kB\nSwapFree:              0 kB\n");
+        uint64_t total, available; tl_bionic_memory_info(&total, &available);
+        /* Linux-style fields, but bounded by the host process's allocation
+         * headroom on iOS. Do not advertise invented reclaimable caches. */
+        snprintf(buf, n, "MemTotal:       %llu kB\nMemFree:        %llu kB\nMemAvailable:   %llu kB\nBuffers:           0 kB\nCached:            0 kB\nSwapTotal:         0 kB\nSwapFree:          0 kB\n",
+                 (unsigned long long)(total / 1024), (unsigned long long)(available / 1024), (unsigned long long)(available / 1024));
         return buf;
     }
     if (!strncmp(path, "/sys/devices/system/cpu/", 24) && (strstr(path, "/present") || strstr(path, "/possible") || strstr(path, "/online"))) {
@@ -1190,15 +1195,23 @@ static void anon_zap(uintptr_t addr, size_t len)
         if (a >= e) continue;
         for (uintptr_t p = a & ~(uintptr_t)16383; p < e;) {           /* walk the regions in the range */
             vm_address_t ra = p; vm_size_t rs = 0;
-            vm_region_basic_info_data_64_t info; mach_msg_type_number_t cnt = VM_REGION_BASIC_INFO_COUNT_64; mach_port_t obj;
+            vm_region_basic_info_data_64_t info; mach_msg_type_number_t cnt = VM_REGION_BASIC_INFO_COUNT_64; mach_port_t obj = MACH_PORT_NULL;
             if (vm_region_64(mach_task_self(), &ra, &rs, VM_REGION_BASIC_INFO_64, (vm_region_info_t)&info, &cnt, &obj) != KERN_SUCCESS) break;
+            if (obj != MACH_PORT_NULL) mach_port_deallocate(mach_task_self(), obj);
             if (ra > p) { p = ra; continue; }
             uintptr_t re = ra + rs < e ? ra + rs : e;
             if (tl_ld_covers((const void *)(uintptr_t)p, re - p) || tl_xmem_contains((const void *)(uintptr_t)p)) {
                 p = re; continue;
             }
             int prot = (info.protection & VM_PROT_READ ? PROT_READ : 0) | (info.protection & VM_PROT_WRITE ? PROT_WRITE : 0);
-            mmap((void *)p, re - p, prot, MAP_FIXED | MAP_PRIVATE | MAP_ANON, -1, 0);
+            if (tl_memory_reserve_contains((void *)p, re - p)) {
+                /* Replacing shared pages with MAP_FIXED private pages would
+                 * silently lose the donor backing and its memory accounting. */
+                if (!mprotect((void *)p, re - p, PROT_READ | PROT_WRITE)) {
+                    memset((void *)p, 0, re - p);
+                    mprotect((void *)p, re - p, prot);
+                }
+            } else mmap((void *)p, re - p, prot, MAP_FIXED | MAP_PRIVATE | MAP_ANON, -1, 0);
             p = re;
         }
     }
@@ -1432,6 +1445,13 @@ void *tl_ld_map_code(const char *path, uint64_t off, size_t len, void *at);
 static void *b_mmap(void *addr, size_t len, int prot, int flags, int fd, long off)
 {
     if (fd >= 0 && husk_binder_is_fd(fd)) return husk_binder_mmap(fd, len);
+    if ((flags & 0x10) && tl_memory_reserve_overlaps(addr, len)) {
+        if (flags == 0x32 && tl_memory_reserve_replace(addr, len, prot)) {
+            anon_add(addr, len); return addr;
+        }
+        tl_set_guest_errno(12);
+        return MAP_FAILED; /* Never overwrite shared backing with a host mapping. */
+    }
     /* A library file mapped executable (libffi's static trampolines): for a library imported from a dylib, its own signed code */
     if ((prot & PROT_EXEC) && !(flags & 0x20) && fd >= 0 && off >= 0) {
         char path[PATH_MAX];
@@ -1477,6 +1497,14 @@ static void *b_mmap(void *addr, size_t len, int prot, int flags, int fd, long of
     if (flags & 0x10)   df |= MAP_FIXED;
     if (flags & 0x20)   df |= MAP_ANON;
     TL_ERRNO_BEGIN();
+    /* Only plain, unhinted, private RW game memory uses the prepared reserve.
+     * Never substitute shared storage for file/shared/fixed/JIT/reservation
+     * mappings, or wait for an extension inside an allocation call. */
+    if (!addr && flags == 0x22 && prot == (PROT_READ | PROT_WRITE) && !getenv("TL_MM_TOTAL_GIB") && !getenv("TL_MM_MAX_GIB")) {
+        void *shared = tl_memory_reserve_alloc(len);
+        if (shared) { anon_add(shared, len); return shared; }
+        errno = 0;
+    }
     bool force_phantom = mm_force_phantom();
     bool refuse = false;
     if ((flags & 0x20) && !(flags & 0x10)) {
@@ -1513,6 +1541,11 @@ static void *b_mmap(void *addr, size_t len, int prot, int flags, int fd, long of
 static int b_munmap(void *a, size_t l)
 {
     if (tl_xmem_contains(a)) return 0;                       /* JIT memory handed out above: kept, as the region only grows */
+    if (tl_memory_reserve_contains(a, 0)) {
+        if (!tl_memory_reserve_release(a, l)) { tl_set_guest_errno(22); return -1; }
+        anon_remove((uintptr_t)a, l);
+        return 0;
+    }
     if (tl_ld_covers(a, l)) {
         /* Mimalloc trims a large reservation to an aligned arena. Under AOT that reservation can
          * sit next to a dylib; unmapping the overlap would drop signed code. Leave the library. */
@@ -1546,6 +1579,7 @@ static bool b_mprotect_writable(void *a, size_t l)
     vm_address_t at = (vm_address_t)(uintptr_t)a; vm_size_t sz = 0;
     vm_region_basic_info_data_64_t info; mach_msg_type_number_t cnt = VM_REGION_BASIC_INFO_COUNT_64; mach_port_t obj = MACH_PORT_NULL;
     if (vm_region_64(mach_task_self(), &at, &sz, VM_REGION_BASIC_INFO_64, (vm_region_info_t)&info, &cnt, &obj) != KERN_SUCCESS) return false;
+    if (obj != MACH_PORT_NULL) mach_port_deallocate(mach_task_self(), obj);
     return at <= (vm_address_t)(uintptr_t)a && at + sz >= (vm_address_t)(uintptr_t)a + l && (info.protection & VM_PROT_WRITE);
 }
 static int b_mprotect(void *a, size_t l, int prot)
@@ -1612,12 +1646,10 @@ static void *b_mremap(void *old, size_t olds, size_t news, int flags, void *newa
 {
     mm_trace("mremap", old, olds, (long)news, flags);
     (void)flags; (void)newaddr;
-    void *n = mmap(NULL, news, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+    void *n = b_mmap(NULL, news, PROT_READ | PROT_WRITE, 0x22, -1, 0);
     if (n == MAP_FAILED) { tl_set_guest_errno(12); return (void *)-1; }
-    anon_add(n, news);
     memcpy(n, old, olds < news ? olds : news);
-    munmap(old, olds);
-    anon_remove((uintptr_t)old, olds);
+    b_munmap(old, olds);
     return n;
 }
 
