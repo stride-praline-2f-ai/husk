@@ -1,4 +1,4 @@
-name: Prepare Mac completely and build Husk Duo IPA
+name: Build Husk Duo IPA on GitHub-hosted Xcode 27
 on:
   push:
     branches: [main]
@@ -11,8 +11,8 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
-    name: Build Duo IPA with owner Xcode
-    runs-on: [self-hosted, macOS, ARM64]
+    name: Build Duo IPA with GitHub-hosted Xcode 27
+    runs-on: xcode-27
     timeout-minutes: 120
     steps:
       - name: Check out private build repository
@@ -123,7 +123,7 @@ jobs:
           # python3 tests/translation-layer/test_settings_grouping.py -v
           # python3 tests/translation-layer/test_reused_driver.py -v
           python3 scripts/run_mac_regressions.py 2>&1 | tee build/logs/regressions.log
-      - name: Prepare cached owner Mac build tools and check Vulkan SDK ABI
+      - name: Prepare clean cloud Mac build tools and check Vulkan SDK ABI
         id: tools
         if: ${{ !cancelled() && steps.source.outcome == 'success' }}
         continue-on-error: true
