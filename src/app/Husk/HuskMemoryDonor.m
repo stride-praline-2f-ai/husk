@@ -7,6 +7,7 @@
 #include <stdatomic.h>
 #include <TargetConditionals.h>
 #include <string.h>
+#include <dlfcn.h>
 
 /* These private extension entry points are already used by built-in StikJIT.
  * If unavailable, preparation fails closed and guest mmap stays ordinary. */
@@ -77,6 +78,12 @@
     dispatch_async(dispatch_get_main_queue(), ^{
         @synchronized(self) { if (self.abandoned) return; }
         Class cls = NSClassFromString(@"NSExtension");
+        if (!cls) {
+            /* Same lazy framework route as Husk built-in JIT; external
+             * StikDebug launches may never have loaded it. */
+            dlopen("/System/Library/Frameworks/ExtensionFoundation.framework/ExtensionFoundation", RTLD_NOW);
+            cls = NSClassFromString(@"NSExtension");
+        }
         NSError *error = nil;
         NSString *identifier = [NSBundle.mainBundle.bundleIdentifier stringByAppendingString:@".MemoryDonor"];
         if (![cls respondsToSelector:@selector(extensionWithIdentifier:error:)]) { dispatch_semaphore_signal(self.ready); return; }
