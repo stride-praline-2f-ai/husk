@@ -283,3 +283,8 @@ User requested actual whole-plan implementation and outstanding fixes before fur
 2026-11-09 [A20-QOS-v1](42-a20-worker-efficiency.md):CyPort1.2/publicQoSsourceverified;runtime-matchedguardedA20workerbudget,independentmanualescape,andboundedUtilityheartbeatimplemented. Local49suites/zerofailures;13sourceblobsreadbackmatch. [Candidate152](builds/adff0fc402c1c0f7989455fb234addcbe3af8d28.md)Macrun42690026822queued,Apple/IPAandphysicalenergyunverified. No newdevicecapture requested;fixedscoresunchanged.
 
 10 November: [verified A20 build152](builds/adff0fc402c1c0f7989455fb234addcbe3af8d28.md), cloud run42694261267,414Apple tests/49suites/zero skips,font/SDK31/96/driver11exports/8setupgroups/freshapp/IPA and independent artifact verification. Source/runtime adaptation verified at build level; physical battery/heat benefit remains unknown. No new logs requested.
+
+
+## E-DUO-002 — A20 trial/rollback and allocation failure
+
+[Returned inline evidence](runs/E-DUO-002.md): actual NP2/3 Utility application and Default restoration;VM scan throttling visible;terminal4MiB RW mmapENOMEM thenUE4+0x8816838 SIGSEGV. No provenjetsam/rootcause/energy benefit. [Memory implementation candidate](43-memory-resilience.md),Apple verification pending.
