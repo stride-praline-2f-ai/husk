@@ -4,6 +4,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 #define TL_DONOR_CHUNK (UINT64_C(64) << 20)
+/* Start preparing an additional region before a level-load allocation burst.
+ * This is shared virtual backing, not an eager physical RAM commitment. */
+#define TL_DONOR_PREFETCH_LOW_WATER (UINT64_C(128) << 20)
 #define TL_DONOR_INITIAL (UINT64_C(256) << 20)
 #define TL_DONOR_HEADROOM (UINT64_C(256) << 20)
 #define TL_DONOR_MAX_BYTES (UINT64_C(6) << 30)
