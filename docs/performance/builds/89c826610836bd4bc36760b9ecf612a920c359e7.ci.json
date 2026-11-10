@@ -1,0 +1,26 @@
+{
+  "source": "89c826610836bd4bc36760b9ecf612a920c359e7",
+  "tree": "3ef2de6f138c149ff34447df318ae0a4d4aaf0f0",
+  "build": 153,
+  "run_id": 42794586409,
+  "job_id": 129756357290,
+  "status": "completed",
+  "conclusion": "success",
+  "stage": "SDK/tools preparation; final outcomes pending",
+  "workflow_revision": "cc38d94ca01ddb8202c361a3a2c341183987d0ef",
+  "runner_request": "xcode-27",
+  "future_default": "self-hosted/macOS/ARM64",
+  "package_verification": "pending",
+  "apple_tests": 419,
+  "apple_skips": 0,
+  "regression_suites": 49,
+  "setup_groups_passed": 8,
+  "font_executable": "pass",
+  "sdk": {
+    "structures": 31,
+    "field_offsets": 96
+  },
+  "artifact_id": 13754050381,
+  "artifact_zip_sha256": "fb1699aa50759975959362e7cd55130b107ba8788ed0362cc495de9ee398dc2f",
+  "delivery": "retained intermediate candidate; final framework-loading compatibility patch follows"
+}
