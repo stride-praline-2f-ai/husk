@@ -149,7 +149,8 @@ class SwiftTests(unittest.TestCase):
         head=s[s.index('struct AppDiagnosis:'):s.index('    var symbol:')]
         methods=s[s.index('    static func fromLog('):s.index('\n/// ',s.index('    private static func apiName('))]
         # The struct closes immediately before the first view doc comment.
-        fixture='import Foundation\n'+head+methods
+        guidance=function((APP/'CrashReport.swift').read_text(),'    private static func forkGuidance(').replace('private static func','static func',1)
+        fixture='import Foundation\n'+head+methods+'\nstruct Guidance {\n'+guidance+'\n}\n'
         with tempfile.TemporaryDirectory() as d:
             p=Path(d);(p/'Diagnosis.swift').write_text(fixture)
             (p/'main.swift').write_text(r'''
@@ -181,6 +182,10 @@ precondition(AppDiagnosis.fromLog(fatal)?.kind == .nativeCrash)
 precondition(RuntimeLogEvidence.fatalSignal(RuntimeLogEvidence.currentLines(fatal)) == 6)
 precondition(RuntimeLogEvidence.fatalSignal(["=== FATAL signal 11"]) == 11)
 precondition(RuntimeLogEvidence.fatalSignal(["=== CRASH: signal 999"]) == nil)
+let advice=Guidance.forkGuidance(mainLog:patch+"\nunity: alive: 16139 frames\nue4 pipeline stall: 127 ms\nmm: mmap FAILED len=0x400000 prot=3 flags=0x22 errno=12\n*** FATAL SIGNAL 11",nativeLog:"",stages:"",config:[:])
+precondition(advice.contains("ENOMEM") && !advice.contains("Explicit missing game data") && !advice.contains("Pipeline errors are present"))
+let historical=Guidance.forkGuidance(mainLog:"[2ms][prev] mm: mmap FAILED len=0x400000 errno=12",nativeLog:"",stages:"",config:[:])
+precondition(!historical.contains("A game memory mapping failed"))
 ''')
             subprocess.run(['swiftc',str(APP/'NativeGameLifecycle.swift'),str(APP/'RuntimeLogEvidence.swift'),str(p/'Diagnosis.swift'),str(p/'main.swift'),'-o',str(p/'test')],check=True)
             subprocess.run([str(p/'test')],check=True,timeout=15)
