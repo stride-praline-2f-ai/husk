@@ -228,7 +228,7 @@ static void schedule_growth(void *context, size_t minimum)
             tl_memory_reserve_set_growth_handler(NULL, NULL); return;
         }
         /* The game may have freed memory while this request was queued. */
-        if ((!minimum && stats.free_bytes >= TL_DONOR_CHUNK) || (minimum && tl_memory_reserve_can_allocate(minimum))) {
+        if ((!minimum && stats.free_bytes >= TL_DONOR_PREFETCH_LOW_WATER) || (minimum && tl_memory_reserve_can_allocate(minimum))) {
             tl_memory_reserve_growth_finished(); return;
         }
         uint64_t request = MAX((uint64_t)minimum, TL_DONOR_CHUNK);
