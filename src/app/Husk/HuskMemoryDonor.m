@@ -107,6 +107,7 @@ typedef NS_ENUM(NSInteger, HuskDonationResult) { HuskDonationOK, HuskDonationCap
 }
 - (HuskDonationResult)donateBytes:(uint64_t)requested
 {
+    dispatch_queue_t queue = dispatch_get_global_queue(QOS_CLASS_UTILITY, 0);
     xpc_object_t request = xpc_dictionary_create(NULL, NULL, 0);
     xpc_dictionary_set_uint64(request, "version", 2);
     xpc_dictionary_set_string(request, "op", "reserve");
