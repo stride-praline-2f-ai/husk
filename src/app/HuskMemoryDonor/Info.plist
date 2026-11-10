@@ -15,7 +15,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>3.4</string>
 	<key>CFBundleVersion</key>
-	<string>153</string>
+	<string>154</string>
 	<key>NSExtension</key>
 	<dict>
 		<key>NSExtensionActivationRule</key>
@@ -38,6 +38,8 @@
 	<dict>
 		<key>ServiceType</key>
 		<string>Application</string>
+		<key>_MultipleInstances</key>
+		<true/>
 		<key>_ProcessType</key>
 		<string>App</string>
 	</dict>
