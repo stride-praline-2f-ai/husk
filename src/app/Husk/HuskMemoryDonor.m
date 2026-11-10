@@ -195,9 +195,10 @@ static void schedule_growth(void *context, size_t minimum)
 - (void)receipt
 {
     tl_memory_reserve_stats stats; tl_memory_reserve_snapshot(&stats);
-    tl_log_line("memory reserve: %zu MiB shared backing mapped, %zu MiB guest-mapped, %llu served allocations, %lu owner(s); separate from main-process tester/headroom, not RSS or a promised limit",
-                stats.mapped_bytes >> 20, stats.used_bytes >> 20,
-                (unsigned long long)stats.served_allocations, (unsigned long)self.donors.count);
+    tl_log_line("memory reserve: %zu MiB shared mapped, %zu MiB in use, %zu MiB free, %llu served, %llu reserve misses, %lu owner(s); not physical RAM or a promised app limit",
+                stats.mapped_bytes >> 20, stats.used_bytes >> 20, stats.free_bytes >> 20,
+                (unsigned long long)stats.served_allocations,
+                (unsigned long long)stats.fallback_allocations, (unsigned long)self.donors.count);
 }
 - (BOOL)prepare
 {
