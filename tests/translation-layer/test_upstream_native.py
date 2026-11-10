@@ -123,6 +123,7 @@ int main(void){
  def test_actual_memory_apis_share_current_bounded_headroom_and_preserve_errno(self):
   text=(TL/'husk-tl-bionic.c').read_text()
   functions=extracted(text,'void tl_bionic_memory_info(')+extracted(text,'static int bionic_sysinfo(')+extracted(text,'static long bionic_sysconf(')
+  functions=functions.replace('TARGET_OS_IPHONE','HUSK_TEST_IPHONE').replace('mach_port_t','husk_test_port_t')
   typedef=text[text.index('typedef struct { long uptime;'):text.index('void tl_bionic_memory_info(')]
   io=(TL/'husk-tl-bionic-io.c').read_text();proc=extracted(io,'    if (!strcmp(path, "/proc/meminfo"))')
   prefix=r'''
@@ -139,9 +140,9 @@ static int sysctlbyname(const char *n,void *p,size_t *l,void *v,size_t z){(void)
 static void tl_set_guest_errno(int n){(void)n;}
 '''
   for ios in (0,1):
-   platform=('#define TARGET_OS_IPHONE 1\nstatic uint64_t os_proc_available_memory(void){return available;}\n' if ios else r'''
-#define TARGET_OS_IPHONE 0
-typedef unsigned mach_msg_type_number_t;typedef unsigned long vm_size_t;typedef int mach_port_t;
+   platform=('#define HUSK_TEST_IPHONE 1\nstatic uint64_t os_proc_available_memory(void){return available;}\n' if ios else r'''
+#define HUSK_TEST_IPHONE 0
+typedef unsigned mach_msg_type_number_t;typedef unsigned long vm_size_t;typedef int husk_test_port_t;
 typedef struct { uint64_t free_count; } vm_statistics64_data_t;typedef void *host_info64_t;
 static int rights;
 #define HOST_VM_INFO64_COUNT 1
@@ -161,7 +162,7 @@ int main(void){uint64_t t,a;errno=EDOM;tl_bionic_memory_info(&t,&a);assert(t==to
  available=0;tl_bionic_memory_info(&t,&a);assert(!a);assert(bionic_sysconf(99)==0);
  available=total+16384;tl_bionic_memory_info(&t,&a);assert(a==total);
  fail_sysctl=1;tl_bionic_memory_info(&t,&a);assert(!t&&!a&&errno==EDOM);
-#if !TARGET_OS_IPHONE
+#if !HUSK_TEST_IPHONE
  assert(rights==0);
 #endif
  return 0;}
@@ -170,7 +171,7 @@ int main(void){uint64_t t,a;errno=EDOM;tl_bionic_memory_info(&t,&a);assert(t==to
 
  def test_vm_region_object_rights_released_and_shared_discard_retains_backing(self):
   text=(TL/'husk-tl-bionic-io.c').read_text()
-  funcs=extracted(text,'static void anon_zap(')+extracted(text,'static bool b_mprotect_writable(')
+  funcs=(extracted(text,'static void anon_zap(')+extracted(text,'static bool b_mprotect_writable(')).replace('mach_port_t','husk_test_port_t')
   self.compile_run(r'''
 #include <assert.h>
 #include <stdbool.h>
@@ -179,7 +180,7 @@ int main(void){uint64_t t,a;errno=EDOM;tl_bionic_memory_info(&t,&a);assert(t==to
 #include <string.h>
 #include <pthread.h>
 typedef uintptr_t vm_address_t;typedef size_t vm_size_t;typedef unsigned mach_msg_type_number_t;
-typedef struct{int protection;}vm_region_basic_info_data_64_t;typedef void*vm_region_info_t;typedef int mach_port_t;
+typedef struct{int protection;}vm_region_basic_info_data_64_t;typedef void*vm_region_info_t;typedef int husk_test_port_t;
 #define MACH_PORT_NULL 0
 #define VM_REGION_BASIC_INFO_COUNT_64 1
 #define VM_REGION_BASIC_INFO_64 1
@@ -196,7 +197,7 @@ static struct{uintptr_t addr;size_t len;}g_anon[1];static int g_nanon=1;
 static pthread_mutex_t g_anon_lock=PTHREAD_MUTEX_INITIALIZER;
 static int rights,fail_query,shared,remaps;
 static int mach_task_self(void){return 1;}
-static int vm_region_64(int task,vm_address_t*a,vm_size_t*s,int flavor,vm_region_info_t info,mach_msg_type_number_t*c,mach_port_t*o){(void)task;(void)flavor;(void)c;if(fail_query)return -1;*a=(uintptr_t)memory;*s=sizeof(memory);((vm_region_basic_info_data_64_t*)info)->protection=3;*o=5;rights++;return 0;}
+static int vm_region_64(int task,vm_address_t*a,vm_size_t*s,int flavor,vm_region_info_t info,mach_msg_type_number_t*c,husk_test_port_t*o){(void)task;(void)flavor;(void)c;if(fail_query)return -1;*a=(uintptr_t)memory;*s=sizeof(memory);((vm_region_basic_info_data_64_t*)info)->protection=3;*o=5;rights++;return 0;}
 static int mach_port_deallocate(int task,int port){assert(task==1&&port==5);rights--;return 0;}
 static bool tl_ld_covers(const void*p,size_t n){(void)p;(void)n;return false;}
 static bool tl_xmem_contains(const void*p){(void)p;return false;}
