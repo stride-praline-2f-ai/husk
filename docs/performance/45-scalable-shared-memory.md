@@ -25,3 +25,6 @@ M1/M8/M10 sequence:terminalmmapENOMEM and limited153donor implementation ->scala
 
 
 Primary release2.7API was fetched directly and confirms the exact announcement wording:NSExtensions+xpc_shmem,not reflected in the in-appMemorylimit tester,and guestRAMoffload separate from mainphys_footprint. This verifies mechanism provenance,not universal12GBusableRAM onHusk.
+
+
+Apple attempt42801697240/source98d2c55 passed422tests/49suites/zero skips,font,SDK31/96 andall8setupgroups,butnewapp compilationcaught a missing localreplyqueue in donateBytes. Declared that Utilityqueue inside the extracted method;freshcloudretry pending. NoIPA created byfailedattempt;no phone/physicalRAMclaim.
