@@ -66,6 +66,9 @@ bool  tl_bionic_is_system_lib(const char *soname);
 bool  tl_mm_address_space_short(void);
 /* The address space mapped outside the shared system libraries; *guest (if given): the guest's own anonymous part. */
 size_t tl_mm_address_space_used(size_t *guest);
+/* Physical capacity and current allocatable headroom (process-limited on iOS).
+ * This is not a guarantee that a particular virtual mapping will succeed. */
+void tl_bionic_memory_info(uint64_t *total, uint64_t *available);
 
 /* ----------------------------------------------------------------- errno */
 
