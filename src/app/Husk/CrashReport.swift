@@ -251,13 +251,17 @@ final class CrashReport: ObservableObject {
     /// Concrete error categories first; an unfinished checkpoint is only a
     /// localization hint, never evidence that the last subsystem caused a crash.
     private static func forkGuidance(mainLog: String, nativeLog: String, stages: String, config: [String: Any]) -> String {
-        let log = (mainLog + "\n" + nativeLog).lowercased()
+        let lines = RuntimeLogEvidence.currentLines(mainLog + "\n" + nativeLog)
+        let log = lines.joined(separator: "\n").lowercased()
         let checkpoints = stages.split(separator: "\n").map(String.init).filter { $0.contains("[fork-stage]") }
         let last = checkpoints.last ?? "No fork checkpoint recorded"
         var hints = ["Last completed checkpoint: " + last,
                      "This proves progress only, NOT root cause. Compare against Game Default / original driver with the same APK and JIT route."]
-        if log.contains("expansion file (obb) is missing") || log.contains("missing game data") {
+        if RuntimeLogEvidence.requiredOBBStartupFailure(lines) != nil {
             hints.append("Explicit missing game data/OBB: validate the exact game files and configured storage before changing Vulkan/JIT.")
+        }
+        if lines.contains(where: { $0.contains("mm: mmap FAILED") && $0.contains("errno=12") }) {
+            hints.append("A game memory mapping failed with ENOMEM. This can mean process memory pressure or an address-space/mapping limit; it does not prove jetsam, missing game data or a worker-policy fault. Preserve the existing cache and avoid increasing memory/cache budgets.")
         }
         if log.contains("vk_error_device_lost") || log.contains("device lost") {
             hints.append("Vulkan device lost: compare original bundled MoltenVK against experimental spatial/archive driver; disable MetalFX/archive one at a time.")
@@ -268,7 +272,7 @@ final class CrashReport: ObservableObject {
         if log.contains("jit prewarm failed") || log.contains("stikdebug is not servicing traps") {
             hints.append("Explicit JIT setup failure: check StikDebug attachment, debugged flag and supported native JIT mapping before changing game graphics.")
         }
-        if log.contains("pipeline") && (log.contains("failed") || log.contains("error")) {
+        if lines.contains(where: { line in let l = line.lowercased(); return l.contains("pipeline") && (l.contains("failed") || l.contains("error")) }) {
             hints.append("Pipeline errors are present. Compare with native pipeline archive and pipeline feedback disabled, keeping graphics/resolution constant.")
         }
         if log.contains("thread-policy") && (log.contains("rollback") || log.contains("frame spike")) {
