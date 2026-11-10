@@ -5,6 +5,7 @@
 #include <objc/runtime.h>
 #include <string.h>
 #include <stdlib.h>
+#include "../../translation-layer-next/husk-tl-memory-donor-policy.h"
 #ifndef VM_FLAGS_PURGABLE
 #define VM_FLAGS_PURGABLE 0x2
 #endif
@@ -36,9 +37,8 @@ __attribute__((constructor)) static void endpoint_transport(void)
 
 @interface HuskMemoryDonorHandler : NSObject <NSExtensionRequestHandling>
 @property(nonatomic, strong) xpc_connection_t channel;
-@property(nonatomic, strong) xpc_object_t memory;
-@property(nonatomic) vm_address_t base;
-@property(nonatomic) size_t bytes;
+@property(nonatomic, strong) NSMutableArray *memories;
+@property(nonatomic) uint64_t donatedBytes;
 @end
 @implementation HuskMemoryDonorHandler
 - (void)beginRequestWithExtensionContext:(NSExtensionContext *)context
@@ -52,7 +52,8 @@ __attribute__((constructor)) static void endpoint_transport(void)
     if (!raw || xpc_get_type(raw) != XPC_TYPE_ENDPOINT) return;
     self.channel = xpc_connection_create_from_endpoint(raw);
     if (!self.channel) return;
-    xpc_connection_set_target_queue(self.channel, dispatch_get_global_queue(QOS_CLASS_UTILITY, 0));
+    dispatch_queue_t queue = dispatch_queue_create("com.husk.memory-owner", dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_UTILITY, 0));
+    xpc_connection_set_target_queue(self.channel, queue);
     xpc_connection_set_event_handler(self.channel, ^(xpc_object_t request) {
         if (xpc_get_type(request) == XPC_TYPE_ERROR) { exit(0); }
         if (xpc_get_type(request) != XPC_TYPE_DICTIONARY) return;
@@ -60,18 +61,28 @@ __attribute__((constructor)) static void endpoint_transport(void)
         if (!reply) return;
         const char *op = xpc_dictionary_get_string(request, "op");
         uint64_t bytes = xpc_dictionary_get_uint64(request, "bytes");
-        /* One non-volatile region, with 256 MiB donor headroom. Never grow in a
-         * gameplay loop, touch it eagerly, or report a grant before it exists. */
-        if (op && !strcmp(op, "reserve") && bytes == (256ull << 20) && !self.memory
-            && os_proc_available_memory() >= bytes + (256ull << 20)) {
-            vm_address_t base = 0;
-            if (vm_allocate(mach_task_self(), &base, bytes, VM_FLAGS_ANYWHERE | VM_FLAGS_PURGABLE) == KERN_SUCCESS) {
-                xpc_object_t memory = xpc_shmem_create((void *)base, bytes);
-                if (memory) { self.memory = memory; self.base = base; self.bytes = bytes; }
-                else vm_deallocate(mach_task_self(), base, bytes);
+        xpc_dictionary_set_uint64(reply, "version", 2);
+        xpc_object_t memory = nil;
+        const char *reason = "protocol";
+        /* Each accepted request receives a distinct, non-volatile backing.
+         * Do not return a previous region or inflate the main-process tester. */
+        if (op && !strcmp(op, "reserve") && xpc_dictionary_get_uint64(request, "version") == 2) {
+            reason = "capacity";
+            if (self.memories.count < 128 && tl_memory_donor_request_allowed(bytes, os_proc_available_memory(), self.donatedBytes)) {
+                vm_address_t base = 0;
+                if (vm_allocate(mach_task_self(), &base, bytes, VM_FLAGS_ANYWHERE | VM_FLAGS_PURGABLE) == KERN_SUCCESS) {
+                    memory = xpc_shmem_create((void *)base, bytes);
+                    if (memory) {
+                        if (!self.memories) self.memories = [NSMutableArray array];
+                        [self.memories addObject:memory]; self.donatedBytes += bytes;
+                    } else { vm_deallocate(mach_task_self(), base, bytes); reason = "transport"; }
+                }
             }
         }
-        if (self.memory) xpc_dictionary_set_value(reply, "memory", self.memory);
+        if (memory) {
+            xpc_dictionary_set_value(reply, "memory", memory);
+            xpc_dictionary_set_uint64(reply, "bytes", bytes);
+        } else xpc_dictionary_set_string(reply, "reason", reason);
         xpc_connection_send_message(self.channel, reply);
     });
     xpc_connection_resume(self.channel);
