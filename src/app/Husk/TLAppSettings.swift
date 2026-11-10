@@ -133,6 +133,7 @@ struct TLAppSettings: Codable, Equatable {
     var pipelineFeedback = false
     var automaticDuoProfile = true
     var a20EfficiencyWorkers = true
+    var sharedMemoryReserve = true
     var spatialUpscaling = false
     var spatialInputPercent = 80
     var renderTargetInventory = false
@@ -241,6 +242,7 @@ struct TLAppSettings: Codable, Equatable {
         pipelineFeedback = try c.decodeIfPresent(Bool.self, forKey: .pipelineFeedback) ?? false
         automaticDuoProfile = try c.decodeIfPresent(Bool.self, forKey: .automaticDuoProfile) ?? true
         a20EfficiencyWorkers = try c.decodeIfPresent(Bool.self, forKey: .a20EfficiencyWorkers) ?? true
+        sharedMemoryReserve = try c.decodeIfPresent(Bool.self, forKey: .sharedMemoryReserve) ?? true
         spatialUpscaling = try c.decodeIfPresent(Bool.self, forKey: .spatialUpscaling) ?? false
         let inputPercent = try c.decodeIfPresent(Int.self, forKey: .spatialInputPercent) ?? 80
         spatialInputPercent = [80, 85, 90, 95].contains(inputPercent) ? inputPercent : 80
@@ -356,6 +358,9 @@ struct TLAppSettingsView: View {
                         ForEach(TLAppSettings.UnrealGraphics.allCases) { Text($0.title).tag($0) }
                     }
                     LabeledContent("Active Preset", value: settings.usesEfficientGraphics(for: app) ? "Sharp / Efficient" : (settings.usesSharpGraphics(for: app) ? "Sharp / High Quality" : "Game Default"))
+                    Toggle("Shared Game Memory", isOn: $settings.sharedMemoryReserve)
+                    Text("Uses an included helper for a bounded phone game-memory reserve when supported. Keep app extensions when installing. Restart required.")
+                        .font(.footnote).foregroundStyle(.secondary)
                     if settings.usesEfficientGraphics(for: app) {
                         if DuoDisplayPolicy.metrics(screen: .main).isInner {
                             Toggle("Automatic Duo Inner Screen", isOn: $settings.automaticDuoProfile)
