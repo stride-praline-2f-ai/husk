@@ -1,0 +1,8 @@
+{
+  "source": "d6c72546f0c57d653b37645fef8780407c385b37",
+  "source_tree": "6362ccb8e52f884cf4a23dcc3ff4bc947e498a24",
+  "local_commit": "b7a944c2",
+  "verification": "complete root tree entries match; source content identical",
+  "changed_files": 24,
+  "status": "passed"
+}
