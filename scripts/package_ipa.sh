@@ -178,6 +178,39 @@ for f in "$APP/PlugIns/HuskJITHelper.appex/HuskJITHelper" \
     fi
 done
 
+# Check the metadata iOS installd actually requires for every embedded
+# app extension. An executable can be present while CFBundleDisplayName is
+# absent; the previous Duo IPA passed our checks and still failed installation.
+python3 - "$APP" <<'PYEXTENSIONS'
+import plistlib
+import sys
+from pathlib import Path
+
+app = Path(sys.argv[1])
+plugins = sorted((app / "PlugIns").glob("*.appex"))
+expected = {"HuskMemoryDonor.appex", "HuskJITHelper.appex", "HuskDownloadsWidget.appex"}
+if {p.name for p in plugins} != expected:
+    raise SystemExit("Missing or unexpected app extensions: " + repr([p.name for p in plugins]))
+for extension in plugins:
+    info = extension / "Info.plist"
+    if not info.is_file():
+        raise SystemExit(f"{extension.name} missing Info.plist")
+    with info.open("rb") as handle:
+        metadata = plistlib.load(handle)
+    required = ("CFBundleDisplayName", "CFBundleIdentifier", "CFBundleExecutable")
+    for key in required:
+        value = metadata.get(key)
+        if not isinstance(value, str) or not value.strip():
+            raise SystemExit(f"{extension.name} missing required nonempty {key}")
+    executable = metadata["CFBundleExecutable"]
+    if not (extension / executable).is_file():
+        raise SystemExit(f"{extension.name} missing executable {executable}")
+    point = metadata.get("NSExtension", {}).get("NSExtensionPointIdentifier")
+    if not isinstance(point, str) or not point.strip():
+        raise SystemExit(f"{extension.name} missing NSExtensionPointIdentifier")
+    print(f"  ok       extension metadata          {extension.name}: {metadata['CFBundleDisplayName']}")
+PYEXTENSIONS
+
 [ $rc -eq 0 ] || { echo "==> bundle is not installable; refusing to package" >&2; exit 1; }
 
 echo "==> packaging"
