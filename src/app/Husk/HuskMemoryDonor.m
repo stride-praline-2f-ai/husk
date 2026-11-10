@@ -143,6 +143,7 @@ typedef NS_ENUM(NSInteger, HuskDonationResult) { HuskDonationOK, HuskDonationCap
 @property(nonatomic, strong) dispatch_queue_t queue;
 @property(nonatomic) uint64_t budget;
 @property(nonatomic) unsigned failures;
+@property(nonatomic) uint64_t lastUsageReceipt;
 @property(atomic) BOOL pressure;
 - (BOOL)prepare;
 - (void)enqueueGrowthFor:(size_t)minimum;
@@ -173,6 +174,24 @@ static void schedule_growth(void *context, size_t minimum)
     }
     return HuskDonationCapacity;
 }
+/* Bounded diagnostic: confirm that guest allocations actually used donated
+ * pages, rather than treating an XPC mapping as proof of game benefit. The
+ * sample runs once every 30s on Utility, never the render/allocation path. */
+- (void)scheduleUsageReceipt
+{
+    __weak HuskMemoryCoordinator *weak = self;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 30 * NSEC_PER_SEC), self.queue, ^{
+        HuskMemoryCoordinator *owner = weak;
+        if (!owner) return;
+        tl_memory_reserve_stats stats;
+        tl_memory_reserve_snapshot(&stats);
+        if (stats.served_allocations != owner.lastUsageReceipt) {
+            owner.lastUsageReceipt = stats.served_allocations;
+            [owner receipt];
+        }
+        [owner scheduleUsageReceipt];
+    });
+}
 - (void)receipt
 {
     tl_memory_reserve_stats stats; tl_memory_reserve_snapshot(&stats);
@@ -198,6 +217,7 @@ static void schedule_growth(void *context, size_t minimum)
         dispatch_async(owner.queue, ^{ tl_memory_reserve_set_growth_handler(NULL, NULL); });
     }];
     tl_memory_reserve_set_growth_handler(schedule_growth, (__bridge void *)self);
+    [self scheduleUsageReceipt];
     return YES;
 }
 - (void)enqueueGrowthFor:(size_t)minimum
@@ -234,7 +254,9 @@ static void schedule_growth(void *context, size_t minimum)
 void husk_memory_donor_prepare(const char *game_data_dir)
 {
     static atomic_bool attempted;
-    if (atomic_exchange(&attempted, true) || !game_data_dir || NSThread.isMainThread) return;
+    if (!game_data_dir || NSThread.isMainThread) return;
+    /* An invalid/main-thread probe must not consume the sole launch attempt. */
+    if (atomic_exchange(&attempted, true)) return;
     @autoreleasepool {
         /* Preserve the protected iPad baseline. Phones may opt out per game. */
         char model[64] = {0}; size_t count = sizeof(model);
@@ -252,7 +274,7 @@ void husk_memory_donor_prepare(const char *game_data_dir)
         coordinator = [HuskMemoryCoordinator new]; coordinator.budget = budget;
         if (![coordinator prepare]) {
             coordinator = nil;
-            tl_log_line("memory reserve: helper unavailable; retaining ordinary guest mmap");
+            tl_log_line("memory reserve: helper failed (extension transport, headroom or client mapping); retaining ordinary guest mmap");
         }
     }
 }
