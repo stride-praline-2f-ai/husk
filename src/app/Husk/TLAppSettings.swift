@@ -359,7 +359,7 @@ struct TLAppSettingsView: View {
                     }
                     LabeledContent("Active Preset", value: settings.usesEfficientGraphics(for: app) ? "Sharp / Efficient" : (settings.usesSharpGraphics(for: app) ? "Sharp / High Quality" : "Game Default"))
                     Toggle("Shared Game Memory", isOn: $settings.sharedMemoryReserve)
-                    Text("Uses an included helper for a bounded phone game-memory reserve when supported. Keep app extensions when installing. Restart required.")
+                    Text("Borrows extra game memory on iPhone when supported. Keep app extensions when installing; an additional App ID may be needed. Restart required.")
                         .font(.footnote).foregroundStyle(.secondary)
                     if settings.usesEfficientGraphics(for: app) {
                         if DuoDisplayPolicy.metrics(screen: .main).isInner {
