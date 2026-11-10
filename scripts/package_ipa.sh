@@ -166,6 +166,7 @@ done
 # StikDebug, but its JIT setup would offer a method that can only fail), and the
 # widget that draws the download Live Activity.
 for f in "$APP/PlugIns/HuskJITHelper.appex/HuskJITHelper" \
+         "$APP/PlugIns/HuskMemoryDonor.appex/HuskMemoryDonor" \
          "$APP/PlugIns/HuskDownloadsWidget.appex/HuskDownloadsWidget" \
          "$APP/Frameworks/StikJIT.framework/StikJIT" \
          "$APP/Frameworks/StikJIT.framework/Info.plist"; do
