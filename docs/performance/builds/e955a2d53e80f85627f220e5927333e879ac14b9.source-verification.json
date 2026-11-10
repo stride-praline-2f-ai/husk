@@ -1,0 +1,8 @@
+{
+  "source": "e955a2d53e80f85627f220e5927333e879ac14b9",
+  "tree": "c7355e8286c58b6adae1704eaea7207d9a62c318",
+  "local_commit": "c5c40ca5",
+  "verification": "all complete remote root tree entries identical; CI exact tree restore passed",
+  "status": "passed",
+  "package_source_stamp": "e955a2d53e80f85627f220e5927333e879ac14b9-dirty"
+}
