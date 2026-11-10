@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "husk-tl-memory-reserve.h"
+#include "husk-tl-memory-donor-policy.h"
 #include <pthread.h>
 #include <stdint.h>
 #include <string.h>
@@ -7,7 +8,7 @@
 #define PAGE_BYTES ((size_t)16384)
 #define MAX_REGION_BYTES ((size_t)256 << 20)
 #define MAX_TOTAL_BYTES ((size_t)6 << 30)
-#define LOW_WATER_BYTES ((size_t)64 << 20)
+#define LOW_WATER_BYTES ((size_t)TL_DONOR_PREFETCH_LOW_WATER)
 #define MAX_REGIONS 128
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 /* One byte per 16 KiB page: <=384 KiB metadata for the entire 6 GiB ceiling.
