@@ -232,4 +232,86 @@ int main(void){char old[32];memset(old,7,sizeof(old));
  failed=1;assert(b_mremap(old,32,64,1,NULL)==MAP_FAILED&&freed==2&&guest_errno==12&&old[0]==7);return 0;}
 ''')
 
+
+ def test_multiple_regions_growth_is_coalesced_reentrant_and_accounted(self):
+  self.compile_run(r"""
+#include "husk-tl-memory-reserve.h"
+#include <assert.h>
+#include <stdint.h>
+#include <string.h>
+#include <sys/mman.h>
+static unsigned calls;
+static void growth(void *context,size_t minimum){(void)minimum;assert(context==&calls);calls++;tl_memory_reserve_stats s;tl_memory_reserve_snapshot(&s);assert(s.regions);}
+static void *region(size_t size){void*p=mmap(NULL,size+16384,3,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);assert(p!=MAP_FAILED);return(void*)(((uintptr_t)p+16383)&~(uintptr_t)16383);}
+int main(void){
+ size_t bytes=4*16384;unsigned char *a=region(bytes),*b=region(bytes);
+ assert(tl_memory_reserve_install(a,bytes));tl_memory_reserve_set_growth_handler(growth,&calls);
+ assert(!tl_memory_reserve_install(a,bytes));assert(!tl_memory_reserve_install(a+16384,bytes));
+ assert(tl_memory_reserve_can_allocate(bytes));assert(tl_memory_reserve_alloc(bytes)==a&&calls==1);assert(!tl_memory_reserve_can_allocate(1));
+ for(int i=0;i<10;i++){assert(!tl_memory_reserve_alloc(16384));}assert(calls==1);
+ assert(tl_memory_reserve_install(b,bytes));assert(tl_memory_reserve_can_allocate(bytes));assert(!tl_memory_reserve_can_allocate(bytes+1));tl_memory_reserve_growth_finished();
+ assert(tl_memory_reserve_alloc(32768)==b&&calls==2);
+ tl_memory_reserve_stats s;tl_memory_reserve_snapshot(&s);
+ assert(s.mapped_bytes==bytes*2&&s.used_bytes==bytes+32768&&s.free_bytes==32768&&s.regions==2&&s.served_allocations==2&&s.fallback_allocations==10);
+ assert(!tl_memory_reserve_contains(a,bytes+16384));
+ assert(tl_memory_reserve_release(a,bytes));assert(tl_memory_reserve_release(a,bytes));
+ tl_memory_reserve_snapshot(&s);assert(s.used_bytes==32768&&s.free_bytes==bytes+32768);
+ assert(tl_memory_reserve_replace(a,16384,3));tl_memory_reserve_snapshot(&s);assert(s.used_bytes==49152);
+ assert(tl_memory_reserve_release(a,16384));assert(tl_memory_reserve_release(b,32768));
+ tl_memory_reserve_snapshot(&s);assert(!s.used_bytes&&s.free_bytes==s.mapped_bytes);
+ tl_memory_reserve_set_growth_handler(NULL,NULL);tl_memory_reserve_growth_finished();
+ assert(tl_memory_reserve_alloc(bytes)==a);assert(tl_memory_reserve_alloc(bytes)==b);assert(!tl_memory_reserve_alloc(1));assert(calls==2);
+ return 0;}
+""",['husk-tl-memory-reserve.c'])
+
+ def test_donor_policy_and_six_gib_virtual_registry_ceiling_without_touching_ram(self):
+  self.compile_run(r"""
+#include "husk-tl-memory-reserve.h"
+#include "husk-tl-memory-donor-policy.h"
+#include <assert.h>
+#include <stdint.h>
+#include <sys/mman.h>
+int main(void){
+ assert(tl_memory_donor_budget(12ull<<30)==(6ull<<30));assert(tl_memory_donor_budget(8ull<<30)==(4ull<<30));
+ assert(tl_memory_donor_budget(6ull<<30)==(3ull<<30));assert(!tl_memory_donor_budget(0));assert(tl_memory_donor_budget(UINT64_MAX)==(6ull<<30));
+ assert(tl_memory_donor_request_allowed(TL_DONOR_CHUNK,TL_DONOR_CHUNK+TL_DONOR_HEADROOM,0));
+ assert(!tl_memory_donor_request_allowed(TL_DONOR_CHUNK,TL_DONOR_CHUNK+TL_DONOR_HEADROOM-1,0));
+ assert(!tl_memory_donor_request_allowed(0,UINT64_MAX,0));assert(!tl_memory_donor_request_allowed(TL_DONOR_CHUNK+1,UINT64_MAX,0));
+ assert(!tl_memory_donor_request_allowed(512ull<<20,UINT64_MAX,0));
+ assert(tl_memory_donor_request_allowed(TL_DONOR_CHUNK,UINT64_MAX,TL_DONOR_MAX_BYTES-TL_DONOR_CHUNK));
+ assert(!tl_memory_donor_request_allowed(TL_DONOR_CHUNK,UINT64_MAX,TL_DONOR_MAX_BYTES));
+ assert(!tl_memory_donor_request_allowed(TL_DONOR_CHUNK,UINT64_MAX,UINT64_MAX));
+ /* Registry/overflow test only: reserve PROT_NONE virtual addresses, never
+  * fault in six GiB of RAM or claim this is a real phone donation test. */
+ size_t total=(size_t)6<<30;void *raw=mmap(NULL,total+16384,PROT_NONE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);assert(raw!=MAP_FAILED);
+ uintptr_t base=((uintptr_t)raw+16383)&~(uintptr_t)16383;
+ for(unsigned i=0;i<96;i++)assert(tl_memory_reserve_install((void*)(base+i*TL_DONOR_CHUNK),TL_DONOR_CHUNK));
+ assert(!tl_memory_reserve_install((void*)(base+total),16384));
+ assert(!tl_memory_reserve_install((void*)(base+1),16384));
+ tl_memory_reserve_stats s;tl_memory_reserve_snapshot(&s);assert(s.mapped_bytes==total&&s.free_bytes==total&&!s.used_bytes&&s.regions==96);
+ assert(!tl_memory_reserve_alloc((size_t)-1));return 0;}
+""",['husk-tl-memory-reserve.c'])
+
+ def test_concurrent_region_install_and_use_have_no_alias_or_stale_contents(self):
+  self.compile_run(r"""
+#include "husk-tl-memory-reserve.h"
+#include <assert.h>
+#include <stdint.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <pthread.h>
+#include <sched.h>
+static void *worker(void *ignored){(void)ignored;for(int i=0;i<600;i++){
+ unsigned char*p=NULL;for(int n=0;n<100000&&!p;n++){p=tl_memory_reserve_alloc(16384);if(!p)sched_yield();}
+ assert(p);for(int j=0;j<16384;j++){assert(!p[j]);}memset(p,9,16384);assert(tl_memory_reserve_release(p,16384));}return NULL;}
+int main(void){
+ size_t bytes=64*16384;void *raw=mmap(NULL,bytes+16384,3,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);assert(raw!=MAP_FAILED);
+ uintptr_t base=((uintptr_t)raw+16383)&~(uintptr_t)16383;
+ assert(tl_memory_reserve_install((void*)base,4*16384));
+ pthread_t threads[8];for(int i=0;i<8;i++)assert(!pthread_create(&threads[i],NULL,worker,NULL));
+ for(int i=1;i<16;i++)assert(tl_memory_reserve_install((void*)(base+i*4*16384),4*16384));
+ for(int i=0;i<8;i++)pthread_join(threads[i],NULL);
+ tl_memory_reserve_stats s;tl_memory_reserve_snapshot(&s);assert(!s.used_bytes&&s.free_bytes==bytes&&s.served_allocations==4800&&s.regions==16);return 0;}
+""",['husk-tl-memory-reserve.c'])
+
 if __name__=='__main__':unittest.main()
