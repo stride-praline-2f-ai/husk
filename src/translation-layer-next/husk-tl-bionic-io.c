@@ -1535,7 +1535,17 @@ static void *b_mmap(void *addr, size_t len, int prot, int flags, int fd, long of
     }
     if (r != MAP_FAILED && (flags & 0x20)) anon_add(r, len);
     mm_trace("mmap", r, len, prot, flags);
-    if (r == MAP_FAILED) tl_log_line("mm: mmap FAILED len=%#zx prot=%d flags=%#x errno=%d", len, prot, flags, errno);
+    if (r == MAP_FAILED) {
+        const int saved_errno = errno;
+        tl_memory_reserve_stats reserve;
+        tl_memory_reserve_snapshot(&reserve);
+        tl_log_line("mm: mmap FAILED len=%#zx prot=%d flags=%#x errno=%d; shared donor mapped=%zuMiB used=%zuMiB free=%zuMiB served=%llu reserve_misses=%llu",
+                    len, prot, flags, saved_errno, reserve.mapped_bytes >> 20,
+                    reserve.used_bytes >> 20, reserve.free_bytes >> 20,
+                    (unsigned long long)reserve.served_allocations,
+                    (unsigned long long)reserve.fallback_allocations);
+        errno = saved_errno;
+    }
     return r;
 }
 static int b_munmap(void *a, size_t l)
