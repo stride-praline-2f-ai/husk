@@ -1,0 +1,27 @@
+{
+  "build": 153,
+  "attempts": [
+    {
+      "run": 42793468613,
+      "runner": "owner Mac",
+      "conclusion": "cancelled"
+    },
+    {
+      "run": 42793670182,
+      "runner": "hosted ARM64",
+      "conclusion": "failure",
+      "failures": [
+        "new test fixture compiler macro/type collisions"
+      ],
+      "other_setup_groups_passed": 7,
+      "app_compiled": false
+    },
+    {
+      "run": 42794586409,
+      "runner": "hosted ARM64",
+      "conclusion": null,
+      "status": "in_progress",
+      "runtime_changes_since_failure": false
+    }
+  ]
+}
