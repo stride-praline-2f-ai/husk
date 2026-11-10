@@ -30,6 +30,7 @@ static int previous_power = -1;
 static const char *last_reason;
 static int64_t reason_at;
 static double baseline_fps,baseline_p95,baseline_low,baseline_high;
+static bool cadence_rejected; /* Relative trial: retain a rejected launch's baseline. */
 static bool trial_mode(int mode){return mode==3||mode==4;}
 static void reset_baseline(void){baseline_fps=baseline_p95=baseline_low=baseline_high=0;}
 
@@ -158,9 +159,13 @@ void tl_thread_policy_sample(int64_t now, int64_t span, double fps, double p95_m
         pipeline_max_ns > TL_WORKER_PIPELINE_MAX_NS || pipeline_ns > (uint64_t)span / 200 ? "pipeline cost" :
         !(fps >= minimum_fps && p95_ms > 0 && p95_ms <= maximum_p95 && max_frame_ms > 0 && max_frame_ms <= 50) ? "frame cadence" : NULL;
     /* Small measured pipeline work is allowed; cadence does not prove headroom. */
+    if (!reason && relative && cadence_rejected) reason = "earlier cadence regression; Balanced retained until restart";
     bool healthy = !reason;
     if (atomic_load(&trial_active)) {
-        if (!healthy) { set_trial(false, reason); cooldown_until = now + 60000000000LL; stable_ns = 0; }
+        if (!healthy) {
+            if (relative && !strcmp(reason, "frame cadence")) cadence_rejected = true;
+            set_trial(false, reason); cooldown_until = now + 60000000000LL; stable_ns = 0;
+        }
     } else if (healthy && now >= cooldown_until) {
         if(relative){
             if(!stable_ns){baseline_low=baseline_high=fps;baseline_p95=p95_ms;}
@@ -197,7 +202,7 @@ void tl_thread_policy_activate(const char *project)
     pthread_mutex_lock(&observation_mu);memset(worker_records,0,sizeof(worker_records));pthread_mutex_unlock(&observation_mu);
     atomic_store(&log_events, 0);
     atomic_store(&trial_active, false); atomic_fetch_add(&revision, 1);
-    stable_ns = cooldown_until = last_sample = 0; previous_power = -1;
+    stable_ns = cooldown_until = last_sample = 0; previous_power = -1; cadence_rejected = false;
     last_reason = NULL; reason_at = 0; reset_baseline();
     if (trial_mode(mode)) tl_log_line("thread-policy adaptive: runtime CPU count %d, reserved normal-worker budget %d; total-capacity heuristic, not detected P/E topology", atomic_load(&capacity_cpus), atomic_load(&fast_workers));
     if (mode) tl_log_line("thread-policy: %s for Dungeons; normal Default and background Utility baseline; extra caps only in admitted Adaptive trials; no core affinity",
