@@ -1,0 +1,17 @@
+{
+  "source": "adff0fc402c1c0f7989455fb234addcbe3af8d28",
+  "attempts": [
+    {
+      "run_id": 42690026822,
+      "job_id": 129407012372,
+      "status": "cancelled",
+      "reason": "superseded by explicitly requested one-time cloud run"
+    },
+    {
+      "run_id": 42694261267,
+      "job_id": 129421784044,
+      "status": "success",
+      "artifact_id": 13709147714
+    }
+  ]
+}
