@@ -1,0 +1,22 @@
+{
+  "source": "d6c72546f0c57d653b37645fef8780407c385b37",
+  "build": 153,
+  "run_id": 42793670182,
+  "job_id": 129753211132,
+  "status": "in_progress",
+  "conclusion": null,
+  "workflow_revision": "4ee1be3578278893739ddc6aeefea43a39db51a6",
+  "runner_request": "xcode-27",
+  "future_runner_default": "self-hosted/macOS/ARM64",
+  "package_verification": "pending",
+  "portable": {
+    "suites": 49,
+    "reported_tests": 411,
+    "deferred_apple_checks": 28,
+    "python_failures": 0,
+    "mac_font": "unavailable on Linux; Apple gate pending"
+  },
+  "observed_at_utc": "2026-11-10 09:48:47 UTC",
+  "apple_regressions_step": "success",
+  "current_step": "Prepare cached owner Mac build tools and check Vulkan SDK ABI"
+}
