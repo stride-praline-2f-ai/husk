@@ -6,9 +6,19 @@
   "run_id": 42694261267,
   "job_id": 129421784044,
   "workflow_revision": "5e11aac3ed0d4672a7f190e6653abc91b17c0a1f",
-  "status": "queued",
-  "artifact_id": null,
-  "apple_checks": "pending; expected414tests/49suites plusfont/SDK31/96/driver11exports/all8setupgroups",
+  "status": "success",
+  "artifact_id": 13709147714,
+  "apple_checks": {
+    "tests": 414,
+    "suites": 49,
+    "skipped": 0,
+    "font": "pass",
+    "sdk_structures": 31,
+    "sdk_offsets": 96,
+    "driver_exports": 11,
+    "setup_groups_passed": 8,
+    "setup_groups_total": 8
+  },
   "local_checks": {
     "suites": 49,
     "reported": 406,
@@ -19,13 +29,8 @@
   "energy": "unmeasured",
   "checklist": "A20-QOS-v1",
   "implementation_build_gates": {
-    "passed": 1,
-    "total": 4,
-    "pending": [
-      "full Apple execution/SDK",
-      "fresh app/sign/package/upload",
-      "independent IPA verification"
-    ]
+    "passed": 4,
+    "total": 4
   },
   "device_gates": {
     "passed": 0,
@@ -44,5 +49,11 @@
     "job_id": 129407012372,
     "status": "cancelled",
     "reason": "superseded by explicitly requested one-time cloud run"
-  }
+  },
+  "environment": "GitHub-hosted ARM64 xcode-27; Xcode27.1/27A9275",
+  "app": "fresh source build; ad hoc signed and packaged",
+  "zip_sha256": "3ba4ff0be3b64d60a36e272dd6c058569486e50378ecf68613a87fa6731d86d9",
+  "ipa_sha256": "d25e6f6b422de094a79f386b4bccfbb9fb08a99da1a71944135bbfe10802d6f8",
+  "expires_at": "2026-11-16T20:49:19Z",
+  "independent_package_verification": "pass"
 }
