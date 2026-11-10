@@ -198,6 +198,19 @@ void exercise_naming(int path, const char *name, int failure) {
                        {'maximum':50.01},{'thermal':1},{'span':1},{'fps':58},{'p95':21}):
             self.reset(mode=3); self.sample(10,**kwargs); self.sample(20,**kwargs)
             self.assertFalse(self.lib.tl_thread_policy_trial_active())
+
+    def test_relative_cadence_loss_does_not_repeat_trial_until_next_launch(self):
+        self.reset(qos=NORMAL,mode=4);self.lib.husk_ue4_set_worker_capacity(6)
+        self.name(b'TaskGraphNP 3')
+        self.sample(10,fps=60,p95=18);self.sample(20,fps=60,p95=18)
+        self.assertTrue(self.lib.tl_thread_policy_trial_active())
+        self.lib.tl_thread_policy_checkpoint();self.assertEqual(self.lib.current_qos(),UTILITY)
+        self.sample(30,fps=58.9,p95=20.49)
+        self.lib.tl_thread_policy_checkpoint();self.assertEqual(self.lib.current_qos(),NORMAL)
+        for seconds in range(40,201,10):self.sample(seconds,fps=60,p95=18)
+        self.assertFalse(self.lib.tl_thread_policy_trial_active())
+        self.reset(mode=4);self.sample(10,fps=60,p95=18);self.sample(20,fps=60,p95=18)
+        self.assertTrue(self.lib.tl_thread_policy_trial_active())
         self.reset(mode=3); self.admit(); self.sample(30,low=True)
         self.assertFalse(self.lib.tl_thread_policy_trial_active())
 
