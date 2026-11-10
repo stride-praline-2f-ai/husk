@@ -1,0 +1,15 @@
+{
+  "source": "98d2c558691cd7bad94ea21ebe2e7c1fbed6e93f",
+  "tree": "dfa989758a77b497f157324900813cff71c1fcc5",
+  "build": 154,
+  "run": 42801697240,
+  "job": 129780571198,
+  "conclusion": "failure",
+  "apple_tests": 422,
+  "apple_skips": 0,
+  "regression_suites": 49,
+  "setup_groups_passed": 8,
+  "app_compilation_error": "donateBytes method missing its local Utility reply queue after extraction from connect",
+  "correction": "declare dispatch_get_global_queue(QOS_CLASS_UTILITY,0) inside donateBytes",
+  "ipa_created": false
+}
