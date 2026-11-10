@@ -120,6 +120,7 @@ targets:
     dependencies:
       # Built-in StikJIT's debugger process. Embedded into PlugIns/.
       - target: HuskJITHelper
+      - target: HuskMemoryDonor
       # The download Live Activity (Lock Screen and Dynamic Island). Embedded into PlugIns/.
       - target: HuskDownloadsWidget
       # Built by scripts/build_ios.sh. Embedded and signed into the bundle.
@@ -269,6 +270,21 @@ targets:
   # Built-in StikJIT's debugger (docs/06-built-in-jit.md). A process cannot
   # synchronously debug itself, so StikJIT runs here and attaches to the app.
   # iOS 26 only: the app falls back to StikDebug below that.
+  HuskMemoryDonor:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "15.5"
+    sources:
+      - path: HuskMemoryDonor
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(HUSK_BUNDLE_IDENTIFIER).MemoryDonor
+        INFOPLIST_FILE: HuskMemoryDonor/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        APPLICATION_EXTENSION_API_ONLY: YES
+        CODE_SIGN_STYLE: Automatic
+        TARGETED_DEVICE_FAMILY: "1,2"
+
   HuskJITHelper:
     type: app-extension
     platform: iOS
