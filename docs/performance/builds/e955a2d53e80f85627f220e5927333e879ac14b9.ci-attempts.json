@@ -1,0 +1,35 @@
+{
+  "build": 153,
+  "attempts": [
+    {
+      "run": 42793468613,
+      "conclusion": "cancelled",
+      "runner": "owner Mac"
+    },
+    {
+      "run": 42793670182,
+      "conclusion": "failure",
+      "reason": "two new Apple fixture namespace conflicts",
+      "app_compiled": false,
+      "other_setup_groups_passed": 7
+    },
+    {
+      "run": 42794586409,
+      "conclusion": "success",
+      "source": "89c826610836bd4bc36760b9ecf612a920c359e7",
+      "tests": 419,
+      "artifact": 13754050381,
+      "independent_package_verified": true,
+      "retained": "intermediate; final adds established lazy extension-framework loading"
+    },
+    {
+      "run": 42795743882,
+      "conclusion": "success",
+      "source": "e955a2d53e80f85627f220e5927333e879ac14b9",
+      "tests": 419,
+      "artifact": 13754305972,
+      "independent_package_verified": true,
+      "delivery": "final"
+    }
+  ]
+}
