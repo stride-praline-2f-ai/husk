@@ -25,6 +25,11 @@
 #include <sys/sysctl.h>
 #include <sys/utsname.h>
 #include <unistd.h>
+#include <TargetConditionals.h>
+#include <mach/mach.h>
+#if TARGET_OS_IPHONE
+#include <os/proc.h>
+#endif
 
 #include "husk-tl-ld.h"
 #include "husk-tl-va.h"
@@ -164,15 +169,35 @@ const char *tl_sysprop(const char *name)
 /* __system_property_find returns an opaque pointer that read() takes back. */
 /* sysinfo(2): what the engines ask for to size their caches -- how much RAM there is, and how much is free. */
 typedef struct { long uptime; unsigned long loads[3], totalram, freeram, sharedram, bufferram, totalswap, freeswap; unsigned short procs, pad; unsigned long totalhigh, freehigh; unsigned int mem_unit; char pad2[4]; } guest_sysinfo;
+void tl_bionic_memory_info(uint64_t *total, uint64_t *available)
+{
+    int saved_errno = errno;
+    uint64_t mem = 0, free_bytes = 0; size_t len = sizeof(mem);
+    if (sysctlbyname("hw.memsize", &mem, &len, NULL, 0) != 0) mem = 0;
+#if TARGET_OS_IPHONE
+    /* The app's additional allocation headroom, rather than a fixed fraction
+     * of the device RAM. Zero is valid under pressure; never inflate it. */
+    free_bytes = os_proc_available_memory();
+#else
+    vm_statistics64_data_t stats; mach_msg_type_number_t count = HOST_VM_INFO64_COUNT;
+    vm_size_t page = 0; mach_port_t host = mach_host_self();
+    if (host_statistics64(host, HOST_VM_INFO64, (host_info64_t)&stats, &count) == KERN_SUCCESS
+        && host_page_size(host, &page) == KERN_SUCCESS)
+        free_bytes = (uint64_t)stats.free_count * page;
+    mach_port_deallocate(mach_task_self(), host);
+#endif
+    *total = mem;
+    *available = free_bytes < mem ? free_bytes : mem;
+    errno = saved_errno;
+}
 static int bionic_sysinfo(guest_sysinfo *si)
 {
     memset(si, 0, sizeof(*si));
-    uint64_t mem = 0; size_t len = sizeof(mem);
-    sysctlbyname("hw.memsize", &mem, &len, NULL, 0);
+    uint64_t mem, available; tl_bionic_memory_info(&mem, &available);
     struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
     si->uptime = ts.tv_sec;
     si->totalram = (unsigned long)mem;
-    si->freeram = (unsigned long)(mem / 4);
+    si->freeram = (unsigned long)available;
     si->mem_unit = 1;
     si->procs = 1;
     return 0;
@@ -564,8 +589,7 @@ static long bionic_sysconf(int name)
     case 38:   return 1024;                                  /* _SC_IOV_MAX */
     case 39: case 40: return 16384;                          /* _SC_PAGESIZE / _SC_PAGE_SIZE */
     case 96: case 97: return getenv("TL_NCPU") ? atol(getenv("TL_NCPU")) : (long)sysconf(_SC_NPROCESSORS_ONLN);   /* _SC_NPROCESSORS_CONF / ONLN */
-    case 98: { uint64_t m = 0; size_t l = sizeof(m); sysctlbyname("hw.memsize", &m, &l, NULL, 0); return (long)(m / 16384); }
-    case 99: { uint64_t m = 0; size_t l = sizeof(m); sysctlbyname("hw.memsize", &m, &l, NULL, 0); return (long)(m / 16384 / 2); }
+    case 98: case 99: { uint64_t m, a; tl_bionic_memory_info(&m, &a); return (long)((name == 98 ? m : a) / 16384); }
     case 100:  return 200809;                                /* _SC_MONOTONIC_CLOCK */
     case 0x4a: return 16384;                                 /* _SC_THREAD_STACK_MIN-ish */
     default:
