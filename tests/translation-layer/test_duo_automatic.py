@@ -59,12 +59,12 @@ if mode=="geometry" {
 } else if mode=="decode" {
  let original=Data("{\"spatialUpscaling\":false,\"efficientResolution\":65,\"customResolutionPercent\":71}".utf8)
  let settings=try JSONDecoder().decode(TLAppSettings.self,from:original)
- assert(settings.automaticDuoProfile && settings.a20EfficiencyWorkers && !settings.spatialUpscaling && settings.efficientResolution == .performance && settings.customResolutionPercent==71)
+ assert(settings.automaticDuoProfile && settings.a20EfficiencyWorkers && settings.sharedMemoryReserve && !settings.spatialUpscaling && settings.efficientResolution == .performance && settings.customResolutionPercent==71)
  assert(settings.supportsDuoAutomatic(for:game))
  assert(!settings.supportsDuoAutomatic(for:TLApp(label:"Other game",packageName:nil,report:FakeReport(nativeEngine:.ue4))))
- var manual=settings;manual.automaticDuoProfile=false;manual.a20EfficiencyWorkers=false
+ var manual=settings;manual.automaticDuoProfile=false;manual.a20EfficiencyWorkers=false;manual.sharedMemoryReserve=false
  let roundtrip=try JSONDecoder().decode(TLAppSettings.self,from:JSONEncoder().encode(manual))
- assert(!roundtrip.automaticDuoProfile && !roundtrip.a20EfficiencyWorkers && roundtrip.customResolutionPercent==71 && !roundtrip.spatialUpscaling)
+ assert(!roundtrip.automaticDuoProfile && !roundtrip.a20EfficiencyWorkers && !roundtrip.sharedMemoryReserve && roundtrip.customResolutionPercent==71 && !roundtrip.spatialUpscaling)
 } else if mode=="duo-settings" {
  var settings=TLAppSettings();settings.efficientResolution = .native
  UIDevice.current.userInterfaceIdiom = .pad // inner-screen UI idiom must not accidentally select the iPad budget
