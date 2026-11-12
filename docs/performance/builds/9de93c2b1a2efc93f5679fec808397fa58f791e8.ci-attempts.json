@@ -1,0 +1,28 @@
+{
+  "scope": "build154",
+  "attempts": [
+    {
+      "run_id": 42801697240,
+      "source": "98d2c558691cd7bad94ea21ebe2e7c1fbed6e93f",
+      "outcome": "compile failed after Apple checks; local donateBytes reply queue missing; corrected; no IPA"
+    },
+    {
+      "run_id": 42802842091,
+      "source": "eac936eda737b80b570d1df28d9016f0b898145c",
+      "outcome": "build passed but superseded; memory helper display name later corrected; do not deliver old artifact"
+    },
+    {
+      "run_id": 42822646824,
+      "outcome": "cancelled, not a passing build"
+    },
+    {
+      "run_id": 42822931182,
+      "outcome": "cancelled, not a passing build"
+    },
+    {
+      "run_id": 42823997904,
+      "source": "9de93c2b1a2efc93f5679fec808397fa58f791e8",
+      "outcome": "success; final package independently verified including all extension metadata"
+    }
+  ]
+}
