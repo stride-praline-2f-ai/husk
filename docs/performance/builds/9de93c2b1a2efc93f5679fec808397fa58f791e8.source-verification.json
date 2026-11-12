@@ -1,0 +1,7 @@
+{
+  "source": "9de93c2b1a2efc93f5679fec808397fa58f791e8",
+  "tree": "79922c51f855939902ce266673910bc36712fc08",
+  "verification": "all complete remote root entries match reconstructed local reviewed source; exact restored source in successful CI; packaged stamp agrees",
+  "status": "passed",
+  "package_source_stamp": "9de93c2b1a2efc93f5679fec808397fa58f791e8-dirty"
+}
