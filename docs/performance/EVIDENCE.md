@@ -291,3 +291,8 @@ User requested actual whole-plan implementation and outstanding fixes before fur
 
 
 Build153disposition:e955a2d53e80f85627f220e5927333e879ac14b9,hosted42795743882,419Apple tests/0skips and independent downloadedIPA/helper/source/library verification passed. Boundedphone donor and memory/resource repairs implemented;actualcrashprevention/energyunknown. [Final handover](builds/e955a2d53e80f85627f220e5927333e879ac14b9.md).
+
+
+## 12 November 2026 — SCALABLE-DONOR-v1 verified candidate
+
+[Build154 final handover](builds/9de93c2b1a2efc93f5679fec808397fa58f791e8.md), with adjacent CI, attempt, source, package and fixed-score JSON records. Hosted run42823997904 passed422Apple checks/49suites, font, SDK31/96, all8setupgroups and fresh app/helper/sign/package. Independent downloaded package/source/library/driver checks include required metadata for all3extensions and multiple donor instances. Real shared backing growth,128MiB prefetch and helper installation fix preserved; earlier eac936 artifact superseded. Build4/4; physical0/2; energyunknown0/1; no all12GB/cooling guarantee or new logs requested. Wholeplan31.11%/implementation79.795918% unchanged.
