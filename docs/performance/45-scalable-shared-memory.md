@@ -28,3 +28,10 @@ Primary release2.7API was fetched directly and confirms the exact announcement w
 
 
 Apple attempt42801697240/source98d2c55 passed422tests/49suites/zero skips,font,SDK31/96 andall8setupgroups,butnewapp compilationcaught a missing localreplyqueue in donateBytes. Declared that Utilityqueue inside the extracted method;freshcloudretry pending. NoIPA created byfailedattempt;no phone/physicalRAMclaim.
+
+
+## 12 November final verification — supersedes pending status above
+
+[Final build154 handover](builds/9de93c2b1a2efc93f5679fec808397fa58f791e8.md), source9de93c2b1a2efc93f5679fec808397fa58f791e8/tree79922c51f855939902ce266673910bc36712fc08, hostedrun42823997904:422Apple tests/49suites/zero skips,font,SDK31/96,8setupgroups,freshapp/helper/sign/package/upload passed. Independent downloaded source/plist/ARM64/signature presence/resources/library/driver verification passed; all three extension display names/executables/identifiers/points verified. The first eac936 successful154 is superseded by the later helper display-name installation fix. Later changes reviewed and preserved:128MiB low-water early replenishment,30-second changed-usage receipts,invalid-probe attempt fix and errno-preserving reserve state on actual mmap failure. No graphics/driver/RAM-ceiling change or new device/energy claim.
+
+SCALABLE-DONOR-v1 implementation/build4/4=100%; phone0/2=0%; energy0/1=0%,benefitunknown. Actual grant and gameplay stability still pending; main-process tester does not measure donated shared backing. Existing fixedwholeplan31.11%/weightedimplementation79.795918% unchanged. No new general gameplay/export campaign. Current later cloud workflow/manifest preserved. Final IPA is144223149bytes,SHA256df9f346e9a73a562790e04f799dfc79b3c1465015b698664373c38c731d6cfbe.
