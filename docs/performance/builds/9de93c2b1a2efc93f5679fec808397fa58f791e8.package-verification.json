@@ -1,0 +1,84 @@
+{
+  "zip_sha256": "d9f51c42a184a4630d8f36e441940a2fe5952e58838713d6eb58f3d46dcea107",
+  "zip_bytes": 144223287,
+  "ipa_sha256": "df9f346e9a73a562790e04f799dfc79b3c1465015b698664373c38c731d6cfbe",
+  "ipa_bytes": 144223149,
+  "info": {
+    "CFBundleIdentifier": "com.husk.app",
+    "CFBundleShortVersionString": "3.4",
+    "CFBundleVersion": "154",
+    "MinimumOSVersion": "15.5",
+    "HuskBuildCommit": "9de93c2b1a2efc93f5679fec808397fa58f791e8-dirty",
+    "HuskBuildDate": "2026-11-10 13:26 UTC"
+  },
+  "extensions": {
+    "HuskDownloadsWidget.appex": {
+      "display_name": "Husk Downloads",
+      "identifier": "com.husk.app.Downloads",
+      "arm64": true,
+      "signature_present": true,
+      "extension_point": "com.apple.widgetkit-extension"
+    },
+    "HuskJITHelper.appex": {
+      "display_name": "Husk JIT Helper",
+      "identifier": "com.husk.app.JITHelper",
+      "arm64": true,
+      "signature_present": true,
+      "extension_point": "com.apple.ar.viewer"
+    },
+    "HuskMemoryDonor.appex": {
+      "display_name": "Husk Memory Donor",
+      "identifier": "com.husk.app.MemoryDonor",
+      "arm64": true,
+      "signature_present": true,
+      "extension_point": "com.apple.ar.viewer"
+    }
+  },
+  "shared_memory_helper": {
+    "embedded": true,
+    "arm64": true,
+    "signature_present": true,
+    "principal_class": "HuskMemoryDonorHandler"
+  },
+  "donor_checks": {
+    "libqemu-aarch64-softmmu.dylib": "matching protected donor",
+    "libANGLE-shared.dylib": "matching3.4 donor",
+    "MoltenVK.framework/MoltenVK": "matching3.4 donor",
+    "libhuskps4.dylib": "matching3.4 donor",
+    "libFilePickerFix.dylib": "matching3.4 donor"
+  },
+  "driver_manifest": {
+    "schema": 1,
+    "upstream_commit": "db66022459ffb663aa2b50f6b018bc2e124f5edf",
+    "upstream_version": "1.4.2",
+    "husk_spatial_patch_sha256": "584dfa2366061f345e6ab08f3b37225b79c98cd81594c8026ab8ef13be87af5a",
+    "husk_native_pipeline_patch_sha256": "584dfa2366061f345e6ab08f3b37225b79c98cd81594c8026ab8ef13be87af5a",
+    "native_archive_abi": 2,
+    "native_archive_cache_schema": 2,
+    "native_archive_compatibility_id": "a734100aa2a773b1e782c33b541593c02e7bba35aa28a5524ea30f2025202c50",
+    "native_archive_compatibility_inputs": {
+      "schema": 2,
+      "upstream_commit": "db66022459ffb663aa2b50f6b018bc2e124f5edf",
+      "spirv_cross_revision": "6c09849fe88c48eaed08413aa022aaa136a3a057",
+      "compiler_contract": "husk-native-default-mvk-compiler-contract-v1",
+      "archive_format_owner": "Metal binary archive"
+    },
+    "feature": "M9-SPATIAL-v3+M5-NATIVE-ARCHIVE-v1+M4-DISPLAY-v1",
+    "default_enabled": false
+  },
+  "driver_exports": [
+    "_vkHuskArchiveConfigure",
+    "_vkHuskArchiveForget",
+    "_vkHuskArchivePrepare",
+    "_vkHuskArchivePriority",
+    "_vkHuskArchiveSnapshot",
+    "_vkHuskDisplayConfigure",
+    "_vkHuskDisplaySnapshot",
+    "_vkHuskSpatialBindings",
+    "_vkHuskSpatialConfigure",
+    "_vkHuskSpatialObservations",
+    "_vkHuskSpatialSnapshot"
+  ],
+  "ipa_crc": "pass",
+  "source": "9de93c2b1a2efc93f5679fec808397fa58f791e8"
+}
