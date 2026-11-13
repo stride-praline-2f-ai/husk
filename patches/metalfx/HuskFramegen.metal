@@ -12,16 +12,22 @@ kernel void huskFlow(texture2d<float,access::sample> previous [[texture(0)]],
     float2 size=float2(current.get_width(),current.get_height());
     float2 centre=(float2(tid)+0.5f)*size/float2(flow.get_width(),flow.get_height());
     float best=INFINITY;float2 displacement=0;
-    for(int y=-4;y<=4;y+=2)for(int x=-4;x<=4;x+=2){
-        float error=0;
-        for(int v=-1;v<=1;v++)for(int u=-1;u<=1;u++){
-            float2 p=centre+float2(u,v)*3.0f;
-            float a=fgLuma(previous.sample(fgSampler,(p+float2(x,y))/size).rgb);
-            float b=fgLuma(current.sample(fgSampler,p/size).rgb);
-            error+=abs(a-b);
+    // A bounded two-level search covers normal camera movement without a
+    // full-resolution dense-flow solve: +/-16px coarse, +/-4px refinement.
+    for(uint level=0;level<2;level++){
+        int step=level?2:8,radius=level?4:16;
+        float2 origin=level?displacement:float2(0);
+        for(int y=-radius;y<=radius;y+=step)for(int x=-radius;x<=radius;x+=step){
+            float2 candidate=origin+float2(x,y);float error=0;
+            for(int v=-1;v<=1;v++)for(int u=-1;u<=1;u++){
+                float2 p=centre+float2(u,v)*3.0f;
+                float a=fgLuma(previous.sample(fgSampler,(p+candidate)/size).rgb);
+                float b=fgLuma(current.sample(fgSampler,p/size).rgb);
+                error+=abs(a-b);
+            }
+            error=error/9.0f+0.0001f*dot(candidate,candidate);
+            if(error<best){best=error;displacement=candidate;}
         }
-        error=error/9.0f+0.0001f*float(x*x+y*y);
-        if(error<best){best=error;displacement=float2(x,y);}
     }
     flow.write(half4(half2(displacement),half(best),1),tid);
 }

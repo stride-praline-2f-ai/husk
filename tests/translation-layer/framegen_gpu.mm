@@ -34,14 +34,16 @@ int main(int argc,char**argv){@autoreleasepool{
     auto forward=texture(device,4,4,MTLPixelFormatRGBA16Float),backward=texture(device,4,4,MTLPixelFormatRGBA16Float);
     auto out=texture(device,64,64,MTLPixelFormatRGBA8Unorm);assert(a&&b&&forward&&backward&&out);
     uint8_t pixels[64*64*4];
+    auto queue=[device newCommandQueue];
+    for(unsigned motion=4;motion<=16;motion+=12){
     for(unsigned shift=0;shift<2;shift++){
         for(unsigned y=0;y<64;y++)for(unsigned x=0;x<64;x++){
-            unsigned offset=(y*64+x)*4;uint8_t value=(uint8_t)((x>=shift*4?x-shift*4:0)*4);
+            unsigned offset=(y*64+x)*4;uint8_t value=(uint8_t)((x>=shift*motion?x-shift*motion:0)*4);
             pixels[offset]=pixels[offset+1]=pixels[offset+2]=value;pixels[offset+3]=255;
         }
         [(shift?b:a) replaceRegion:MTLRegionMake2D(0,0,64,64) mipmapLevel:0 withBytes:pixels bytesPerRow:256];
     }
-    auto queue=[device newCommandQueue];auto command=[queue commandBuffer];
+    auto command=[queue commandBuffer];
     for(unsigned reverse=0;reverse<2;reverse++){
         auto e=[command computeCommandEncoder];[e setTexture:reverse?b:a atIndex:0];[e setTexture:reverse?a:b atIndex:1];
         [e setTexture:reverse?backward:forward atIndex:2];dispatch(e,flow,4,4);[e endEncoding];
@@ -50,12 +52,13 @@ int main(int argc,char**argv){@autoreleasepool{
     [e setTexture:forward atIndex:2];[e setTexture:backward atIndex:3];[e setTexture:out atIndex:4];dispatch(e,interpolate,64,64);[e endEncoding];
     [command commit];[command waitUntilCompleted];assert(command.status==MTLCommandBufferStatusCompleted);
     __fp16 vectors[4*4*4];[forward getBytes:vectors bytesPerRow:32 fromRegion:MTLRegionMake2D(0,0,4,4) mipmapLevel:0];
-    assert(fabs((float)vectors[(2*4+2)*4]+4.0f)<0.5f);
+    assert(fabs((float)vectors[(2*4+2)*4]+(float)motion)<0.5f);
     [out getBytes:pixels bytesPerRow:256 fromRegion:MTLRegionMake2D(0,0,64,64) mipmapLevel:0];
-    unsigned centre=(32*64+32)*4;assert(abs((int)pixels[centre]-120)<=2);
+    unsigned centre=(32*64+32)*4;assert(abs((int)pixels[centre]-(int)((32-motion/2)*4))<=2);
     command=[queue commandBuffer];e=[command computeCommandEncoder];[e setTexture:b atIndex:0];[e setTexture:out atIndex:1];dispatch(e,copy,64,64);[e endEncoding];
     [command commit];[command waitUntilCompleted];assert(command.status==MTLCommandBufferStatusCompleted);
-    [out getBytes:pixels bytesPerRow:256 fromRegion:MTLRegionMake2D(0,0,64,64) mipmapLevel:0];assert(pixels[centre]==112&&pixels[centre+3]==255);
+    [out getBytes:pixels bytesPerRow:256 fromRegion:MTLRegionMake2D(0,0,64,64) mipmapLevel:0];assert(pixels[centre]==(32-motion)*4&&pixels[centre+3]==255);
+    }
     printf("PASS: real GPU shader compilation, bidirectional translation, intermediate image and real-frame copy on %s\n",device.name.UTF8String);
     [queue release];[a release];[b release];[forward release];[backward release];[out release];
     [flow release];[interpolate release];[copy release];[f release];[i release];[c release];[library release];[options release];[device release];

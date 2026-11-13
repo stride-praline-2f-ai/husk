@@ -1,0 +1,18 @@
+{
+  "source": "928e6ab85956658d38e9cc739d3f94e22da92779",
+  "tree": "773d5ca2b9f746e3a7bee40da3f037dc5979c056",
+  "build": 155,
+  "run_id": 43398998286,
+  "job_id": 131796857294,
+  "workflow_commit": "d55878c627a7aa80b5a50d4fead09580252afebf",
+  "status": "success; intermediate narrow-motion artifact superseded by final wider-motion source",
+  "apple_tests": 428,
+  "suites": 49,
+  "skips": 0,
+  "gpu_test": "Actual shader compilation,4px bidirectional translation/intermediate image/copy on Apple Paravirtual device passed",
+  "lease_test": "actual callback/pool/lifetime/pause guards passed with Mac clock facade",
+  "fresh_driver_app_helper_sign_package_upload": "passed",
+  "source_package_independent_verification": "pending; final wider-motion artifact to be verified for delivery",
+  "phone_device_validation": "pending",
+  "energy_benefit": "unknown"
+}
