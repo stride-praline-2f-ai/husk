@@ -159,10 +159,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 scripts/reuse_spatial_driver.py "$RUNNER_TEMP/husk-driver.zip"
+          bash scripts/build_spatial_moltenvk_ios.sh 2>&1 | tee build/logs/framegen-driver-build.log
+          for item in Playport-0.5.0.ipa NOTICES.tar; do
+            donor="$HUSK_TOOL_CACHE/donors/$item"
+            if [ ! -s "$donor" ]; then
+              curl --fail --location --retry 3 "https://github.com/playportdev/playport/releases/download/v0.5.0/$item" --output "$donor.partial"
+              mv "$donor.partial" "$donor"
+            fi
+          done
+          python3 scripts/stage_metal4_driver.py "$HUSK_TOOL_CACHE/donors/Playport-0.5.0.ipa" "$HUSK_TOOL_CACHE/donors/NOTICES.tar"
+          xcrun lipo -archs build/ios-arm64/lib/KosmicKrisp.framework/KosmicKrisp
+          xcrun nm -gU build/ios-arm64/lib/KosmicKrisp.framework/KosmicKrisp > build/logs/metal4-exports.txt
+          grep -E "_vkGetInstanceProcAddr$" build/logs/metal4-exports.txt
+          grep -E "_vkGetDeviceProcAddr$" build/logs/metal4-exports.txt
+          xcrun otool -l build/ios-arm64/lib/KosmicKrisp.framework/KosmicKrisp > build/logs/metal4-load-commands.txt
           xcrun lipo -archs build/ios-arm64/lib/HuskMoltenVK.framework/HuskMoltenVK
           xcrun nm -gU build/ios-arm64/lib/HuskMoltenVK.framework/HuskMoltenVK > build/logs/driver-exports.txt
-          for symbol in SpatialConfigure SpatialSnapshot SpatialObservations SpatialBindings DisplayConfigure DisplaySnapshot ArchiveConfigure ArchiveSnapshot ArchivePrepare ArchiveForget ArchivePriority; do
+          for symbol in SpatialConfigure SpatialSnapshot SpatialObservations SpatialBindings DisplayConfigure DisplaySnapshot ArchiveConfigure ArchiveSnapshot ArchivePrepare ArchiveForget ArchivePriority FramegenConfigure FramegenSnapshot FramegenPause; do
             grep -E "_vkHusk${symbol}$" build/logs/driver-exports.txt
           done
       - name: Build pairing library with cached dependencies
