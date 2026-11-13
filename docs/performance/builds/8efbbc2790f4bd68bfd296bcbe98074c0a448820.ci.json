@@ -1,0 +1,14 @@
+{
+  "source": "8efbbc2790f4bd68bfd296bcbe98074c0a448820",
+  "tree": "2135a2ecace174ebf0f1e06c5d590337cb2fa572",
+  "build": 155,
+  "run_id": 43396629876,
+  "job_id": 131789013392,
+  "workflow_commit": "68573040f3ff94825de6aa76fecab5044cc54ca0",
+  "status": "failed; no IPA",
+  "cause": "Stray leading plus characters in new Objective-C init method; actual presenter lease test compilation and driver compilation failed. Other setup groups passed; project missing newly failed driver.",
+  "gate_semantics": "continue-on-error step conclusions appear success; setup-summary reports authoritative outcomes and blocked stale packaging",
+  "correction": "Remove stray plus characters; retain full driver compile errors on failure; add actual shader GPU regression when runner exposes Metal hardware",
+  "device_validation": "pending",
+  "energy_benefit": "unknown"
+}

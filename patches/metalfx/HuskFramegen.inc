@@ -104,10 +104,10 @@ static void fgDispatch(id<MTLComputeCommandEncoder> e,id<MTLComputePipelineState
     [e setComputePipelineState:p];[e dispatchThreads:MTLSizeMake(w,h,1) threadsPerThreadgroup:MTLSizeMake(8,8,1)];
 }
 @implementation HuskFGPresenter
-+- (instancetype)init {
-+    if((self=[super init])){_stopped=false;_paused=false;_tickPending=false;_inFlight=0;_epoch=1;_ready=[NSMutableArray new];}
-+    return self;
-+}
+- (instancetype)init {
+    if((self=[super init])){_stopped=false;_paused=false;_tickPending=false;_inFlight=0;_epoch=1;_ready=[NSMutableArray new];}
+    return self;
+}
 - (instancetype)initWithLayer:(CAMetalLayer*)layer config:(tl_fg_config)c {
     if(!(self=[self init]))return nil;
     _layer=[layer retain];_device=[layer.device retain];_epoch=1;_paused=fgPaused.load();

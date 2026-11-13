@@ -131,4 +131,14 @@ int main(){@autoreleasepool{
    subprocess.run(['clang++','-std=c++17','-fblocks','-fno-objc-arc','-Wno-deprecated-declarations','-framework','Foundation','-framework','Metal','-framework','QuartzCore','-I',str(p),str(p/'lease.mm'),'-o',str(p/'lease')],check=True)
    subprocess.run([str(p/'lease')],check=True,timeout=10)
 
+
+ def test_real_optical_flow_shader_compiles_and_interpolates_on_available_host_gpu(self):
+  with tempfile.TemporaryDirectory() as d:
+   exe=Path(d)/'gpu'
+   subprocess.run(['clang++','-std=c++17','-fno-objc-arc','-framework','Foundation','-framework','Metal',str(ROOT/'tests/translation-layer/framegen_gpu.mm'),'-o',str(exe)],check=True)
+   result=subprocess.run([str(exe),str(ROOT/'patches/metalfx/HuskFramegen.metal')],text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=30)
+   print(result.stdout)
+   if result.returncode==77:self.skipTest('runner exposes no Metal GPU; shader execution unavailable')
+   self.assertEqual(result.returncode,0,result.stdout)
+
 if __name__=='__main__':unittest.main()

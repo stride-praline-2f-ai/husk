@@ -28,7 +28,18 @@ for patch in "$HUSK_ROOT"/patches/husk-spirv-cross-*.patch; do
 done
 ./fetchDependencies --ios --spirv-cross-root "$SPVC"
 python3 "$HUSK_ROOT/scripts/verify_vulkan_observer_abi.py" "$SRC" --ios
-make ios
+if ! make ios; then
+    mkdir -p "$HUSK_ROOT/build/logs"
+    if [ -f xcodebuild.log ]; then
+        cp xcodebuild.log "$HUSK_ROOT/build/logs/framegen-driver-xcodebuild.log"
+        python3 - <<'ERRORS'
+from pathlib import Path
+for line in Path('xcodebuild.log').read_text(errors='replace').splitlines():
+    if 'error:' in line:print(line)
+ERRORS
+    fi
+    exit 1
+fi
 SOURCE="$SRC/Package/Release/MoltenVK/dynamic/MoltenVK.xcframework/ios-arm64/MoltenVK.framework"
 test -s "$SOURCE/MoltenVK"
 rm -rf "$OUT"
