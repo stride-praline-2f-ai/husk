@@ -1,0 +1,25 @@
+{
+  "build": 155,
+  "attempts": [
+    {
+      "source": "8efbbc2790f4bd68bfd296bcbe98074c0a448820",
+      "run_id": 43396629876,
+      "outcome": "initializer syntax failed Apple lease/driver compile; corrected; no IPA"
+    },
+    {
+      "source": "6e922c34928c07ccf431cc3471aa45d0bfde5e3b",
+      "run_id": 43397860966,
+      "outcome": "iOS driver and GPU check passed; Mac-only clock facade failed final regression gate; corrected; no IPA"
+    },
+    {
+      "source": "928e6ab85956658d38e9cc739d3f94e22da92779",
+      "run_id": 43398998286,
+      "outcome": "428Apple checks and full build/package passed; intermediate independently verified; superseded by wider motion search"
+    },
+    {
+      "source": "6f3750de39095989b1764d623c63e575a2b0aedb",
+      "run_id": 43400335184,
+      "outcome": "428Apple checks, expanded synthetic GPU motion cases, fresh build/package and independent final verification passed"
+    }
+  ]
+}

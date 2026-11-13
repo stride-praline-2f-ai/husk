@@ -301,3 +301,8 @@ Build153disposition:e955a2d53e80f85627f220e5927333e879ac14b9,hosted42795743882,4
 ## 13 November METAL4-FG-v1 candidate
 
 [Implementation/design/source/provenance and acceptance](46-metal4-dungeons-framegen.md). Real Playport iOS Metal4 Vulkan port identified and pinned; standalone colour-flow Dungeons frame generation implemented with explicit30→60target and bounded presentation lifetimes. This supersedes the earlier assessment-only no-port conclusion; upstreamMesa still has no official iOS support. Apple SDK/component/freshdriver/IPA and device quality/latency/energy remain pending. Build154 remains verified; both beta controls defaultOFF; RAM/saves/caches retained.
+
+
+## Build155 final Metal4 / Dungeons framegen beta verified
+
+[Source6f3750de final handover](builds/6f3750de39095989b1764d623c63e575a2b0aedb.md),adjacent CI/attempt/source/package/score records;cloud43400335184.428Apple checks/49suites/zero skips,actual synthetic4px/16px GPU interpolation/copy,lease lifetime,SDK31/96,8setupgroups,freshdriver/app/helper/sign/package and independent final downloaded verification passed. Optional modes separate/defaultOFF;RAM retained. ActualDuo visuals/latency/lifecycle/cooling unknown;no new long logs.

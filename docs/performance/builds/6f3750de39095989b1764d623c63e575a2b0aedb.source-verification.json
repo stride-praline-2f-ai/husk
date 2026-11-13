@@ -1,0 +1,9 @@
+{
+  "source": "6f3750de39095989b1764d623c63e575a2b0aedb",
+  "tree": "6d92945e803452e6f34a5bfb6e167477bb484c3e",
+  "local_commit": "7bbcb92b",
+  "verification": "Complete GitHub source tree equals local reviewed tree; exact canonical commit reconstructed/hash checked, source bundle SHA checked by successful CI; packaged stamp and exact embedded shader/full driver patch digest match",
+  "status": "passed",
+  "packaged_stamp": "6f3750de39095989b1764d623c63e575a2b0aedb-dirty",
+  "ram_sources": "unchanged from locally mirrored verified build154"
+}

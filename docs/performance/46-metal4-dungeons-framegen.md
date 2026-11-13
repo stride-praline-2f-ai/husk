@@ -44,3 +44,8 @@ Second hosted run43397860966/source6e922c34 successfully built the fresh iOS dri
 Motion-range review: a four-pixel-only search was too narrow for ordinary camera motion at30renderedFPS. The bounded two-level search now covers up to20pixels with50candidates instead of a dense solve; GPU regression verifies both4pixel and16pixel translations/intermediate outputs. Cost/quality on actual Dungeons is still pending.
 
 Third hosted run43398998286/source928e6ab8 passed428Apple tests/49suites/zero skips, actual offscreen lease tests, synthetic GPU translation/intermediate/copy checks, all setup groups, fresh iOS driver/app/helper/sign/package/upload. This is retained as a successful intermediate; final delivery includes the wider motion search and its16pixel GPU case. Actual Duo output/quality/latency/cooling remain unverified.
+
+
+## Final verified candidate
+
+[Build155 handover](builds/6f3750de39095989b1764d623c63e575a2b0aedb.md): source6f3750de/run43400335184 passed428Apple tests/49suites/zero skips,font,SDK31/96,all8setupgroups,fresh14-export driver/app/helper/sign/package and independent downloaded IPA/source/exactshader/driver/extension verification. Expanded4px/16px GPU cases passed on Apple Paravirtual device. METAL4-FG-v1 build4/4=100%,phone0/3,energy0/1UNKNOWN; unchangedfixed31.11%/I79.795918%. Successful928e package is superseded. Both default-OFF modes remain separate; RAM sources and prior normal defaults retained. See final handover for short optional functional check and full rollback; no new general diagnostic export campaign.

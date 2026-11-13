@@ -1,0 +1,30 @@
+{
+  "source": "6f3750de39095989b1764d623c63e575a2b0aedb",
+  "tree": "6d92945e803452e6f34a5bfb6e167477bb484c3e",
+  "build": 155,
+  "run_id": 43400335184,
+  "job_id": 131801311860,
+  "workflow_commit": "a752067092ce7f4e0a3579114ea9b42e9e2a60b2",
+  "conclusion": "success",
+  "apple_tests": 428,
+  "suites": 49,
+  "skips": 0,
+  "font_check": "passed",
+  "vulkan_abi_structures": 31,
+  "vulkan_abi_offsets": 96,
+  "setup_groups_passed": 8,
+  "custom_driver_exports": 14,
+  "fresh_driver_app_helper_sign_package_upload": "passed",
+  "synthetic_gpu": {
+    "device": "Apple Paravirtual device",
+    "shader_compile": "passed",
+    "bidirectional_motion_4px_16px": "passed",
+    "intermediate_pixels_and_real_copy": "passed",
+    "scope": "synthetic runner GPU, not Duo gameplay or energy"
+  },
+  "artifact_id": 14024613750,
+  "artifact_expires_at": "2026-11-20T09:25:36Z",
+  "verification_date": "2026-11-13",
+  "phone_validation": "pending",
+  "energy_benefit": "unknown"
+}
