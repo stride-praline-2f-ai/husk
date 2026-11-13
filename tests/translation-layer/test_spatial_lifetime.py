@@ -97,9 +97,9 @@ int main(){@autoreleasepool{
    p=Path(d);tl=ROOT/'src/translation-layer-next'
    (p/'HuskFramegenABI.h').write_text((tl/'husk-tl-framegen.h').read_text())
    (p/'HuskFramegenShader.inc').write_text('static const char* huskFramegenShader="";')
-   # Only the platform/headroom facade differs; execute the actual drawable,
+   # Only platform/headroom/unused iOS clock-factory facades differ; execute the actual drawable,
    # completion and bounded pool implementation without allocating a GPU.
-   code=(ROOT/'patches/metalfx/HuskFramegen.inc').read_text().replace('#if TARGET_OS_IOS','#if 1').replace('#include <os/proc.h>','static uint64_t os_proc_available_memory(){return 1ULL<<30;}')
+   code=(ROOT/'patches/metalfx/HuskFramegen.inc').read_text().replace('#if TARGET_OS_IOS','#if 1').replace('#include <os/proc.h>','static uint64_t os_proc_available_memory(){return 1ULL<<30;}').replace('[CADisplayLink displayLinkWithTarget:self selector:@selector(tick:)]','((CADisplayLink*)nil)')
    (p/'HuskFramegen.inc').write_text(code)
    (p/'lease.mm').write_text(r"""
 #import <Foundation/Foundation.h>
@@ -121,7 +121,7 @@ int main(){@autoreleasepool{
  @autoreleasepool{auto* replacement=(HuskFGDrawable*)huskFramegenDrawable(p,nil);assert(replacement&&replacement->_slot==0);}
  assert(!p->_used[0]);
  for(unsigned i=1;i<4;i++)[frames[i] release];
- p->_paused=true;assert(!huskFramegenDrawable(p,nil));p->_paused=false;p->_stopped=true;assert(!huskFramegenDrawable(p,nil));
+ p->_paused=true;@autoreleasepool{assert(huskFramegenDrawable(p,nil));}p->_paused=false;p->_stopped=true;assert(!huskFramegenDrawable(p,nil));
  [p release];
  tl_fg_config c={1,sizeof(c),1,1816,1280,0};assert(vkHuskFramegenConfigure(&c));
  c.width=c.height=4096;assert(!vkHuskFramegenConfigure(&c));c.enabled=0;assert(vkHuskFramegenConfigure(&c));

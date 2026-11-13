@@ -264,7 +264,10 @@ id<CAMetalDrawable> huskFramegenDrawable(void* raw,CAMetalLayer* layer){
     HuskFGPresenter* p=(HuskFGPresenter*)raw;if(!p||fgFailed.load())return layer.nextDrawable;
     std::unique_lock<std::mutex> lock(p->_poolLock);
     for(;;){
-        if(p->_stopped.load()||p->_paused.load())return nil;
+        // Resigning active must not poison a still-live Vulkan swapchain.
+        // Allow an already-running producer to finish into an offscreen lease;
+        // enqueue rejects paused/stale frames without touching a real drawable.
+        if(p->_stopped.load())return nil;
         for(unsigned i=0;i<4;i++)if(!p->_used[i]){
             p->_used[i]=true;HuskFGDrawable* f=[HuskFGDrawable new];f->_owner=[p retain];f->_slot=i;f->_epoch=p->_epoch.load();return [f autorelease];
         }

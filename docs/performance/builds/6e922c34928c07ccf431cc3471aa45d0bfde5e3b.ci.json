@@ -1,0 +1,16 @@
+{
+  "source": "6e922c34928c07ccf431cc3471aa45d0bfde5e3b",
+  "tree": "b9200bc386154a42275583b83e593415853d18b7",
+  "build": 155,
+  "run_id": 43397860966,
+  "job_id": 131793099536,
+  "workflow_commit": "573690d2ba1c3eebee1ae4ad916868ba82893062",
+  "status": "failed final regression gate; no IPA",
+  "driver_build": "fresh iOS driver passed; framegen exports verified",
+  "gpu_test": "PASS: real GPU shader compilation, bidirectional translation, intermediate image and real-frame copy on Apple Paravirtual device",
+  "cause": "Mac lease test facade compiled the unavailable-on-macOS iOS CADisplayLink factory; iOS production compile passed",
+  "correction": "Host lease fixture stubs only its unused iOS clock factory; actual lease/retirement code retained; active pause guard refined",
+  "setup": "all other setup groups passed",
+  "device_validation": "Duo unavailable; paravirtual GPU synthetic test is not game/cooling evidence",
+  "energy_benefit": "unknown"
+}
