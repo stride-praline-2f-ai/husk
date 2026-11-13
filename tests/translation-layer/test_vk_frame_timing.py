@@ -44,6 +44,9 @@ class VulkanTimingTests(unittest.TestCase):
 #include "husk-tl-component-scope.h"
 #include "husk-tl-pipeline-diagnostics.h"
 #include "husk-tl-pipeline-feedback.h"
+#include "husk-tl-framegen.h"
+static bool framegen_requested;
+bool tl_vk_framegen_snapshot(tl_fg_stats*s){(void)s;return false;}
 #undef TARGET_OS_IOS
 #undef TARGET_OS_OSX
 #define TARGET_OS_IOS 0
@@ -144,6 +147,7 @@ static void *fake_dlsym(void *lib, const char *name) {
     return NULL;
 }
 #define dlsym fake_dlsym
+#define vk_symbol(name) fake_dlsym(V.lib,name)
 """
         harness += counters + acquire + pacing + r"""
 void configure_store(const char *path) {

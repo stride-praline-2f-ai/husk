@@ -20,6 +20,7 @@ static int image(void*d,const void*ci,const void*a,uint64_t*out){calls++;if(d!=(
 static void begin(void*c,const void*ci,uint32_t contents){begins++;if(c!=(void *)19||ci!=expected||contents!=2)errors++;}
 static void *get(void*lib,const char*name){(void)lib;if(!strcmp(name,"vkCreateImage"))return(void *)image;if(!strcmp(name,"vkCmdBeginRenderPass"))return(void *)begin;return NULL;}
 #define dlsym get
+#define vk_symbol(name) get(V.lib,name)
 '''+wrappers+r'''
 static const struct{const char*name;void*fn;}k_over[]={{"vkCreateImage",w_vkCreateImage},{"vkCmdBeginRenderPass",w_vkCmdBeginRenderPass}};
 '''+lookup+r'''

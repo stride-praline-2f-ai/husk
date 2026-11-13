@@ -133,6 +133,8 @@ struct TLAppSettings: Codable, Equatable {
     var pipelineFeedback = false
     var automaticDuoProfile = true
     var a20EfficiencyWorkers = true
+    var frameGeneration = false
+    var metal4Renderer = false
     var sharedMemoryReserve = true
     var spatialUpscaling = false
     var spatialInputPercent = 80
@@ -242,6 +244,8 @@ struct TLAppSettings: Codable, Equatable {
         pipelineFeedback = try c.decodeIfPresent(Bool.self, forKey: .pipelineFeedback) ?? false
         automaticDuoProfile = try c.decodeIfPresent(Bool.self, forKey: .automaticDuoProfile) ?? true
         a20EfficiencyWorkers = try c.decodeIfPresent(Bool.self, forKey: .a20EfficiencyWorkers) ?? true
+        frameGeneration = try c.decodeIfPresent(Bool.self, forKey: .frameGeneration) ?? false
+        metal4Renderer = try c.decodeIfPresent(Bool.self, forKey: .metal4Renderer) ?? false
         sharedMemoryReserve = try c.decodeIfPresent(Bool.self, forKey: .sharedMemoryReserve) ?? true
         spatialUpscaling = try c.decodeIfPresent(Bool.self, forKey: .spatialUpscaling) ?? false
         let inputPercent = try c.decodeIfPresent(Int.self, forKey: .spatialInputPercent) ?? 80
@@ -358,6 +362,16 @@ struct TLAppSettingsView: View {
                         ForEach(TLAppSettings.UnrealGraphics.allCases) { Text($0.title).tag($0) }
                     }
                     LabeledContent("Active Preset", value: settings.usesEfficientGraphics(for: app) ? "Sharp / Efficient" : (settings.usesSharpGraphics(for: app) ? "Sharp / High Quality" : "Game Default"))
+                    if #available(iOS 26.0, *), FileManager.default.fileExists(atPath: (Bundle.main.privateFrameworksPath ?? "") + "/KosmicKrisp.framework/KosmicKrisp") {
+                        Toggle("Metal 4 Vulkan (Beta)", isOn: $settings.metal4Renderer)
+                        Text("Separate KosmicKrisp renderer. Spatial upscaling and native pipeline archives are unavailable in this beta; it renders at the selected output resolution. Restart required. Turn off to restore MoltenVK and MetalFX.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                    if settings.usesEfficientGraphics(for: app) && app.label.lowercased().contains("dungeons") {
+                        Toggle("Dungeons Frame Generation (Beta)", isOn: $settings.frameGeneration)
+                        Text("30 rendered → 60 presented target. Estimates motion from colour frames; may add artifacts and input latency. Uses MoltenVK with your spatial upscaling; Metal 4 selection is ignored while this mode is on. Restart required. Turn off to restore your rendered-FPS setting.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
                     Toggle("Shared Game Memory", isOn: $settings.sharedMemoryReserve)
                     Text("Borrows extra game memory on iPhone when supported. Keep app extensions when installing; an additional App ID may be needed. Restart required.")
                         .font(.footnote).foregroundStyle(.secondary)
@@ -370,7 +384,7 @@ struct TLAppSettingsView: View {
                                     Text("Keeps two normal-priority worker slots; extra eligible workers use lower priority only after stable gameplay. Turn off to restore Balanced without changing resolution or MetalFX. Restart required.")
                                         .font(.footnote).foregroundStyle(.secondary)
                                 }
-                                Text("Reduced inner-screen output, MetalFX 80%, 60 FPS and Driver Default. A20 Pro can favour efficiency cores for extra workers with automatic performance rollback; other chips retain Balanced. Detailed profiling stays off. Restart required.")
+                                Text(settings.frameGeneration ? "Reduced output with MetalFX 80%. Frame Generation requests 30 rendered FPS and targets 60 presented images; input latency and image quality differ from 60 real FPS. Restart required." : (settings.metal4Renderer ? "Metal 4 beta uses the reduced output target at 60 real FPS without the MoltenVK spatial pass. Detailed profiling stays off. Restart required." : "Reduced inner-screen output, MetalFX 80%, 60 FPS and Driver Default. A20 Pro can favour efficiency cores for extra workers with automatic performance rollback; other chips retain Balanced. Detailed profiling stays off. Restart required."))
                                     .font(.footnote).foregroundStyle(.secondary)
                             }
                         }

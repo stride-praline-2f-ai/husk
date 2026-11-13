@@ -37,6 +37,7 @@ static int host_images(void *device,uint64_t swapchain,uint32_t *count,uint64_t 
 }
 static void *lookup(void *lib,const char *name){(void)lib;if(!strcmp(name,"vkCreateSwapchainKHR"))return(void*)host_create;if(!strcmp(name,"vkGetSwapchainImagesKHR"))return(void*)host_images;if(!strcmp(name,"vkGetPhysicalDeviceSurfaceCapabilitiesKHR"))return(void*)host_caps;return NULL;}
 #define dlsym lookup
+#define vk_symbol(name) lookup(V.lib,name)
 static void tl_log_line(const char *s,...){(void)s;}
 /* The extracted wrapper is compiled without the full Husk crash recorder. */
 static void husk_crash_stage(const char *s){(void)s;}

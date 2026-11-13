@@ -159,3 +159,5 @@ void tl_ld_set_aot_dir(const char *dir);
 #include "husk-tl-display.h"
 #include "husk-tl-lifecycle.h"
 #include "husk-tl-crash-signal.h"
+
+#include "../../translation-layer-next/husk-tl-framegen.h"

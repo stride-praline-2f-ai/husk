@@ -23,6 +23,7 @@
 #include "husk-tl-render-inventory.h"
 #include "husk-tl-pipeline-feedback.h"
 #include "husk-tl-spatial.h"
+#include "husk-tl-framegen.h"
 #include "husk-tl-native-archive.h"
 #include "husk-tl-lifecycle.h"
 #include "husk-tl-audio.h"
@@ -370,6 +371,7 @@ bool tl_na_start(const tl_ga_config *cfg)
     tl_thread_policy_activate(project);
     tl_ri_activate(project);
     tl_pf_activate(project);
+    tl_vk_framegen_prepare(project,N.cfg.width,N.cfg.height);
     if(tl_vk_spatial_prepare(project,&N.cfg.width,&N.cfg.height)){
         tl_nwindow_configure(cfg->width,cfg->height,cfg->metal_layer);
         tl_hle_set_dimensions(cfg->width,cfg->height);
@@ -544,5 +546,6 @@ void tl_na_touch(int phase, int id, float x, float y) { tl_inq_touch(phase, id, 
  * silences its audio instead of feeding a GPU iOS will no longer let it have. Only real changes are passed on. */
 void tl_na_set_paused(bool paused)
 {
+    tl_vk_framegen_pause(paused);
     tl_lifecycle_request(paused);
 }

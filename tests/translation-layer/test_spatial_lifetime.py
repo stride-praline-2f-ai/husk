@@ -91,4 +91,44 @@ int main(){@autoreleasepool{
 }}
 ''')
    binary=p/'check';subprocess.run(['clang++','-std=c++17','-fno-objc-arc','-fblocks','-I',str(p),'-I',str(inc),str(p/'main.mm'),'-framework','Foundation','-framework','Metal','-framework','MetalFX','-o',str(binary)],check=True);subprocess.run([str(binary)],check=True)
+
+ def test_framegen_offscreen_lease_retirement_callback_once_and_pool_reuse(self):
+  with tempfile.TemporaryDirectory() as d:
+   p=Path(d);tl=ROOT/'src/translation-layer-next'
+   (p/'HuskFramegenABI.h').write_text((tl/'husk-tl-framegen.h').read_text())
+   (p/'HuskFramegenShader.inc').write_text('static const char* huskFramegenShader="";')
+   # Only the platform/headroom facade differs; execute the actual drawable,
+   # completion and bounded pool implementation without allocating a GPU.
+   code=(ROOT/'patches/metalfx/HuskFramegen.inc').read_text().replace('#if TARGET_OS_IOS','#if 1').replace('#include <os/proc.h>','static uint64_t os_proc_available_memory(){return 1ULL<<30;}')
+   (p/'HuskFramegen.inc').write_text(code)
+   (p/'lease.mm').write_text(r"""
+#import <Foundation/Foundation.h>
+#import <Metal/Metal.h>
+#import <QuartzCore/QuartzCore.h>
+#include <atomic>
+#include <cassert>
+#include <mutex>
+#include "HuskFramegen.inc"
+int main(){@autoreleasepool{
+ auto*p=[HuskFGPresenter new];HuskFGDrawable* frames[4];
+ for(unsigned i=0;i<4;i++){@autoreleasepool{frames[i]=[(HuskFGDrawable*)huskFramegenDrawable(p,nil) retain];assert(frames[i]&&p->_used[i]);}}
+ assert(!huskFramegenDrawable(p,nil));
+ __block unsigned callbacks=0;HuskFGDrawable*first=frames[0];
+ [frames[0] addPresentedHandler:^(id<MTLDrawable> d){callbacks++;assert(d.presentedTime==2);[first finish:9];}];
+ [frames[0] finish:2];[frames[0] finish:3];assert(callbacks==1&&frames[0].presentedTime==2);
+ [frames[0] addPresentedHandler:^(id<MTLDrawable> d){callbacks++;assert(d.presentedTime==2);}];assert(callbacks==2);
+ auto held=[frames[0] retain];[frames[0] release];assert(p->_used[0]);[held release];assert(!p->_used[0]);
+ @autoreleasepool{auto* replacement=(HuskFGDrawable*)huskFramegenDrawable(p,nil);assert(replacement&&replacement->_slot==0);}
+ assert(!p->_used[0]);
+ for(unsigned i=1;i<4;i++)[frames[i] release];
+ p->_paused=true;assert(!huskFramegenDrawable(p,nil));p->_paused=false;p->_stopped=true;assert(!huskFramegenDrawable(p,nil));
+ [p release];
+ tl_fg_config c={1,sizeof(c),1,1816,1280,0};assert(vkHuskFramegenConfigure(&c));
+ c.width=c.height=4096;assert(!vkHuskFramegenConfigure(&c));c.enabled=0;assert(vkHuskFramegenConfigure(&c));
+ tl_fg_stats stats={1,sizeof(stats)};assert(vkHuskFramegenSnapshot(&stats)&&!stats.active&&!stats.failed);
+}return 0;}
+""")
+   subprocess.run(['clang++','-std=c++17','-fblocks','-fno-objc-arc','-Wno-deprecated-declarations','-framework','Foundation','-framework','Metal','-framework','QuartzCore','-I',str(p),str(p/'lease.mm'),'-o',str(p/'lease')],check=True)
+   subprocess.run([str(p/'lease')],check=True,timeout=10)
+
 if __name__=='__main__':unittest.main()

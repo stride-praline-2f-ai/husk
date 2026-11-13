@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Production controller fast path and Vulkan dispatch, with host API facades."""
 from pathlib import Path
-import os,re,subprocess,tempfile,unittest
+import os,re,subprocess,tempfile,unittest,sys
 from test_lifecycle_resilience import function
 ROOT=Path(__file__).resolve().parents[2];TL=ROOT/'src/translation-layer-next'
 class RuntimeTests(unittest.TestCase):
@@ -71,6 +71,7 @@ static void resolve_feature_hooks(void*i){(void)i;}
 #define LOG(...) do{}while(0)
 static void *lookup(void*l,const char*n){(void)l;return !strcmp(n,"vkGetDeviceProcAddr")?(void*)gdpa:(void*)host;}
 #define dlsym lookup
+#define vk_symbol(name) lookup(V.lib,name)
 static void *w_vkGetInstanceProcAddr(void*,const char*);static void *w_vkGetDeviceProcAddr(void*,const char*);
 '''+declarations+'\n'+table+'\n'+function(vk,'static void *overridden(')+'\n'+function(vk,'static void *w_vkGetInstanceProcAddr(void *instance, const char *name)\n{')+'\n'+function(vk,'static void *w_vkGetDeviceProcAddr(void *device, const char *name)\n{')+'\n'+function(vk,'void *tl_vk_resolve(')+r'''
 int main(void){const char*pure[]={"vkCreateShaderModule","vkDestroyShaderModule","vkCreateSampler","vkDestroySampler","vkCreateDescriptorSetLayout","vkDestroyDescriptorSetLayout","vkCreatePipelineLayout","vkDestroyPipelineLayout","vkCreateRenderPass","vkCreateRenderPass2","vkCreateRenderPass2KHR","vkDestroyRenderPass","vkDestroyPipeline"};
@@ -96,4 +97,94 @@ int main(void){const char*pure[]={"vkCreateShaderModule","vkDestroyShaderModule"
  def test_mapping_epoch_forces_correct_republication(self):self.case('mapping')
  def test_frontend_neutralisation_releases_buttons_and_axes_before_disconnect(self):self.case('neutral')
  def test_all_proc_lookup_paths_retain_compatible_wrappers(self):subprocess.run([str(self.vk)],check=True,timeout=5)
+
+class ICDDispatchTests(unittest.TestCase):
+ @classmethod
+ def setUpClass(cls):
+  cls.tmp=tempfile.TemporaryDirectory();cls.addClassCleanup(cls.tmp.cleanup);p=Path(cls.tmp.name)
+  (p/'icd.c').write_text(r"""
+#include <string.h>
+static int command(void){return 42;}
+void *vkGetInstanceProcAddr(void *instance,const char *name){
+ if(!strcmp(name,"vkCreateInstance"))return(void*)command;
+ if(instance&&!strcmp(name,"vkCreateBuffer"))return(void*)command;
+ return 0;
+}
+""")
+  (p/'dispatch.c').write_text(r"""
+#include <assert.h>
+#include <dlfcn.h>
+#include <stdint.h>
+#include <string.h>
+#include "husk-tl-vk-dispatch.h"
+static tl_vkd_dispatch d=TL_VKD_INITIALIZER;
+static void *query(void*unused){(void)unused;for(unsigned i=0;i<50000;i++){
+ void *fn=tl_vkd_lookup(&d,"vkCreateBuffer");if(fn)assert(((int(*)(void))fn)()==42);
+ assert(tl_vkd_lookup(&d,"vkNeverInventAnExtension")==0);
+}return 0;}
+int main(int argc,char **argv){assert(argc==3);d.library=dlopen(argv[1],RTLD_NOW|RTLD_LOCAL);assert(d.library);d.symbol=dlsym;d.gipa=(tl_vkd_gipa)dlsym(d.library,"vkGetInstanceProcAddr");assert(d.gipa);
+ assert(!dlsym(d.library,"vkCreateBuffer"));assert(!tl_vkd_lookup(&d,0));
+ assert(((int(*)(void))tl_vkd_lookup(&d,"vkCreateInstance"))()==42);
+ assert(!tl_vkd_lookup(&d,"vkCreateBuffer"));assert(!tl_vkd_add(&d,0));
+ if(!strcmp(argv[2],"lifetime")){
+  assert(tl_vkd_add(&d,(void*)1));assert(tl_vkd_add(&d,(void*)1));
+  assert(((int(*)(void))tl_vkd_lookup(&d,"vkCreateBuffer"))()==42);
+  tl_vkd_remove(&d,(void*)1);assert(!tl_vkd_lookup(&d,"vkCreateBuffer"));
+  assert(tl_vkd_add(&d,(void*)2));assert(tl_vkd_lookup(&d,"vkCreateBuffer"));
+ }else if(!strcmp(argv[2],"capacity")){
+  for(uintptr_t i=1;i<=16;i++)assert(tl_vkd_add(&d,(void*)i));assert(!tl_vkd_add(&d,(void*)17));
+  tl_vkd_remove(&d,(void*)8);assert(tl_vkd_add(&d,(void*)17));
+ }else if(!strcmp(argv[2],"concurrency")){
+  pthread_t threads[4];for(unsigned i=0;i<4;i++)assert(!pthread_create(&threads[i],0,query,0));
+  for(unsigned i=0;i<10000;i++){assert(tl_vkd_add(&d,(void*)1));tl_vkd_remove(&d,(void*)1);}
+  for(unsigned i=0;i<4;i++)pthread_join(threads[i],0);
+ }else assert(0);
+ dlclose(d.library);return 0;
+}
+""")
+  cc=os.environ.get('CC','cc');cls.driver=p/('icd.dylib' if sys.platform=='darwin'else'icd.so');cls.exe=p/'dispatch'
+  subprocess.run([cc,'-dynamiclib'if sys.platform=='darwin'else'-shared','-fPIC',str(p/'icd.c'),'-o',str(cls.driver)],check=True)
+  subprocess.run([cc,'-std=c11','-O2','-Wall','-Wextra','-Werror','-Wno-misleading-indentation','-pthread','-I',str(TL),str(p/'dispatch.c'),'-o',str(cls.exe)]+([]if sys.platform=='darwin'else['-ldl']),check=True)
+ def run_case(self,case):subprocess.run([str(self.exe),str(self.driver),case],check=True,timeout=15)
+ def test_icd_only_exports_and_probe_instance_destruction(self):self.run_case('lifetime')
+ def test_instance_capacity_is_bounded_and_slots_reusable(self):self.run_case('capacity')
+ def test_lookups_and_instance_retirement_do_not_race(self):self.run_case('concurrency')
+
+
+class FramegenAdmissionTests(unittest.TestCase):
+ def test_real_framegen_admission_changes_rendered_cap_only_after_driver_accepts(self):
+  vk=(TL/'husk-tl-vulkan.m').read_text();part=vk[vk.index('static bool framegen_requested;'):vk.index('static bool spatial_requested;')]
+  with tempfile.TemporaryDirectory() as d:
+   p=Path(d);f=p/'fg.c';f.write_text(r"""
+#include <assert.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdatomic.h>
+#include <string.h>
+#include "husk-tl-framegen.h"
+static struct{void*lib;}V={(void*)1};
+static bool efficient=true,available=true,accept=true;static int fps=60,paused=-1,calls;
+static bool tl_ue4_efficiency_enabled(void){return efficient;}
+static void husk_ue4_set_efficiency(bool e,int f){assert(e);fps=f;}
+static void tl_log_line(const char*fmt,...){(void)fmt;}
+static int configure(const tl_fg_config*c){calls++;assert(c->version==1&&c->size==sizeof(*c)&&c->width==1816&&c->height==1280);return accept;}
+static void pause_driver(int p){paused=p;}
+static void*vk_symbol(const char*n){if(!available)return 0;if(!strcmp(n,"vkHuskFramegenConfigure"))return(void*)configure;if(!strcmp(n,"vkHuskFramegenPause"))return(void*)pause_driver;return 0;}
+"""+part+r"""
+static bool vk_ready(void){return available;}
+int main(void){
+ assert(!tl_vk_framegen_prepare("Dungeons",1816,1280)&&fps==60&&!calls);
+ husk_ue4_set_frame_generation(true);assert(!tl_vk_framegen_prepare(0,1816,1280));assert(!tl_vk_framegen_prepare("Other",1816,1280));
+ efficient=false;assert(!tl_vk_framegen_prepare("Dungeons",1816,1280));efficient=true;
+ available=false;assert(!tl_vk_framegen_prepare("Dungeons",1816,1280)&&fps==60&&!calls);available=true;
+ accept=false;assert(!tl_vk_framegen_prepare("Dungeons",1816,1280)&&fps==60&&calls==1);
+ tl_vk_framegen_pause(true);accept=true;assert(tl_vk_framegen_prepare("Dungeons",1816,1280)&&fps==30&&paused==1&&calls==2);
+ tl_vk_framegen_pause(false);assert(paused==0);
+ tl_fg_stats stats;assert(!tl_vk_framegen_snapshot(&stats)&&stats.version==1&&stats.size==sizeof(stats)&&!stats.active);
+ return 0;
+}
+""")
+   subprocess.run([os.environ.get('CC','cc'),'-std=c11','-Wall','-Wextra','-Werror','-I',str(TL),str(f),'-o',str(p/'fg')],check=True)
+   subprocess.run([str(p/'fg')],check=True)
+
 if __name__=='__main__':unittest.main()

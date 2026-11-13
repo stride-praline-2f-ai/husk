@@ -51,6 +51,7 @@ static void tl_log_line(const char *format,...){(void)format;}
 static int configure(const tl_spatial_config*c){calls++;assert(c->output_width==2128&&c->input_width==1696);return driver_accepts;}
 static void* fake_dlsym(void *lib,const char*name){(void)lib;return driver_present&&!strcmp(name,"vkHuskSpatialConfigure")?(void*)configure:NULL;}
 #define dlsym fake_dlsym
+#define vk_symbol(name) fake_dlsym(V.lib,name)
 '''+body+r'''
 int main(void){
  int w=2128,h=1600;float x=1064,y=800;

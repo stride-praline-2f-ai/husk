@@ -23,6 +23,7 @@ static void host2(void*d,const void*info,void **out){calls++;if(d!=(void *)7||in
 static void export_queue(void*q,void **out){if(q!=(void *)11)failures++;*out=(void *)13;}
 static void *fake_dlsym(void*lib,const char*name){(void)lib;if(!strcmp(name,"vkGetDeviceQueue"))return(void *)host1;if(!strcmp(name,"vkGetDeviceQueue2"))return(void *)host2;if(available&&!strcmp(name,"vkGetMTLCommandQueueMVK"))return(void *)export_queue;return NULL;}
 #define dlsym fake_dlsym
+#define vk_symbol(name) fake_dlsym(V.lib,name)
 '''
   harness+=wrappers+r'''
 int run(int enabled,int export_present){sharp=enabled;available=export_present;calls=registered=failures=0;void*q=NULL;

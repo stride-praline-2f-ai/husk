@@ -87,6 +87,7 @@ static bool dxvk_game(void){return false;}
 static void properties(void *pd,void *out){(void)pd;memset(out,0,4096);}
 static void *fake_dlsym(void *lib,const char *name){(void)lib;(void)name;return (void *)properties;}
 #define dlsym fake_dlsym
+#define vk_symbol(name) fake_dlsym(V.lib,name)
 void tl_pc_device(void *d,uint32_t v,uint32_t id,const uint8_t uuid[16]){(void)d;(void)v;(void)id;(void)uuid;++store_devices;}
 static int host_create(void *pd,const tl_pf_device_info *ci,const void *a,void **out){
  forwarded=pd==(void *)3&&ci==(void *)5&&a==(void *)7;*out=(void *)1;return create_status;

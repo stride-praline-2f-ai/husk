@@ -3,6 +3,7 @@ import SwiftUI
 import UIKit
 import QuartzCore
 import AVFoundation
+import Metal
 import UniformTypeIdentifiers
 
 /// The engines the native runtime drives. Both draw into a CAMetalLayer through ANGLE. Starting a different APK
@@ -41,6 +42,8 @@ final class TLUnityUIView: UIView, UIKeyInput {
     private let requestedScale: CGFloat
     private let automaticDuoProfile: Bool
     private let a20EfficiencyWorkers: Bool
+    private let metal4Renderer: Bool
+    private let frameGeneration: Bool
     private var automaticFastWorkerBudget = 0
     private let apk: String
     private let sharpGraphics: Bool
@@ -98,7 +101,7 @@ final class TLUnityUIView: UIView, UIKeyInput {
     /// Called when three fingers tap at once: the way back to the interface while it is hidden.
     var onThreeFingerTap: (() -> Void)?
 
-    init(apk: String, extraApks: [String] = [], dataDir: String, engine: TLNativeEngine, portrait: Bool = false, scale: CGFloat = 2, sharpGraphics: Bool = false, efficientGraphics: Bool = false, efficientFrameLimit: Int = 60, threadPolicy: Int = 0, submissionMode: Int = 0, driverProfiling: Bool = false, pipelineIdentification: Bool = false, engineOnlyLimiter: Bool = false, renderTargetInventory: Bool = false, pipelineFeedback: Bool = false, spatialUpscaling: Bool = false, spatialInputPercent: Int = 80, clockPresentation: Bool = false, feedbackClockCorrection: Bool = false, nativePipelineArchiveMode: Int = 0, nativeArchiveVerification: Bool = false, execution: HuskExecutionOptions = .init(), automaticDuoProfile: Bool = false, a20EfficiencyWorkers: Bool = true) {
+    init(apk: String, extraApks: [String] = [], dataDir: String, engine: TLNativeEngine, portrait: Bool = false, scale: CGFloat = 2, sharpGraphics: Bool = false, efficientGraphics: Bool = false, efficientFrameLimit: Int = 60, threadPolicy: Int = 0, submissionMode: Int = 0, driverProfiling: Bool = false, pipelineIdentification: Bool = false, engineOnlyLimiter: Bool = false, renderTargetInventory: Bool = false, pipelineFeedback: Bool = false, spatialUpscaling: Bool = false, spatialInputPercent: Int = 80, clockPresentation: Bool = false, feedbackClockCorrection: Bool = false, nativePipelineArchiveMode: Int = 0, nativeArchiveVerification: Bool = false, execution: HuskExecutionOptions = .init(), automaticDuoProfile: Bool = false, a20EfficiencyWorkers: Bool = true, metal4Renderer: Bool = false, frameGeneration: Bool = false) {
         self.requestedScale = scale
         self.automaticDuoProfile = automaticDuoProfile
         self.a20EfficiencyWorkers = a20EfficiencyWorkers
@@ -111,6 +114,8 @@ final class TLUnityUIView: UIView, UIKeyInput {
         self.driverProfiling = driverProfiling
         self.pipelineIdentification = pipelineIdentification
         self.pipelineFeedback = pipelineFeedback
+        self.frameGeneration = frameGeneration
+        self.metal4Renderer = metal4Renderer
         self.spatialUpscaling = spatialUpscaling
         self.spatialInputPercent = spatialInputPercent
         self.clockPresentation = clockPresentation
@@ -409,10 +414,10 @@ final class TLUnityUIView: UIView, UIKeyInput {
                 "engine": "ue4", "game": (apk as NSString).lastPathComponent,
                 "launch_width": width, "launch_height": height,
                 "sharp_graphics": sharpGraphics, "efficient_graphics": efficientGraphics,
-                "requested_fps": efficientFrameLimit, "worker_policy": threadPolicy,
+                "requested_fps": efficientFrameLimit, "frame_generation_30_to_60_requested": frameGeneration, "worker_policy": threadPolicy,
                 "submission_mode": submissionMode, "detailed_driver_profiling": driverProfiling, "pipeline_identification": pipelineIdentification, "pipeline_creation_feedback": pipelineFeedback, "metalfx_spatial_requested": spatialUpscaling, "metalfx_input_percent": spatialInputPercent, "clock_correct_presentation": clockPresentation, "feedback_clock_correction": feedbackClockCorrection, "native_pipeline_archive_mode": nativePipelineArchiveMode, "native_archive_verification": nativeArchiveVerification, "metal_prefill": execution.prefill, "metal_command_buffer_limit": execution.commandBufferLimit, "initialization_parking": execution.initializationParking, "swapchain_image_budget": execution.swapchainImages, "engine_only_limiter": engineOnlyLimiter, "render_target_inventory": renderTargetInventory,
                 "windowed": windowed, "cache": "existing compatible persistence; see runtime events",
-                "driver": "bundled MoltenVK; verify runtime version in attempt log"
+                "driver": (metal4Renderer && !frameGeneration) ? "Metal 4 Vulkan requested; verify runtime selection in attempt log" : "bundled MoltenVK; verify runtime version in attempt log"
             ]
             CrashReport.noteForkConfiguration(forkConfiguration)
             EfficiencyDiagnostics.shared.attach(forkConfiguration)
@@ -468,8 +473,9 @@ final class TLUnityUIView: UIView, UIKeyInput {
         case .nativeactivity: started = husk_ue4_launch(apk, dataDir, layerPtr, Int32(width), Int32(height), angle, ca)       // the NativeActivity driver; with no Unreal in the APK it runs the plain game
         case .ue4:
             // Unreal draws with Vulkan, which on this device is MoltenVK, a framework of the app's own.
-            husk_ue4_set_clock_presentation(clockPresentation)
-            husk_ue4_set_feedback_clock(feedbackClockCorrection)
+            husk_ue4_set_frame_generation(frameGeneration)
+            husk_ue4_set_clock_presentation(frameGeneration ? false : clockPresentation)
+            husk_ue4_set_feedback_clock(frameGeneration ? false : feedbackClockCorrection)
             husk_ue4_set_native_archive(Int32(nativePipelineArchiveMode))
             husk_ue4_set_native_archive_verification(nativeArchiveVerification)
             husk_ue4_set_spatial_upscaling(spatialUpscaling)
@@ -493,10 +499,30 @@ final class TLUnityUIView: UIView, UIKeyInput {
             HuskLog.log("tl", "ue4 resolution: device \(UIDevice.current.model), display \(Int(UIScreen.main.bounds.width * UIScreen.main.scale))x\(Int(UIScreen.main.bounds.height * UIScreen.main.scale)), render scale \(contentScaleFactor), launch surface \(width)x\(height); launch-time selection, not runtime calibration")
             if let fw = Bundle.main.privateFrameworksPath {
                 let candidate = fw + "/HuskMoltenVK.framework/HuskMoltenVK"
-                let experimental = (spatialUpscaling || nativePipelineArchiveMode != 0) && FileManager.default.fileExists(atPath: candidate)
-                husk_ue4_set_vulkan(experimental ? candidate : fw + "/MoltenVK.framework/MoltenVK")
-                husk_crash_stage(experimental ? "ue4_experimental_moltenvk_selected" : "ue4_original_moltenvk_selected")
-                HuskLog.log("tl", "[M9-SPATIAL] driver \(experimental ? "pinned experimental" : "original"); spatial requested \(spatialUpscaling), archive mode \(nativePipelineArchiveMode); actual native project/preflight decides activation")
+                let experimental = (spatialUpscaling || nativePipelineArchiveMode != 0 || frameGeneration) && FileManager.default.fileExists(atPath: candidate)
+                var selected = experimental ? candidate : fw + "/MoltenVK.framework/MoltenVK"
+                if metal4Renderer && !frameGeneration {
+                    let metal4 = fw + "/KosmicKrisp.framework/KosmicKrisp"
+                    if #available(iOS 26.0, *), FileManager.default.fileExists(atPath: metal4),
+                       MTLCreateSystemDefaultDevice()?.supportsFamily(.apple7) == true {
+                        selected = metal4
+                        // This independent driver has neither the custom spatial
+                        // bridge nor archive ABI. Do not lower its guest extent
+                        // or claim those MoltenVK effects are active.
+                        husk_ue4_set_spatial_upscaling(false)
+                        husk_ue4_set_native_archive(0)
+                        husk_ue4_set_native_archive_verification(false)
+                        husk_ue4_set_clock_presentation(false)
+                        husk_ue4_set_feedback_clock(false)
+                        HuskLog.log("tl", "[M3/M9 METAL4] KosmicKrisp beta requested; selected output resolution and real FPS retained; spatial/native archive/timed-present unavailable on this backend; restart with Metal 4 OFF restores MoltenVK")
+                    } else {
+                        HuskLog.log("tl", "[M3/M9 METAL4] beta unavailable on this OS/device/package; existing MoltenVK path retained")
+                    }
+                }
+                husk_ue4_set_vulkan(selected)
+                let usingMetal4 = selected.hasSuffix("KosmicKrisp.framework/KosmicKrisp")
+                husk_crash_stage(usingMetal4 ? "ue4_metal4_selected" : (experimental ? "ue4_experimental_moltenvk_selected" : "ue4_original_moltenvk_selected"))
+                HuskLog.log("tl", "[M3/M9 renderer] selected \(usingMetal4 ? "KosmicKrisp Metal 4 beta" : (experimental ? "pinned experimental MoltenVK" : "original MoltenVK")); spatial requested \(spatialUpscaling && !usingMetal4), frame generation requested \(frameGeneration); native preflight decides activation")
             }
             husk_crash_stage("ue4_native_runtime_launch_enter")
             started = husk_ue4_launch(apk, dataDir, layerPtr, Int32(width), Int32(height), angle, ca)
@@ -970,6 +996,8 @@ struct TLUnityScreen: UIViewRepresentable {
     var execution = HuskExecutionOptions()
     var automaticDuoProfile = false
     var a20EfficiencyWorkers = true
+    var metal4Renderer = false
+    var frameGeneration = false
     var onStats: ((String) -> Void)? = nil
     var onThreeFingerTap: (() -> Void)? = nil
     /// One view per game for the life of the process. The engine's GPU surface belongs to this view's layer and an
@@ -977,9 +1005,9 @@ struct TLUnityScreen: UIViewRepresentable {
     private static var shared: [String: TLUnityUIView] = [:]
 
     /// The game's one view, made the first time it is asked for.
-    static func view(apk: String, extraApks: [String], dataDir: String, engine: TLNativeEngine, portrait: Bool, scale: CGFloat, sharpGraphics: Bool = false, efficientGraphics: Bool = false, efficientFrameLimit: Int = 60, threadPolicy: Int = 0, submissionMode: Int = 0, driverProfiling: Bool = false, pipelineIdentification: Bool = false, engineOnlyLimiter: Bool = false, renderTargetInventory: Bool = false, pipelineFeedback: Bool = false, spatialUpscaling: Bool = false, spatialInputPercent: Int = 80, clockPresentation: Bool = false, feedbackClockCorrection: Bool = false, nativePipelineArchiveMode: Int = 0, nativeArchiveVerification: Bool = false, execution: HuskExecutionOptions = .init(), automaticDuoProfile: Bool = false, a20EfficiencyWorkers: Bool = true) -> TLUnityUIView {
+    static func view(apk: String, extraApks: [String], dataDir: String, engine: TLNativeEngine, portrait: Bool, scale: CGFloat, sharpGraphics: Bool = false, efficientGraphics: Bool = false, efficientFrameLimit: Int = 60, threadPolicy: Int = 0, submissionMode: Int = 0, driverProfiling: Bool = false, pipelineIdentification: Bool = false, engineOnlyLimiter: Bool = false, renderTargetInventory: Bool = false, pipelineFeedback: Bool = false, spatialUpscaling: Bool = false, spatialInputPercent: Int = 80, clockPresentation: Bool = false, feedbackClockCorrection: Bool = false, nativePipelineArchiveMode: Int = 0, nativeArchiveVerification: Bool = false, execution: HuskExecutionOptions = .init(), automaticDuoProfile: Bool = false, a20EfficiencyWorkers: Bool = true, metal4Renderer: Bool = false, frameGeneration: Bool = false) -> TLUnityUIView {
         if let view = shared[apk] { return view }
-        let view = TLUnityUIView(apk: apk, extraApks: extraApks, dataDir: dataDir, engine: engine, portrait: portrait, scale: scale, sharpGraphics: sharpGraphics, efficientGraphics: efficientGraphics, efficientFrameLimit: efficientFrameLimit, threadPolicy: threadPolicy, submissionMode: submissionMode, driverProfiling: driverProfiling, pipelineIdentification: pipelineIdentification, engineOnlyLimiter: engineOnlyLimiter, renderTargetInventory: renderTargetInventory, pipelineFeedback: pipelineFeedback, spatialUpscaling: spatialUpscaling, spatialInputPercent: spatialInputPercent, clockPresentation: clockPresentation, feedbackClockCorrection: feedbackClockCorrection, nativePipelineArchiveMode: nativePipelineArchiveMode, nativeArchiveVerification: nativeArchiveVerification, execution: execution, automaticDuoProfile: automaticDuoProfile, a20EfficiencyWorkers: a20EfficiencyWorkers)
+        let view = TLUnityUIView(apk: apk, extraApks: extraApks, dataDir: dataDir, engine: engine, portrait: portrait, scale: scale, sharpGraphics: sharpGraphics, efficientGraphics: efficientGraphics, efficientFrameLimit: efficientFrameLimit, threadPolicy: threadPolicy, submissionMode: submissionMode, driverProfiling: driverProfiling, pipelineIdentification: pipelineIdentification, engineOnlyLimiter: engineOnlyLimiter, renderTargetInventory: renderTargetInventory, pipelineFeedback: pipelineFeedback, spatialUpscaling: spatialUpscaling, spatialInputPercent: spatialInputPercent, clockPresentation: clockPresentation, feedbackClockCorrection: feedbackClockCorrection, nativePipelineArchiveMode: nativePipelineArchiveMode, nativeArchiveVerification: nativeArchiveVerification, execution: execution, automaticDuoProfile: automaticDuoProfile, a20EfficiencyWorkers: a20EfficiencyWorkers, metal4Renderer: metal4Renderer, frameGeneration: frameGeneration)
         shared[apk] = view
         return view
     }
@@ -990,7 +1018,7 @@ struct TLUnityScreen: UIViewRepresentable {
             view.transform = .identity
             view.onStats = onStats; view.onThreeFingerTap = onThreeFingerTap; return view
         }
-        let view = TLUnityUIView(apk: apk, extraApks: extraApks, dataDir: dataDir, engine: engine, portrait: portrait, scale: scale, sharpGraphics: sharpGraphics, efficientGraphics: efficientGraphics, efficientFrameLimit: efficientFrameLimit, threadPolicy: threadPolicy, submissionMode: submissionMode, driverProfiling: driverProfiling, pipelineIdentification: pipelineIdentification, engineOnlyLimiter: engineOnlyLimiter, renderTargetInventory: renderTargetInventory, pipelineFeedback: pipelineFeedback, spatialUpscaling: spatialUpscaling, spatialInputPercent: spatialInputPercent, clockPresentation: clockPresentation, feedbackClockCorrection: feedbackClockCorrection, nativePipelineArchiveMode: nativePipelineArchiveMode, nativeArchiveVerification: nativeArchiveVerification, execution: execution, automaticDuoProfile: automaticDuoProfile, a20EfficiencyWorkers: a20EfficiencyWorkers)
+        let view = TLUnityUIView(apk: apk, extraApks: extraApks, dataDir: dataDir, engine: engine, portrait: portrait, scale: scale, sharpGraphics: sharpGraphics, efficientGraphics: efficientGraphics, efficientFrameLimit: efficientFrameLimit, threadPolicy: threadPolicy, submissionMode: submissionMode, driverProfiling: driverProfiling, pipelineIdentification: pipelineIdentification, engineOnlyLimiter: engineOnlyLimiter, renderTargetInventory: renderTargetInventory, pipelineFeedback: pipelineFeedback, spatialUpscaling: spatialUpscaling, spatialInputPercent: spatialInputPercent, clockPresentation: clockPresentation, feedbackClockCorrection: feedbackClockCorrection, nativePipelineArchiveMode: nativePipelineArchiveMode, nativeArchiveVerification: nativeArchiveVerification, execution: execution, automaticDuoProfile: automaticDuoProfile, a20EfficiencyWorkers: a20EfficiencyWorkers, metal4Renderer: metal4Renderer, frameGeneration: frameGeneration)
         view.onStats = onStats
         view.onThreeFingerTap = onThreeFingerTap
         Self.shared[apk] = view
@@ -1148,7 +1176,7 @@ struct TLCocosAttemptView: View {
                     // The game always has the whole screen: it is told its size once, as it starts, so nothing may take space from it.
                     // The bar and the log are drawn over it instead, and hiding them shows everything underneath.
                     TLUnityScreen(apk: apk, extraApks: Array(app.apks.dropFirst()), dataDir: dataDir, engine: engine, portrait: portrait,
-                                  scale: settings.renderScale(for: app), sharpGraphics: settings.usesSharpGraphics(for: app), efficientGraphics: settings.usesEfficientGraphics(for: app), efficientFrameLimit: settings.efficientFrameRate.rawValue, threadPolicy: settings.workerScheduling.rawValue, submissionMode: settings.vulkanSubmission.rawValue, driverProfiling: settings.driverPhaseProfiling, pipelineIdentification: settings.pipelineIdentification, engineOnlyLimiter: settings.engineOnlyLimiter, renderTargetInventory: settings.renderTargetInventory, pipelineFeedback: settings.pipelineFeedback, spatialUpscaling: settings.spatialUpscaling, spatialInputPercent: settings.spatialInputPercent, clockPresentation: settings.clockPresentation, feedbackClockCorrection: settings.feedbackClockCorrection, nativePipelineArchiveMode: settings.nativePipelineArchiveMode, nativeArchiveVerification: settings.nativeArchiveVerification, execution: settings.execution, automaticDuoProfile: settings.supportsDuoAutomatic(for: app), a20EfficiencyWorkers: settings.a20EfficiencyWorkers, onStats: { stats = $0 }, onThreeFingerTap: { toggleInterface() })
+                                  scale: settings.renderScale(for: app), sharpGraphics: settings.usesSharpGraphics(for: app), efficientGraphics: settings.usesEfficientGraphics(for: app), efficientFrameLimit: settings.efficientFrameRate.rawValue, threadPolicy: settings.workerScheduling.rawValue, submissionMode: settings.vulkanSubmission.rawValue, driverProfiling: settings.driverPhaseProfiling, pipelineIdentification: settings.pipelineIdentification, engineOnlyLimiter: settings.engineOnlyLimiter, renderTargetInventory: settings.renderTargetInventory, pipelineFeedback: settings.pipelineFeedback, spatialUpscaling: settings.spatialUpscaling, spatialInputPercent: settings.spatialInputPercent, clockPresentation: settings.clockPresentation, feedbackClockCorrection: settings.feedbackClockCorrection, nativePipelineArchiveMode: settings.nativePipelineArchiveMode, nativeArchiveVerification: settings.nativeArchiveVerification, execution: settings.execution, automaticDuoProfile: settings.supportsDuoAutomatic(for: app), a20EfficiencyWorkers: settings.a20EfficiencyWorkers, metal4Renderer: settings.metal4Renderer, frameGeneration: settings.frameGeneration, onStats: { stats = $0 }, onThreeFingerTap: { toggleInterface() })
                         .background(Color.black)
                     .overlay {
                         // A game whose menus answer only a controller: with none paired, one on the glass. Hiding the bar leaves

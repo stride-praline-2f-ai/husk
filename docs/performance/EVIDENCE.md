@@ -296,3 +296,8 @@ Build153disposition:e955a2d53e80f85627f220e5927333e879ac14b9,hosted42795743882,4
 ## 12 November 2026 — SCALABLE-DONOR-v1 verified candidate
 
 [Build154 final handover](builds/9de93c2b1a2efc93f5679fec808397fa58f791e8.md), with adjacent CI, attempt, source, package and fixed-score JSON records. Hosted run42823997904 passed422Apple checks/49suites, font, SDK31/96, all8setupgroups and fresh app/helper/sign/package. Independent downloaded package/source/library/driver checks include required metadata for all3extensions and multiple donor instances. Real shared backing growth,128MiB prefetch and helper installation fix preserved; earlier eac936 artifact superseded. Build4/4; physical0/2; energyunknown0/1; no all12GB/cooling guarantee or new logs requested. Wholeplan31.11%/implementation79.795918% unchanged.
+
+
+## 13 November METAL4-FG-v1 candidate
+
+[Implementation/design/source/provenance and acceptance](46-metal4-dungeons-framegen.md). Real Playport iOS Metal4 Vulkan port identified and pinned; standalone colour-flow Dungeons frame generation implemented with explicit30→60target and bounded presentation lifetimes. This supersedes the earlier assessment-only no-port conclusion; upstreamMesa still has no official iOS support. Apple SDK/component/freshdriver/IPA and device quality/latency/energy remain pending. Build154 remains verified; both beta controls defaultOFF; RAM/saves/caches retained.

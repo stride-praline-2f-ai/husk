@@ -70,6 +70,23 @@ REPLACEMENTS={
     ]
   ]
 }
+# Frame generation owns offscreen leases; the WSI still performs all original
+# Vulkan semaphore/fence bookkeeping and receives per-lease completion handlers.
+REPLACEMENTS["MVKSwapchain.h"][1][1] += "\n\tvoid* _huskFramegen = nullptr;"
+REPLACEMENTS["MVKSwapchain.mm"][0][1] += '\n#include "HuskFramegen.inc"'
+REPLACEMENTS["MVKSwapchain.mm"][1][1] += "\n    _huskFramegen=huskFramegenNew(getCAMetalLayer());"
+REPLACEMENTS["MVKSwapchain.mm"][4][1] = REPLACEMENTS["MVKSwapchain.mm"][4][1].replace("_huskSpatial.enabled)","_huskSpatial.enabled || huskFramegenRequested())")
+REPLACEMENTS["MVKSwapchain.mm"].append([
+    "MVKSwapchain::~MVKSwapchain() {",
+    "MVKSwapchain::~MVKSwapchain() {\n    huskFramegenDelete(_huskFramegen);_huskFramegen=nullptr;"
+])
+REPLACEMENTS["MVKImage.mm"].append([
+    "_mtlDrawable = [_swapchain->getCAMetalLayer().nextDrawable retain];",
+    "_mtlDrawable = [(_swapchain->_huskFramegen ? huskFramegenDrawable(_swapchain->_huskFramegen,_swapchain->getCAMetalLayer()) : _swapchain->getCAMetalLayer().nextDrawable) retain];"
+])
+REPLACEMENTS["MVKImage.mm"][1][1] = REPLACEMENTS["MVKImage.mm"][1][1].replace(
+    "\tMVKSwapchainSignaler signaler", "    if(_swapchain->_huskFramegen)huskFramegenSubmitted(mtlDrwbl,mtlCmdBuff);\n\tMVKSwapchainSignaler signaler")
+
 # This is a GPU compiler contract, not a diagnostic/package build identity.
 # Bump when transforms change MSL/native descriptor compilation semantics.
 NATIVE_COMPILER_CONTRACT="husk-native-default-mvk-compiler-contract-v1"
@@ -121,17 +138,21 @@ def prepare(src):
     changed[project]=original.replace('"-all_load",','"-all_load",\\n\\t\\t\\t\\t\\t"-weak_framework",\\n\\t\\t\\t\\t\\t"MetalFX",'.replace("\\n","\n").replace("\\t","\t"))
     # All anchors are checked before mutation.
     for path,content in changed.items():path.write_text(content)
-    for name in ["HuskSpatial.inc","HuskSpatialDriver.h"]:shutil.copy2(ROOT/"patches/metalfx"/name,gpu/name)
+    for name in ["HuskSpatial.inc","HuskSpatialDriver.h","HuskFramegen.inc"]:shutil.copy2(ROOT/"patches/metalfx"/name,gpu/name)
     shutil.copy2(ROOT/"src/translation-layer-next/husk-tl-spatial.h",gpu/"HuskSpatialABI.h")
     shutil.copy2(ROOT/"patches/metalfx/HuskDisplay.inc",gpu/"HuskDisplay.inc")
     shutil.copy2(ROOT/"src/translation-layer-next/husk-tl-display.h",gpu/"HuskDisplayABI.h")
+    shutil.copy2(ROOT/"src/translation-layer-next/husk-tl-framegen.h",gpu/"HuskFramegenABI.h")
+    shader=(ROOT/"patches/metalfx/HuskFramegen.metal").read_text()
+    (gpu/"HuskFramegenShader.inc").write_text('static const char* huskFramegenShader=R"HUSKFG('+shader+')HUSKFG";\n')
     inputs=[ROOT/"patches/metalfx/HuskDisplay.inc",ROOT/"src/translation-layer-next/husk-tl-display.h",Path(__file__),ROOT/"patches/metalfx/HuskSpatial.inc",ROOT/"patches/metalfx/HuskSpatialDriver.h",ROOT/"src/translation-layer-next/husk-tl-spatial.h",ROOT/"patches/metalfx/HuskArchive.inc",ROOT/"src/translation-layer-next/husk-tl-native-archive.h"]
+    inputs += [ROOT/"patches/metalfx/HuskFramegen.inc",ROOT/"patches/metalfx/HuskFramegen.metal",ROOT/"src/translation-layer-next/husk-tl-framegen.h"]
     digest=hashlib.sha256()
     for path in inputs:digest.update(path.read_bytes())
     archive=(ROOT/"patches/metalfx/HuskArchive.inc").read_text()
     (gpu/"HuskArchive.inc").write_text('#define HUSK_ARCHIVE_PATCH_ID "'+digest.hexdigest()+'"\n#define HUSK_ARCHIVE_COMPAT_ID "'+compatibility+'"\n'+archive)
     shutil.copy2(ROOT/"src/translation-layer-next/husk-tl-native-archive.h",gpu/"HuskArchiveABI.h")
-    manifest={"schema":1,"upstream_commit":PIN,"upstream_version":"1.4.2","husk_spatial_patch_sha256":digest.hexdigest(),"husk_native_pipeline_patch_sha256":digest.hexdigest(),"native_archive_abi":2,"native_archive_cache_schema":2,"native_archive_compatibility_id":compatibility,"native_archive_compatibility_inputs":compatibility_inputs,"feature":"M9-SPATIAL-v3+M5-NATIVE-ARCHIVE-v1+M4-DISPLAY-v1","default_enabled":False}
+    manifest={"schema":1,"upstream_commit":PIN,"upstream_version":"1.4.2","husk_spatial_patch_sha256":digest.hexdigest(),"husk_native_pipeline_patch_sha256":digest.hexdigest(),"native_archive_abi":2,"native_archive_cache_schema":2,"native_archive_compatibility_id":compatibility,"native_archive_compatibility_inputs":compatibility_inputs,"feature":"M9-SPATIAL-v3+M5-NATIVE-ARCHIVE-v1+M4-DISPLAY-v1+M9-FLOW-FRAMEGEN-v1","default_enabled":False}
     (src/"HuskSpatialBuild.json").write_text(json.dumps(manifest,indent=2)+"\n")
     print(json.dumps(manifest))
 if __name__=="__main__":prepare(Path(sys.argv[1]).resolve())

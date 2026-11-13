@@ -44,7 +44,7 @@ cp "$SRC/HuskSpatialBuild.json" "$OUT/"
 nm -gU "$OUT/HuskMoltenVK" | grep -E '_vkHuskSpatialConfigure$'
 nm -gU "$OUT/HuskMoltenVK" | grep -E '_vkHuskSpatialSnapshot$'
 nm -gU "$OUT/HuskMoltenVK" | grep -E '_vkHuskSpatialObservations$'
-for symbol in SpatialBindings DisplayConfigure DisplaySnapshot; do
+for symbol in SpatialBindings DisplayConfigure DisplaySnapshot FramegenConfigure FramegenSnapshot FramegenPause; do
     nm -gU "$OUT/HuskMoltenVK" | grep -E "_vkHusk${symbol}$"
 done
 for symbol in Configure Snapshot Prepare Forget Priority; do

@@ -117,6 +117,7 @@ static int create(void*d,const void*c,const void*a,uint64_t*out){assert(d==(void
 static void destroy(void*d,uint64_t o,const void*a){assert(d==(void*)1&&o==200&&a==expected_alloc);calls++;}
 static void *lookup(void*l,const char*n){(void)l;return strstr(n,"Create")?(void*)create:(void*)destroy;}
 #define dlsym lookup
+#define vk_symbol(name) lookup(V.lib,name)
 /* WRAPPERS */
 int forwarding(void){
  calls=0;returned=0;husk_ue4_set_pipeline_diagnostics(true);pi_sampler sampler={.type=31};uint64_t out=0;
