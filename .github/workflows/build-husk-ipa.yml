@@ -12,7 +12,7 @@ concurrency:
 jobs:
   build:
     name: Build Duo IPA with GitHub-hosted Xcode 27
-    runs-on: xcode-27
+    runs-on: macos-latest
     timeout-minutes: 120
     steps:
       - name: Check out private build repository
