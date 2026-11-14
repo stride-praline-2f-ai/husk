@@ -183,7 +183,10 @@ jobs:
         id: shaders
         if: ${{ !cancelled() && steps.source.outcome == 'success' }}
         continue-on-error: true
-        run: python3 scripts/stage_verified_shaders.py "$HUSK_TOOL_CACHE/donors/Husk-3.4.ipa"
+        run: |
+          set -euo pipefail
+          python3 scripts/stage_verified_shaders.py "$HUSK_TOOL_CACHE/donors/Husk-3.4.ipa"
+          python3 tests/translation-layer/test_android_font_weight.py 2>&1 | tee build/logs/android-font-weight.log
       - name: Set up Java compiler for Android framework repair
         id: java_tools
         if: ${{ !cancelled() && steps.resources.outcome == 'success' }}
