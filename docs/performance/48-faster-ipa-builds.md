@@ -1,0 +1,17 @@
+# BUILD-FAST-v1 — reuse verified components between IPA builds
+
+User request14November2026 during ANKI-PROGRESS-v1 cloud run43635256581: build IPAs much faster. That frozen repair build continues with its original gates. This work changes future build orchestration, not game graphics, quality or RAM policy. Sequence: corrected fresh-Java packaging -> source-keyed reusable components -> next hosted build warms caches -> measure a comparable warm build. No device testing is required for this build-system change.
+
+The old workflow redownloaded toolchains/donors, rebuilt XcodeGen/Rust dependencies, rebuilt the graphics driver and now rebuilt Java on every app change. New separate Actions caches retain:
+
+Measured cold reference: Anki repair run43635256581 completed successfully in6min47s (20:01:44–20:08:31UTC): tools89s, custom driver126s, Java21s, pairing22s and fresh app/package90s. These phases identify reusable work; they are not a warm-build speedup measurement. The current user has closed app-performance tuning; build delivery improvements remain separately requested.
+
+* Pinned downloads/build tools and Rust dependencies, separated by host/compiler/SDK identity and setup recipes. Existing setup and checksum/pin validation still run.
+* The custom native driver, keyed by compiler/SDK/ARM64 identity, the complete current custom-driver input list, build recipe and SPIRV-Cross patches. A restore verifies every component file hash, exact manifest compiler/ABI/schema/patch contract and ARM64 admission; existing export/ABI checks still run. Project embedding is restored idempotently.
+* Full/core Java DEX and their build receipt, keyed by handwritten/generated/stub source, generators/build scripts, regression fixture and compiler/SDK identity. A restore verifies all cached bytes, source and DEX receipts, then stages them over the pinned release runtime resources. A Java edit forces fresh Java compilation; an app-only edit can reuse it.
+
+There are no approximate restore keys for compiled components. Missing, changed, extra, corrupt or symlinked content fails validation and takes the fresh-build path. A component cache hit never substitutes an old app executable. The full49-suite regression gate, font execution, prerequisite collection, fresh app build, source stamp, extension/signing/packaging and final artifact verification remain. No DerivedData/app binary cache is introduced here. GitHub can evict caches or leave them cold; that reduces speed only, not required validation. First use needs to populate caches; no measured minute/speedup claim yet.
+
+Validation:9 portable tests cover key stability/content/platform changes, app-edit independence, sealed bytes, corrupt/extra/symlink/key rejection and repeated project embedding. A real newly compiled Java component was sealed, verified and restored locally. Workflow YAML and all49 required suite references remain valid. Actual hosted native-driver cache admission and cold/warm timings remain pending; do not call those measured or passed. Future runtime IPA source must include these helper scripts before activating the new workflow; do not point it at the older156 source that lacks them.
+
+BUILD-FAST-v1 readiness: implementation/configuration and local component verification2/3; hosted cold+warm exercise0/1 pending. Existing performance roadmap31.11%/I79.795918% unchanged; this is delivery engineering, not a device energy improvement.

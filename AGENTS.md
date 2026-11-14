@@ -6,6 +6,8 @@ Read this file and [PROJECT_PLAN.md](PROJECT_PLAN.md), then the linked evidence 
 
 ## Primary objective and protected baseline
 
+Current user scope (14November2026): performance-optimization work is finished for now. Focus on AnkiDroid working reliably as a lightweight app: startup, UI/buttons, deck import/sync/study and direct Home Screen launch. Preserve existing game improvements, but do not reopen game/thermal/graphics experiments, performance scoring discussions or general gameplay logging without a new request. Finish the separately requested faster-build pipeline; no new app-performance tuning campaign. Give short functional handovers and the smallest relevant Anki check instead of performance-plan percentages.
+
 Minimise practical battery energy, electrical power and unnecessary heat while maintaining excellent visuals, responsive gameplay and smooth sustained 60 FPS. Maximum uncapped FPS is not the principal benchmark.
 
 The available test device is the 13-inch M4 iPad Pro, 1TB/16GB. Preserve the analysed code baseline `3c2d52c0f26ca9b40796633b169c40fd7f535e7c` and its 2128 × 1600 presentation reference: Dungeons V1.4, Sharp / Efficient, 60 FPS, Balanced, Driver Default, persistent cache enabled, detailed driver profiling off for normal comparisons, Low Power Mode off. This is the best documented working reference, not a proven energy optimum. The 1784 × 1336 run is a separate experiment, not a replacement default.

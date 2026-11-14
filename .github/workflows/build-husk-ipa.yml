@@ -60,6 +60,35 @@ jobs:
             echo "Source objects sent; connected GitHub tool will finish branch publication."
           fi
           python3 "$RUNNER_TEMP/husk-build-status.py"
+      - name: Fingerprint reusable build components
+        id: cache_keys
+        run: |
+          python3 tests/translation-layer/test_ipa_build_cache.py
+          python3 scripts/ipa_build_cache.py keys >> "$GITHUB_OUTPUT"
+      - name: Restore pinned tools downloads and Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ runner.tool_cache }}/husk/donors
+            ${{ runner.tool_cache }}/husk/cargo
+            ${{ runner.tool_cache }}/husk/rustup
+            ${{ runner.tool_cache }}/husk/xcodegen-*
+            ${{ runner.tool_cache }}/husk/vulkan-headers-*
+            ${{ runner.tool_cache }}/husk/rppairing-target
+            ${{ runner.tool_cache }}/husk/java-framework
+          key: husk-tools-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache_keys.outputs.tools }}-${{ hashFiles('scripts/prepare_mac_build_tools.sh', 'scripts/build_rppairing_ios.sh', 'src/rppairing-ios/Cargo.lock', 'scripts/stage_graphics_build.py', 'scripts/stage_metal4_driver.py') }}
+      - name: Restore source-matched native driver component
+        id: driver_cache
+        uses: actions/cache/restore@v4
+        with:
+          path: build/cache/driver
+          key: husk-driver-v1-${{ steps.cache_keys.outputs.driver }}
+      - name: Restore source-matched Java component
+        id: java_cache
+        uses: actions/cache/restore@v4
+        with:
+          path: build/cache/java
+          key: husk-java-v1-${{ steps.cache_keys.outputs.java }}
       - name: Check every platform signing and packaging prerequisite
         id: platform
         if: ${{ !cancelled() && steps.source.outcome == 'success' }}
@@ -166,7 +195,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bash scripts/build_java_framework_for_ipa.sh 2>&1 | tee build/logs/java-framework.log
+          if python3 scripts/ipa_build_cache.py restore java '${{ steps.cache_keys.outputs.java }}'; then
+            echo 'Reused source-matched tested Java DEX; fresh app build still required' | tee build/logs/java-framework.log
+          else
+            bash scripts/build_java_framework_for_ipa.sh 2>&1 | tee build/logs/java-framework.log
+            python3 scripts/ipa_build_cache.py save java '${{ steps.cache_keys.outputs.java }}'
+          fi
+      - name: Save verified Java component for future app-only builds
+        if: ${{ steps.java_framework.outcome == 'success' && steps.java_cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: build/cache/java
+          key: husk-java-v1-${{ steps.cache_keys.outputs.java }}
       - name: Verify unchanged driver independently
         id: driver
         if: ${{ !cancelled() && steps.source.outcome == 'success' }}
@@ -174,7 +214,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bash scripts/build_spatial_moltenvk_ios.sh 2>&1 | tee build/logs/framegen-driver-build.log
+          if python3 scripts/ipa_build_cache.py restore driver '${{ steps.cache_keys.outputs.driver }}'; then
+            echo 'Reused verified matching native driver; app will be rebuilt' | tee build/logs/framegen-driver-build.log
+          else
+            bash scripts/build_spatial_moltenvk_ios.sh 2>&1 | tee build/logs/framegen-driver-build.log
+            python3 scripts/ipa_build_cache.py save driver '${{ steps.cache_keys.outputs.driver }}'
+          fi
           for item in Playport-0.5.0.ipa NOTICES.tar; do
             donor="$HUSK_TOOL_CACHE/donors/$item"
             if [ ! -s "$donor" ]; then
@@ -193,6 +238,12 @@ jobs:
           for symbol in SpatialConfigure SpatialSnapshot SpatialObservations SpatialBindings DisplayConfigure DisplaySnapshot ArchiveConfigure ArchiveSnapshot ArchivePrepare ArchiveForget ArchivePriority FramegenConfigure FramegenSnapshot FramegenPause; do
             grep -E "_vkHusk${symbol}$" build/logs/driver-exports.txt
           done
+      - name: Save verified native driver for future app-only builds
+        if: ${{ steps.driver.outcome == 'success' && steps.driver_cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: build/cache/driver
+          key: husk-driver-v1-${{ steps.cache_keys.outputs.driver }}
       - name: Build pairing library with cached dependencies
         id: pairing
         if: ${{ !cancelled() && steps.source.outcome == 'success' }}

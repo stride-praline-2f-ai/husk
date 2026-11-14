@@ -1,0 +1,202 @@
+{
+  "run_id": 43635256581,
+  "job_id": 132570537128,
+  "status": "completed",
+  "conclusion": "success",
+  "workflow_commit": "e46b4c83fe817b5e8d872f1eee2ae20ba51d3514",
+  "source": "852f78c876bf2583510f045328288885095887de",
+  "tree": "ddc681e394bf6f54b5c8740eb211705a99c9b6a6",
+  "apple_tests": 428,
+  "suites": 49,
+  "skips": 0,
+  "progressbar_assertions": 10,
+  "steps": [
+    {
+      "name": "Set up job",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 1,
+      "started_at": "2026-11-14T20:01:45Z",
+      "completed_at": "2026-11-14T20:01:46Z"
+    },
+    {
+      "name": "Check out private build repository",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 2,
+      "started_at": "2026-11-14T20:01:46Z",
+      "completed_at": "2026-11-14T20:01:49Z"
+    },
+    {
+      "name": "Restore exact reviewed source",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 3,
+      "started_at": "2026-11-14T20:01:49Z",
+      "completed_at": "2026-11-14T20:01:52Z"
+    },
+    {
+      "name": "Check every platform signing and packaging prerequisite",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 4,
+      "started_at": "2026-11-14T20:01:52Z",
+      "completed_at": "2026-11-14T20:01:54Z"
+    },
+    {
+      "name": "Run full regression suite including actual Duo policy",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 5,
+      "started_at": "2026-11-14T20:01:54Z",
+      "completed_at": "2026-11-14T20:02:29Z"
+    },
+    {
+      "name": "Prepare clean cloud Mac build tools and check Vulkan SDK ABI",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 6,
+      "started_at": "2026-11-14T20:02:29Z",
+      "completed_at": "2026-11-14T20:03:58Z"
+    },
+    {
+      "name": "Stage matching release resources",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 7,
+      "started_at": "2026-11-14T20:03:58Z",
+      "completed_at": "2026-11-14T20:04:02Z"
+    },
+    {
+      "name": "Verify exact unchanged release Metal shaders",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 8,
+      "started_at": "2026-11-14T20:04:02Z",
+      "completed_at": "2026-11-14T20:04:03Z"
+    },
+    {
+      "name": "Set up Java compiler for Android framework repair",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 9,
+      "started_at": "2026-11-14T20:04:03Z",
+      "completed_at": "2026-11-14T20:04:03Z"
+    },
+    {
+      "name": "Rebuild and exercise the repaired Java framework",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 10,
+      "started_at": "2026-11-14T20:04:03Z",
+      "completed_at": "2026-11-14T20:04:24Z"
+    },
+    {
+      "name": "Verify unchanged driver independently",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 11,
+      "started_at": "2026-11-14T20:04:24Z",
+      "completed_at": "2026-11-14T20:06:30Z"
+    },
+    {
+      "name": "Build pairing library with cached dependencies",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 12,
+      "started_at": "2026-11-14T20:06:30Z",
+      "completed_at": "2026-11-14T20:06:52Z"
+    },
+    {
+      "name": "Check staged project and every required library",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 13,
+      "started_at": "2026-11-14T20:06:52Z",
+      "completed_at": "2026-11-14T20:06:54Z"
+    },
+    {
+      "name": "Report all setup failures together before app compilation",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 14,
+      "started_at": "2026-11-14T20:06:54Z",
+      "completed_at": "2026-11-14T20:06:54Z"
+    },
+    {
+      "name": "Build and package fresh Duo IPA",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 15,
+      "started_at": "2026-11-14T20:06:54Z",
+      "completed_at": "2026-11-14T20:08:24Z"
+    },
+    {
+      "name": "Upload installable IPA",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 16,
+      "started_at": "2026-11-14T20:08:24Z",
+      "completed_at": "2026-11-14T20:08:26Z"
+    },
+    {
+      "name": "Save private build result",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 17,
+      "started_at": "2026-11-14T20:08:26Z",
+      "completed_at": "2026-11-14T20:08:28Z"
+    },
+    {
+      "name": "Upload build logs on failure",
+      "status": "completed",
+      "conclusion": "skipped",
+      "number": 18,
+      "started_at": "2026-11-14T20:08:28Z",
+      "completed_at": "2026-11-14T20:08:28Z"
+    },
+    {
+      "name": "Post Set up Java compiler for Android framework repair",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 35,
+      "started_at": "2026-11-14T20:08:28Z",
+      "completed_at": "2026-11-14T20:08:28Z"
+    },
+    {
+      "name": "Post Check out private build repository",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 36,
+      "started_at": "2026-11-14T20:08:28Z",
+      "completed_at": "2026-11-14T20:08:28Z"
+    },
+    {
+      "name": "Complete job",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 37,
+      "started_at": "2026-11-14T20:08:28Z",
+      "completed_at": "2026-11-14T20:08:29Z"
+    }
+  ],
+  "artifact": {
+    "id": 14129488098,
+    "name": "Husk-Duo-IPA",
+    "size_in_bytes": 149223669,
+    "url": "https://api.github.com/repos/stride-praline-2f-ai/husk/actions/artifacts/14129488098",
+    "archive_download_url": "https://api.github.com/repos/stride-praline-2f-ai/husk/actions/artifacts/14129488098/zip",
+    "expired": false,
+    "created_at": "2026-11-14T20:08:26Z",
+    "expires_at": "2026-11-21T20:08:25Z",
+    "updated_at": "2026-11-14T20:08:26Z",
+    "digest": "sha256:afd5feb7de99275ed7263eb9c8255a9a9a1e3b980a85cdf346633269f06c4358",
+    "workflow_run": {
+      "id": 43635256581,
+      "repository_id": 1451482305,
+      "head_repository_id": 1451482305,
+      "head_branch": "main",
+      "head_sha": "e46b4c83fe817b5e8d872f1eee2ae20ba51d3514"
+    }
+  }
+}
