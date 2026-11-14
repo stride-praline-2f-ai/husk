@@ -1,0 +1,21 @@
+{
+  "host": "Filebin temporary direct IPA hosting",
+  "anonymous_full_download_verified": true,
+  "downloaded_bytes": 149244994,
+  "downloaded_sha256": "a308e2a623ec1bc5f3546577149d6886ec14bc1bfdeb648ae5f3f220c5e04417",
+  "range_magic": "504b0304",
+  "github_delivery_failed_before_steps": [
+    43652405884,
+    43652760284
+  ],
+  "drive_failure": "413; 100 MiB connector limit",
+  "source": "bb4a6c2fd2399a2076a5aeaa022160f1d54a8217",
+  "build": 160,
+  "file_name": "Husk-3.4-build160-AnkiDroid.ipa",
+  "expires_at": "2026-11-21T23:26:26.732887Z",
+  "upload_status": 201,
+  "range_status": 206,
+  "first_request_verification_cookie": true,
+  "delivery_verified_at": "2026-11-14T23:27:37.701984+00:00",
+  "note": "Direct .ipa URL returned to user; full anonymous re-download SHA matches independently verified package. Filebin may first show cookie verification. Expiring URL omitted from source records."
+}

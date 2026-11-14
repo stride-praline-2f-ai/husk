@@ -1,0 +1,17 @@
+{
+  "source": "7df9409fc97141aa61eee938dc6e89eca9624419",
+  "run_id": 43650749472,
+  "job_id": 132618438578,
+  "result": "packaging blocked; no IPA",
+  "passed": [
+    "real JavaScript button and W_reply download test",
+    "all49 existing regression suites"
+  ],
+  "blocked": "new font regression: italic face has no weight axis",
+  "followup": {
+    "run_id": 43651167578,
+    "job_id": 132619724118,
+    "result": "diagnostic only, failed; printed Helvetica with no italic/slant trait. Temporary metadata fallback was used only to inspect the face, never as acceptance.",
+    "decision": "Use variable font's own wght/ital axes with original descriptor to preserve family; keep strict axis/family/raster checks."
+  }
+}

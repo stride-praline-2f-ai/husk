@@ -53,7 +53,12 @@ int main(int argc,char **argv) {
  gface *medium=face_family("sans-serif-medium",0);assert(actual_weight(medium->base)==500);
  gface *light=face_family("sans-serif-light",0);assert(actual_weight(light->base)==300);
  gface *bold=face_family("sans-serif",1);assert(actual_weight(bold->base)==700);
- CTFontRef italic=with_weight(base,400,true);assert(actual_weight(italic)==400 && (CTFontGetSymbolicTraits(italic)&kCTFontItalicTrait));
+ CTFontRef italic=with_weight(base,400,true);assert(actual_weight(italic)==400);
+ int italTag=0x6974616c;CFNumberRef italKey=CFNumberCreate(NULL,kCFNumberIntType,&italTag);
+ CFDictionaryRef italValues=CTFontCopyVariation(italic);double italValue=0;
+ assert(italValues && CFNumberGetValue(CFDictionaryGetValue(italValues,italKey),kCFNumberDoubleType,&italValue) && italValue==1);
+ CFStringRef family=CTFontCopyFamilyName(italic);assert(CFStringFind(family,CFSTR("Roboto"),0).location!=kCFNotFound);
+ CFRelease(family);CFRelease(italValues);CFRelease(italKey);
  double oldCoverage=coverage(thin),fixedCoverage=coverage(normal->base);
  assert(oldCoverage>0 && fixedCoverage>oldCoverage*1.25);
  printf("CoreText regular100->400, sized cache, light300/medium500/bold700/italic preserved; same-size glyph coverage %.0f -> %.0f passed\n",oldCoverage,fixedCoverage);
@@ -66,7 +71,7 @@ class FontWeightTests(unittest.TestCase):
   self.assertEqual(hashlib.sha256(FONT.read_bytes()).hexdigest(),'9e157d5ff70ae52cc8c527b36e89d9b3c69c6c814da79fa6237a0bf0895abc7c')
   with tempfile.TemporaryDirectory() as td:
    p=Path(td);(p/'test.c').write_text(PROGRAM)
-   cmd=['clang','-O1','-fblocks','-ffunction-sections','-fdata-sections','-I',str(ROOT/'src/translation-layer-next'),str(p/'test.c'),'-framework','CoreGraphics','-framework','CoreText','-framework','ImageIO','-Wl,-dead_strip','-Wl,-undefined,dynamic_lookup','-o',str(p/'test')]
+   cmd=['clang','-O1','-fblocks','-ffunction-sections','-fdata-sections','-I',str(ROOT/'src/translation-layer-next'),'-I',str(ROOT/'src/translation-layer'),str(p/'test.c'),'-framework','CoreGraphics','-framework','CoreText','-framework','ImageIO','-Wl,-dead_strip','-Wl,-undefined,dynamic_lookup','-o',str(p/'test')]
    c=subprocess.run(cmd,capture_output=True,text=True);self.assertEqual(c.returncode,0,c.stdout+c.stderr)
    r=subprocess.run([str(p/'test'),str(FONT.resolve())],capture_output=True,text=True,timeout=30);self.assertEqual(r.returncode,0,r.stdout+r.stderr);print(r.stdout,end='')
 if __name__=='__main__':unittest.main(verbosity=2)

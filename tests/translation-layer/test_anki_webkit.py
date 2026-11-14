@@ -20,7 +20,7 @@ PROGRAM=r'''
 #include "husk-tl-dvm-web.m"
 void tl_log_line(const char *format,...) { (void)format; }
 void tl_javaapp_web_events(void) {}
-const char *tl_jni_string(jobj *value) { return (const char *)value; }
+const char *tl_jni_string(const jobj *value) { return (const char *)value; }
 const char *tl_data_dir(void) { return "/tmp"; }
 static BOOL has_event(NSString *kind) {
  BOOL found=NO;

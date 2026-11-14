@@ -168,33 +168,52 @@ static CTFontRef roboto(void)
     return f;
 }
 
-/* A variable font (Roboto is one) at a weight: its 'wght' axis; others get the bold trait from 700 up. */
+/* A variable font may enumerate Thin first. Set the requested weight even for regular400;
+ * use its italic axis directly instead of a symbolic lookup that can substitute Helvetica. */
 static CTFontRef with_weight(CTFontRef f, int weight, bool italic)
 {
     CTFontRef out = NULL;
+    bool weight_axis = false, italic_axis = false;
+    CFDictionaryRef current = CTFontCopyVariation(f);
+    CFMutableDictionaryRef variation = current ? CFDictionaryCreateMutableCopy(NULL, 0, current) :
+        CFDictionaryCreateMutable(NULL, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    if (current) CFRelease(current);
     CFArrayRef axes = CTFontCopyVariationAxes(f);
-    /* CoreText may select the first named instance (Roboto Thin) from a variable-font file.
-       Apply regular weight too: skipping 400 leaves normal Android text at that instance's 100. */
-    if (axes && CFArrayGetCount(axes) > 0) {
-        int tag = 0x77676874; /* 'wght' */
-        CFNumberRef k = CFNumberCreate(NULL, kCFNumberIntType, &tag);
-        double w = weight;
-        CFNumberRef v = CFNumberCreate(NULL, kCFNumberDoubleType, &w);
-        CFDictionaryRef var = CFDictionaryCreate(NULL, (const void **)&k, (const void **)&v, 1, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-        const void *ak[] = { kCTFontVariationAttribute }; const void *av[] = { var };
-        CFDictionaryRef attrs = CFDictionaryCreate(NULL, ak, av, 1, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-        CTFontDescriptorRef d = CTFontDescriptorCreateWithAttributes(attrs);
-        out = CTFontCreateCopyWithAttributes(f, 12, NULL, d);
-        CFRelease(d); CFRelease(attrs); CFRelease(var); CFRelease(v); CFRelease(k);
+    for (CFIndex i = 0; axes && i < CFArrayGetCount(axes); i++) {
+        CFDictionaryRef axis = CFArrayGetValueAtIndex(axes, i);
+        CFNumberRef identifier = CFDictionaryGetValue(axis, kCTFontVariationAxisIdentifierKey);
+        int tag = 0;
+        if (!identifier || !CFNumberGetValue(identifier, kCFNumberIntType, &tag)) continue;
+        double value;
+        if (tag == 0x77676874) { value = weight; weight_axis = true; } /* wght */
+        else if (tag == 0x6974616c) { value = italic ? 1 : 0; italic_axis = true; } /* ital */
+        else continue;
+        double lo = value, hi = value;
+        CFNumberRef minimum = CFDictionaryGetValue(axis, kCTFontVariationAxisMinimumValueKey);
+        CFNumberRef maximum = CFDictionaryGetValue(axis, kCTFontVariationAxisMaximumValueKey);
+        if (minimum) CFNumberGetValue(minimum, kCFNumberDoubleType, &lo);
+        if (maximum) CFNumberGetValue(maximum, kCFNumberDoubleType, &hi);
+        if (value < lo) value = lo;
+        if (value > hi) value = hi;
+        CFNumberRef number = CFNumberCreate(NULL, kCFNumberDoubleType, &value);
+        CFDictionarySetValue(variation, identifier, number); CFRelease(number);
     }
     if (axes) CFRelease(axes);
-    if (!out) {
-        CTFontSymbolicTraits t = (weight >= 600 ? kCTFontBoldTrait : 0) | (italic ? kCTFontItalicTrait : 0);
-        if (t) out = CTFontCreateCopyWithSymbolicTraits(f, 12, NULL, t, t);
-        if (!out) { CFRetain(f); out = f; }
-    } else if (italic) {
-        CTFontRef it = CTFontCreateCopyWithSymbolicTraits(out, 12, NULL, kCTFontItalicTrait, kCTFontItalicTrait);
-        if (it) { CFRelease(out); out = it; }
+    if (weight_axis || italic_axis) {
+        const void *keys[] = { kCTFontVariationAttribute }; const void *values[] = { variation };
+        CFDictionaryRef attributes = CFDictionaryCreate(NULL, keys, values, 1, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+        CTFontDescriptorRef original = CTFontCopyFontDescriptor(f);
+        CTFontDescriptorRef descriptor = CTFontDescriptorCreateCopyWithAttributes(original, attributes);
+        out = CTFontCreateWithFontDescriptor(descriptor, 12, NULL);
+        CFRelease(descriptor); CFRelease(original); CFRelease(attributes);
+    }
+    CFRelease(variation);
+    if (!out) { CFRetain(f); out = f; }
+    if (!weight_axis || (italic && !italic_axis)) {
+        CTFontSymbolicTraits mask = (weight_axis ? 0 : kCTFontBoldTrait) | (italic_axis ? 0 : kCTFontItalicTrait);
+        CTFontSymbolicTraits wanted = (weight >= 600 ? kCTFontBoldTrait : 0) | (italic ? kCTFontItalicTrait : 0);
+        CTFontRef styled = CTFontCreateCopyWithSymbolicTraits(out, 12, NULL, wanted & mask, mask);
+        if (styled) { CFRelease(out); out = styled; }
     }
     return out;
 }

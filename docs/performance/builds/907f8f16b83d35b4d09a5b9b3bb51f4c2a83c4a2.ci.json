@@ -1,0 +1,12 @@
+{
+  "source": "907f8f16b83d35b4d09a5b9b3bb51f4c2a83c4a2",
+  "tree": "135f305f9bed7b9d0f2fae7b387b0a8d142e4987",
+  "run_id": 43650396180,
+  "job_id": 132617333223,
+  "result": "failure; no app compilation/package",
+  "failures": [
+    "New WK JavaScript-click fixture used tl_jni_string(jobj*) instead of const jobj*.",
+    "New actual-font fixture omitted src/translation-layer header search path."
+  ],
+  "scope": "Test-fixture compile failures; no claim that new font regression or full49 suites passed"
+}
