@@ -27,6 +27,9 @@
 #include "husk-tl-egl.h"
 #include "husk-tl-internal.h"
 #include "husk-tl-ld.h"
+#include "husk-tl-java-input.h"
+
+static atomic_bool g_web_events_pending;
 
 void tl_nwindow_configure(int w, int h, void *layer);
 void *tl_nwindow_get(void);
@@ -280,16 +283,14 @@ NAT(N_uptimeNanos) { (void)self; (void)a; struct timespec t; clock_gettime(CLOCK
 NAT(N_pollInput)
 {
     (void)self; (void)a;
-    pthread_mutex_lock(&A.q_lock);
-    int n = A.qn / 4;
-    if (!n) { pthread_mutex_unlock(&A.q_lock); *ret = L(NULL); return true; }
-    jobj *arr = tl_jni_new_prim_array('I', (uint32_t)(1 + A.qn));
+    int32_t snapshot[4100];
+    int count = tl_java_input_snapshot(&A.q_lock, A.q, &A.qn, &g_web_events_pending, snapshot);
+    if (!count) { *ret = L(NULL); return true; }
+    jobj *arr = tl_jni_new_prim_array('I', (uint32_t)(1 + count));
     arr->refs = 1u << 30;
     int32_t *v = arr->arr.data;
-    v[0] = n;
-    memcpy(v + 1, A.q, (size_t)A.qn * 4);
-    A.qn = 0;
-    pthread_mutex_unlock(&A.q_lock);
+    v[0] = count / 4;
+    memcpy(v + 1, snapshot, (size_t)count * 4);
     *ret = L(arr);
     return true;
 }
@@ -1165,6 +1166,7 @@ bool tl_javaapp_start(const tl_javaapp_config *cfg)
     atomic_store(&A.ended, false);
     atomic_store(&A.paused, false);
     atomic_store(&A.frames, 0);
+    atomic_store(&g_web_events_pending, false);
     A.qn = 0; A.gl_view = NULL; A.gl_renderer = NULL; A.content = NULL; A.gl_started = false;
     /* stores into a library's executable view (data sharing a page with its code, as Unity's does) go through the writable one */
     { void tl_codewrite_enable(void); tl_codewrite_enable(); }
@@ -1238,6 +1240,7 @@ void tl_javaapp_touch(int phase, int id, float x, float y)
     if (A.qn + 4 <= 4096) { A.q[A.qn++] = phase; A.q[A.qn++] = id; A.q[A.qn++] = fx.i; A.q[A.qn++] = fy.i; }
     pthread_mutex_unlock(&A.q_lock);
 }
+void tl_javaapp_web_events(void) { tl_java_web_notify(&g_web_events_pending); }
 void tl_javaapp_key(int code, bool down) { tl_javaapp_touch(4, code, down ? 1e-45f : 0.0f, 0); }
 void tl_javaapp_back(void) { tl_javaapp_touch(5, 0, 0, 0); }
 void tl_javaapp_set_paused(bool p)

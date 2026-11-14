@@ -56,7 +56,7 @@ static void emit(NSString *kind, int wid, NSArray<NSString *> *fields)
     if (g_nev == g_cev) { g_cev = g_cev ? g_cev * 2 : 32; g_ev = realloc(g_ev, (size_t)g_cev * sizeof(*g_ev)); }
     g_ev[g_nev++] = strdup(u ? u : "");
     pthread_mutex_unlock(&g_ev_lock);
-    tl_javaapp_touch(9, 0, 0, 0);
+    tl_javaapp_web_events();
 }
 
 /* ---- the host's screen and the container the web views live in */
@@ -114,8 +114,7 @@ static void set_screen_opaque(bool opaque)
 
 @class HuskWeb;
 static NSMutableDictionary<NSNumber *, HuskWeb *> *g_views;
-static NSMutableDictionary<NSNumber *, id> *g_pending;      /* call id -> completion block / scheme task */
-static int g_next_call = 1;
+#include "husk-tl-web-pending.inc"
 static atomic_int g_visible_webs;
 
 /* ---- each Android app's own website data (cookies, storage), as Android keeps a WebView data directory per app: a data store of
@@ -275,6 +274,7 @@ static NSString *bridge_js(void)
 }
 - (void)teardown
 {
+    pending_cancel_owner(_wid);
     [_web removeObserver:self forKeyPath:@"title"];
     [_web removeObserver:self forKeyPath:@"estimatedProgress"];
     [_web removeObserver:self forKeyPath:@"URL"];
@@ -294,13 +294,6 @@ static NSString *bridge_js(void)
 {
     emit(@"h", _wid, @[ _web.canGoBack ? @"1" : @"0", _web.canGoForward ? @"1" : @"0", _web.URL.absoluteString ?: @"" ]);
 }
-- (int)park:(id)thing
-{
-    int call = g_next_call++;
-    g_pending[@(call)] = thing;
-    return call;
-}
-
 /* navigation */
 - (void)webView:(WKWebView *)w decidePolicyForNavigationAction:(WKNavigationAction *)act decisionHandler:(void (^)(WKNavigationActionPolicy))decide
 {
@@ -316,7 +309,7 @@ static NSString *bridge_js(void)
     bool web = [scheme isEqualToString:@"http"] || [scheme isEqualToString:@"https"] || [scheme isEqualToString:@"huskapp"] ||
                [scheme isEqualToString:@"about"] || [scheme isEqualToString:@"data"] || [scheme isEqualToString:@"blob"] || [scheme isEqualToString:@"file"];
     if (!main && web) { decide(WKNavigationActionPolicyAllow); return; }
-    int call = [self park:[decide copy]];
+    int call = pending_add(_wid, HuskWebNavigation, [decide copy], 30, ^{ decide(WKNavigationActionPolicyCancel); });
     emit(@"o", _wid, @[ [NSString stringWithFormat:@"%d", call], u.absoluteString ?: @"", main ? @"1" : @"0",
                         act.navigationType == WKNavigationTypeLinkActivated ? @"1" : @"0", act.request.HTTPMethod ?: @"GET", web ? @"1" : @"0" ]);
 }
@@ -337,17 +330,18 @@ static NSString *bridge_js(void)
 /* dialogs and the bridge */
 - (void)webView:(WKWebView *)w runJavaScriptAlertPanelWithMessage:(NSString *)msg initiatedByFrame:(WKFrameInfo *)f completionHandler:(void (^)(void))done
 {
-    int call = [self park:[done copy]];
+    int call = pending_add(_wid, HuskWebAlert, [done copy], 0, ^{ done(); });
     emit(@"A", _wid, @[ [NSString stringWithFormat:@"%d", call], f.request.URL.absoluteString ?: @"", msg ?: @"" ]);
 }
 - (void)webView:(WKWebView *)w runJavaScriptConfirmPanelWithMessage:(NSString *)msg initiatedByFrame:(WKFrameInfo *)f completionHandler:(void (^)(BOOL))done
 {
-    int call = [self park:[done copy]];
+    int call = pending_add(_wid, HuskWebConfirm, [done copy], 0, ^{ done(NO); });
     emit(@"C", _wid, @[ [NSString stringWithFormat:@"%d", call], f.request.URL.absoluteString ?: @"", msg ?: @"" ]);
 }
 - (void)webView:(WKWebView *)w runJavaScriptTextInputPanelWithPrompt:(NSString *)msg defaultText:(NSString *)def initiatedByFrame:(WKFrameInfo *)f completionHandler:(void (^)(NSString *))done
 {
-    int call = [self park:[done copy]];
+    bool bridge = [msg hasPrefix:@"husk:"];
+    int call = pending_add(_wid, bridge ? HuskWebBridge : HuskWebPrompt, [done copy], bridge ? 30 : 0, ^{ done(nil); });
     if ([msg hasPrefix:@"husk:"]) emit(@"j", _wid, @[ [NSString stringWithFormat:@"%d", call], [msg substringFromIndex:5] ]);
     else emit(@"P", _wid, @[ [NSString stringWithFormat:@"%d", call], f.request.URL.absoluteString ?: @"", msg ?: @"", def ?: @"" ]);
 }
@@ -367,7 +361,9 @@ static NSString *bridge_js(void)
 /* the app's own content */
 - (void)webView:(WKWebView *)w startURLSchemeTask:(id<WKURLSchemeTask>)task
 {
-    int call = [self park:task];
+    int call = pending_add(_wid, HuskWebScheme, task, 60, ^{
+        [task didFailWithError:[NSError errorWithDomain:NSURLErrorDomain code:NSURLErrorCancelled userInfo:nil]];
+    });
     NSURLRequest *r = task.request;
     NSMutableArray *f = [NSMutableArray arrayWithArray:@[ [NSString stringWithFormat:@"%d", call], r.URL.absoluteString ?: @"", r.HTTPMethod ?: @"GET",
                                                           r.mainDocumentURL && [r.mainDocumentURL isEqual:r.URL] ? @"1" : @"0" ]];
@@ -376,7 +372,14 @@ static NSString *bridge_js(void)
 }
 - (void)webView:(WKWebView *)w stopURLSchemeTask:(id<WKURLSchemeTask>)task
 {
-    for (NSNumber *k in g_pending.allKeys) if (g_pending[k] == task) [g_pending removeObjectForKey:k];
+    for (NSNumber *k in g_pending.allKeys) {
+        HuskWebPending *p = g_pending[k];
+        if (p.kind == HuskWebScheme && p.value == task) {
+            HuskWebPending *stopped = pending_take(k.intValue);
+            NSURLSessionTask *network = stopped.network; stopped.network = nil;
+            [network cancel];
+        }
+    }
 }
 @end
 
@@ -421,7 +424,7 @@ NAT(W_create)
     (void)self; (void)ret;
     int wid = a[0].i;
     on_main(^{
-        if (!g_views) { g_views = [NSMutableDictionary dictionary]; g_pending = [NSMutableDictionary dictionary]; }
+        if (!g_views) g_views = [NSMutableDictionary dictionary];
         if (!g_views[@(wid)]) g_views[@(wid)] = [[HuskWeb alloc] initWithId:wid];
     });
     return true;
@@ -600,16 +603,16 @@ NAT(W_reply)
     NSString *r = nstr(a[1].l);
     bool isNull = a[1].l == NULL;
     on_main(^{
-        id thing = g_pending[@(call)];
-        if (!thing) return;
-        [g_pending removeObjectForKey:@(call)];
-        /* which kind of waiter this is shows in the block's type only to the compiler: the reply's form says it */
-        if ([r isEqualToString:@"\x01nav-allow"]) ((void (^)(WKNavigationActionPolicy))thing)(WKNavigationActionPolicyAllow);
-        else if ([r isEqualToString:@"\x01nav-cancel"]) ((void (^)(WKNavigationActionPolicy))thing)(WKNavigationActionPolicyCancel);
-        else if ([r isEqualToString:@"\x01alert"]) ((void (^)(void))thing)();
-        else if ([r isEqualToString:@"\x01yes"]) ((void (^)(BOOL))thing)(YES);
-        else if ([r isEqualToString:@"\x01no"]) ((void (^)(BOOL))thing)(NO);
-        else ((void (^)(NSString *))thing)(isNull ? nil : r);
+        HuskWebPending *p = g_pending[@(call)];
+        if (!p || p.kind == HuskWebScheme) return;
+        pending_take(call);  /* remove before calling WebKit, which can reenter */
+        switch (p.kind) {
+            case HuskWebNavigation: ((void (^)(WKNavigationActionPolicy))p.value)([r isEqualToString:@"\x01nav-allow"] ? WKNavigationActionPolicyAllow : WKNavigationActionPolicyCancel); break;
+            case HuskWebAlert: ((void (^)(void))p.value)(); break;
+            case HuskWebConfirm: ((void (^)(BOOL))p.value)([r isEqualToString:@"\x01yes"]); break;
+            case HuskWebPrompt: case HuskWebBridge: ((void (^)(NSString *))p.value)(isNull ? nil : r); break;
+            case HuskWebScheme: break;
+        }
     });
     return true;
 }
@@ -621,24 +624,26 @@ NAT(W_respond)
     NSArray *hdr = nstrs(a[5].l);
     NSData *body = nbytes(a[6].l);
     on_main(^{
-        id<WKURLSchemeTask> task = g_pending[@(call)];
-        if (!task) return;
+        HuskWebPending *entry = g_pending[@(call)];
+        if (!entry || entry.kind != HuskWebScheme || entry.network) return;
+        id<WKURLSchemeTask> task = entry.value;
         if (status == 0) {
             /* not the app's: fetch the real URL (reason) and hand that over */
             NSURL *real = reason ? [NSURL URLWithString:reason] : nil;
-            if (!real) { [g_pending removeObjectForKey:@(call)]; [task didFailWithError:[NSError errorWithDomain:NSURLErrorDomain code:NSURLErrorFileDoesNotExist userInfo:nil]]; return; }
+            if (!real) { pending_take(call); [task didFailWithError:[NSError errorWithDomain:NSURLErrorDomain code:NSURLErrorFileDoesNotExist userInfo:nil]]; return; }
             NSMutableURLRequest *r = [task.request mutableCopy];
             r.URL = real;
             /* the page's cookies are the data store's, both ways */
             r.HTTPShouldHandleCookies = NO;
             NSString *ck = cookie_header(real);
             if (ck) [r setValue:ck forHTTPHeaderField:@"Cookie"];
-            [[NSURLSession.sharedSession dataTaskWithRequest:r completionHandler:^(NSData *d, NSURLResponse *resp, NSError *err) {
+            entry.network = [NSURLSession.sharedSession dataTaskWithRequest:r completionHandler:^(NSData *d, NSURLResponse *resp, NSError *err) {
                 NSHTTPURLResponse *hr0 = [resp isKindOfClass:NSHTTPURLResponse.class] ? (NSHTTPURLResponse *)resp : nil;
                 if (hr0) cookies_put([NSHTTPCookie cookiesWithResponseHeaderFields:hr0.allHeaderFields forURL:hr0.URL ?: real]);
                 dispatch_async(dispatch_get_main_queue(), ^{
-                    if (!g_pending[@(call)]) return;
-                    [g_pending removeObjectForKey:@(call)];
+                    if (g_pending[@(call)] != entry) return;
+                    pending_take(call);
+                    entry.network = nil;
                     if (err) { [task didFailWithError:err]; return; }
                     NSHTTPURLResponse *hr = [resp isKindOfClass:NSHTTPURLResponse.class] ? (NSHTTPURLResponse *)resp : nil;
                     NSHTTPURLResponse *out = [[NSHTTPURLResponse alloc] initWithURL:task.request.URL statusCode:hr ? hr.statusCode : 200 HTTPVersion:@"HTTP/1.1"
@@ -647,10 +652,11 @@ NAT(W_respond)
                     if (d) [task didReceiveData:d];
                     [task didFinish];
                 });
-            }] resume];
+            }];
+            [entry.network resume];
             return;
         }
-        [g_pending removeObjectForKey:@(call)];
+        pending_take(call);
         if (status < 0) { [task didFailWithError:[NSError errorWithDomain:NSURLErrorDomain code:NSURLErrorFileDoesNotExist userInfo:nil]]; return; }
         NSMutableDictionary *h = [NSMutableDictionary dictionary];
         for (NSUInteger i = 0; i + 1 < hdr.count; i += 2) h[hdr[i]] = hdr[i + 1];
@@ -668,15 +674,18 @@ NAT(W_respond)
 NAT(W_poll)
 {
     (void)self; (void)a;
+    /* Detach host-owned bytes before any guest allocation/GC safepoint. */
     pthread_mutex_lock(&g_ev_lock);
     int n = g_nev;
-    if (!n) { pthread_mutex_unlock(&g_ev_lock); *ret = L(NULL); return true; }
+    char **events = g_ev;
+    g_ev = NULL; g_nev = g_cev = 0;
+    pthread_mutex_unlock(&g_ev_lock);
+    if (!n) { free(events); *ret = L(NULL); return true; }
     jobj *arr = tl_jni_new_obj_array(tl_jni_class("java/lang/String"), (uint32_t)n);
     arr->cls = tl_jni_class("[Ljava/lang/String;");
     arr->refs = 1u << 30;
-    for (int i = 0; i < n; i++) { arr->oarr.v[i] = dvm_new_string_utf8(g_ev[i]); free(g_ev[i]); }
-    g_nev = 0;
-    pthread_mutex_unlock(&g_ev_lock);
+    for (int i = 0; i < n; i++) { arr->oarr.v[i] = dvm_new_string_utf8(events[i]); free(events[i]); }
+    free(events);
     *ret = L(arr);
     return true;
 }
@@ -771,7 +780,7 @@ void tl_web_attach(void *screen_view, void *container, float scale, bool fresh)
             /* a new app on a new screen: whatever the last one left goes */
             for (HuskWeb *h in g_views.allValues) [h teardown];
             [g_views removeAllObjects];
-            [g_pending removeAllObjects];
+            pending_cancel_all();
             pthread_mutex_lock(&g_hit_lock);
             g_nhits = 0;
             pthread_mutex_unlock(&g_hit_lock);
