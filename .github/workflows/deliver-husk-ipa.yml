@@ -1,0 +1,40 @@
+name: Deliver existing Husk IPA directly
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/deliver-husk-ipa.yml', '.github/ci/deliver_ipa.py', 'delivery/request.json']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: husk-file-delivery
+  cancel-in-progress: false
+jobs:
+  deliver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read existing build request
+        id: request
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          r=json.loads(Path('delivery/request.json').read_text())
+          with open(os.environ['GITHUB_OUTPUT'],'a')as out:
+              out.write('run_id='+str(int(r['run_id']))+'\n')
+          PY
+      - name: Download the already-built IPA
+        uses: actions/download-artifact@v4
+        with:
+          name: Husk-Duo-IPA
+          path: delivery-package
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.request.outputs.run_id }}
+      - name: Verify and prepare direct HTTPS download
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 .github/ci/deliver_ipa.py
