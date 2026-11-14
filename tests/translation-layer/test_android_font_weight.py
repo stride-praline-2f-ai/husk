@@ -66,7 +66,7 @@ class FontWeightTests(unittest.TestCase):
   self.assertEqual(hashlib.sha256(FONT.read_bytes()).hexdigest(),'9e157d5ff70ae52cc8c527b36e89d9b3c69c6c814da79fa6237a0bf0895abc7c')
   with tempfile.TemporaryDirectory() as td:
    p=Path(td);(p/'test.c').write_text(PROGRAM)
-   cmd=['clang','-O1','-fblocks','-ffunction-sections','-fdata-sections','-I',str(ROOT/'src/translation-layer-next'),str(p/'test.c'),'-framework','CoreGraphics','-framework','CoreText','-framework','ImageIO','-Wl,-dead_strip','-Wl,-undefined,dynamic_lookup','-o',str(p/'test')]
+   cmd=['clang','-O1','-fblocks','-ffunction-sections','-fdata-sections','-I',str(ROOT/'src/translation-layer-next'),'-I',str(ROOT/'src/translation-layer'),str(p/'test.c'),'-framework','CoreGraphics','-framework','CoreText','-framework','ImageIO','-Wl,-dead_strip','-Wl,-undefined,dynamic_lookup','-o',str(p/'test')]
    c=subprocess.run(cmd,capture_output=True,text=True);self.assertEqual(c.returncode,0,c.stdout+c.stderr)
    r=subprocess.run([str(p/'test'),str(FONT.resolve())],capture_output=True,text=True,timeout=30);self.assertEqual(r.returncode,0,r.stdout+r.stderr);print(r.stdout,end='')
 if __name__=='__main__':unittest.main(verbosity=2)
