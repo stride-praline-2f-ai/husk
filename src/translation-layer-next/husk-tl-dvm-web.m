@@ -313,6 +313,24 @@ static NSString *bridge_js(void)
     emit(@"o", _wid, @[ [NSString stringWithFormat:@"%d", call], u.absoluteString ?: @"", main ? @"1" : @"0",
                         act.navigationType == WKNavigationTypeLinkActivated ? @"1" : @"0", act.request.HTTPMethod ?: @"GET", web ? @"1" : @"0" ]);
 }
+/* Android's DownloadListener receives attachments and content the web engine cannot display. */
+- (void)webView:(WKWebView *)w decidePolicyForNavigationResponse:(WKNavigationResponse *)navigation decisionHandler:(void (^)(WKNavigationResponsePolicy))decide
+{
+    (void)w;
+    NSURLResponse *r=navigation.response;
+    NSHTTPURLResponse *http=[r isKindOfClass:NSHTTPURLResponse.class]?(id)r:nil;
+    NSString *disposition=nil;
+    for (NSString *key in http.allHeaderFields) if ([key caseInsensitiveCompare:@"Content-Disposition"]==NSOrderedSame) disposition=[http.allHeaderFields[key] description];
+    NSInteger status=http?http.statusCode:200;
+    if (navigation.isForMainFrame && status>=400) emit(@"H",_wid,@[r.URL.absoluteString?:@"",[NSString stringWithFormat:@"%ld",(long)status],r.MIMEType?:@"text/plain"]);
+    BOOL attachment=[[disposition lowercaseString] hasPrefix:@"attachment"];
+    if (navigation.isForMainFrame && status>=200 && status<300 && (attachment || !navigation.canShowMIMEType)) {
+        decide(WKNavigationResponsePolicyCancel);
+        emit(@"d",_wid,@[r.URL.absoluteString?:@"",disposition?:@"",r.MIMEType?:@"application/octet-stream",[NSString stringWithFormat:@"%lld",(long long)r.expectedContentLength]]);
+        return;
+    }
+    decide(WKNavigationResponsePolicyAllow);
+}
 - (void)webView:(WKWebView *)w didStartProvisionalNavigation:(WKNavigation *)n { emit(@"s", _wid, @[ w.URL.absoluteString ?: @"" ]); }
 - (void)webView:(WKWebView *)w didCommitNavigation:(WKNavigation *)n { emit(@"m", _wid, @[ w.URL.absoluteString ?: @"" ]); [self history]; }
 - (void)webView:(WKWebView *)w didFinishNavigation:(WKNavigation *)n { [self history]; emit(@"f", _wid, @[ w.URL.absoluteString ?: @"" ]); }
@@ -382,6 +400,8 @@ static NSString *bridge_js(void)
     }
 }
 @end
+
+#include "husk-tl-downloads.inc"
 
 /* ---- husk.Web's natives: the main thread does the work */
 
@@ -690,6 +710,21 @@ NAT(W_poll)
     return true;
 }
 
+NAT(W_downloadStart) {
+    (void)self; (void)ret;
+    download_start(a[0].j,nstr(a[1].l),nstr(a[2].l),nstrs(a[3].l)); return true;
+}
+NAT(W_downloadQuery) {
+    (void)self;
+    NSArray<NSString *> *s=download_snapshot(a[0].j);
+    if (!s) { *ret=L(NULL); return true; }
+    jobj *arr=tl_jni_new_obj_array(tl_jni_class("java/lang/String"),(uint32_t)s.count);
+    arr->cls=tl_jni_class("[Ljava/lang/String;"); arr->refs=1u<<30;
+    for (NSUInteger i=0;i<s.count;i++) arr->oarr.v[i]=dvm_new_string_utf8(s[i].UTF8String);
+    *ret=L(arr); return true;
+}
+NAT(W_downloadRemove) { (void)self; *ret=Z(download_remove(a[0].j)); return true; }
+
 /* ---- CookieManager: the app's data store's cookies */
 NAT(W_app)
 {
@@ -742,6 +777,9 @@ NAT(W_cookieAny)
 }
 
 static const struct { const char *name, *sig; dvm_native_fn fn; } k_web[] = {
+    { "downloadStart", "(JLjava/lang/String;Ljava/lang/String;[Ljava/lang/String;)V", W_downloadStart },
+    { "downloadQuery", "(J)[Ljava/lang/String;", W_downloadQuery },
+    { "downloadRemove", "(J)Z", W_downloadRemove },
     { "create", "(I)V", W_create },
     { "destroy", "(I)V", W_destroy },
     { "frame", "(IIIIIZZ)V", W_frame },

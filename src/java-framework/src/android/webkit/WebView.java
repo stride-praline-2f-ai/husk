@@ -68,7 +68,7 @@ public class WebView extends AbsoluteLayout implements android.view.ViewTreeObse
     private final HuskWebSettings mSettings;
     private volatile WebViewClient mClient = new WebViewClient();
     private volatile WebChromeClient mChrome;
-    private DownloadListener mDownload;
+    private volatile DownloadListener mDownload;
     private FindListener mFindListener;
     private PictureListener mPictureListener;
     private WebViewRenderProcessClient mRenderClient;
@@ -157,9 +157,19 @@ public class WebView extends AbsoluteLayout implements android.view.ViewTreeObse
         synchronized (this) { if (mSettingsPosted) return; mSettingsPosted = true; }
         mHandler.post(() -> { synchronized (this) { mSettingsPosted = false; } pushSettings(); });
     }
-    private void pushSettings() {
+    private String mSentSettings;
+    private synchronized void pushSettings() {
         if (mDestroyed) return;
-        husk.Web.settings(mId, mSettings.getJavaScriptEnabled(), mSettings.getUserAgentString(), mSettings.getTextZoom(), mSettings.getMediaPlaybackRequiresUserGesture());
+        boolean js=mSettings.getJavaScriptEnabled(), gesture=mSettings.getMediaPlaybackRequiresUserGesture();
+        String ua=mSettings.getUserAgentString(); int zoom=mSettings.getTextZoom();
+        String key=js+"\n"+gesture+"\n"+zoom+"\n"+ua;
+        if (key.equals(mSentSettings)) return;
+        husk.Web.settings(mId, js, ua, zoom, gesture); mSentSettings=key;
+    }
+    private synchronized void hostLoad(String url, String[] headers, byte[] body) {
+        if (mDestroyed) return;
+        pushSettings(); // queue the current JavaScript/UA policy before WebKit starts this navigation
+        husk.Web.load(mId,url,headers,body);
     }
     @Override public void setBackgroundColor(int color) { if (!mDestroyed) husk.Web.background(mId, color); }
 
@@ -197,22 +207,23 @@ public class WebView extends AbsoluteLayout implements android.view.ViewTreeObse
                     if (virtual) { mLocalSchemes.put(u.getHost(), u.getScheme()); mPrimed.put(toHost(target), r); }
                     else if (r != null && u.getHost() != null) mNetworkFirst.put(u.getHost().toLowerCase(java.util.Locale.ROOT), u.getScheme());
                 }
-                husk.Web.load(mId, toHost(target), headers, null);
+                hostLoad(toHost(target), headers, null);
             });
             return;
         }
-        husk.Web.load(mId, toHost(url), headers, null);
+        hostLoad(toHost(url), headers, null);
     }
     public void postUrl(String url, byte[] postData) {
         if (mDestroyed) return;
         mUrl = url;
-        husk.Web.load(mId, toHost(url), null, postData);
+        hostLoad(toHost(url), null, postData);
     }
     public void loadData(String data, String mimeType, String encoding) {
         if (mDestroyed) return;
         Log.d(TAG, "loadData " + mimeType);
         byte[] bytes = "base64".equalsIgnoreCase(encoding) ? android.util.Base64.decode(data, android.util.Base64.DEFAULT) : (data == null ? "" : data).getBytes(java.nio.charset.StandardCharsets.UTF_8);
         mUrl = "data:" + (mimeType == null ? "text/html" : mimeType) + "," + (data == null ? "" : data.substring(0, Math.min(data.length(), 64)));
+        pushSettings();
         husk.Web.loadData(mId, bytes, mimeType == null || mimeType.isEmpty() ? "text/html" : mimeType, "utf-8", null);
     }
     public void loadDataWithBaseURL(String baseUrl, String data, String mimeType, String encoding, String historyUrl) {
@@ -221,6 +232,7 @@ public class WebView extends AbsoluteLayout implements android.view.ViewTreeObse
         byte[] bytes = (data == null ? "" : data).getBytes(java.nio.charset.StandardCharsets.UTF_8);
         String base = baseUrl == null || baseUrl.startsWith("data:") ? null : baseUrl;
         mUrl = historyUrl != null ? historyUrl : base != null ? base : "about:blank";
+        pushSettings();
         husk.Web.loadData(mId, bytes, mimeType == null || mimeType.isEmpty() ? "text/html" : mimeType, "utf-8", base == null ? null : toHost(base));
     }
     public void evaluateJavascript(String script, ValueCallback<String> resultCallback) { eval(script, resultCallback); }
@@ -231,11 +243,11 @@ public class WebView extends AbsoluteLayout implements android.view.ViewTreeObse
         husk.Web.eval(mId, script, cb);
     }
     public void stopLoading() { if (!mDestroyed) husk.Web.go(mId, 3); }
-    public void reload() { if (!mDestroyed) husk.Web.go(mId, 2); }
+    public void reload() { if (!mDestroyed) { pushSettings(); husk.Web.go(mId, 2); } }
     public boolean canGoBack() { return mCanBack; }
-    public void goBack() { if (!mDestroyed) { mCanBack = false; husk.Web.go(mId, 0); } }
+    public void goBack() { if (!mDestroyed) { mCanBack = false; pushSettings(); husk.Web.go(mId, 0); } }
     public boolean canGoForward() { return mCanForward; }
-    public void goForward() { if (!mDestroyed) husk.Web.go(mId, 1); }
+    public void goForward() { if (!mDestroyed) { pushSettings(); husk.Web.go(mId, 1); } }
     public boolean canGoBackOrForward(int steps) { return steps == 0 || (steps < 0 ? steps == -1 && mCanBack : steps == 1 && mCanForward); }
     public void goBackOrForward(int steps) { if (steps < 0) for (int i = 0; i < -steps; i++) goBack(); else for (int i = 0; i < steps; i++) goForward(); }
     public boolean pageUp(boolean top) { eval(top ? "window.scrollTo(0,0)" : "window.scrollBy(0,-window.innerHeight/2)", null); return true; }
@@ -618,6 +630,17 @@ public class WebView extends AbsoluteLayout implements android.view.ViewTreeObse
     /** @hide */
     public void huskEvent(String[] f) {
         switch (f[0]) {
+        case "d": {
+            DownloadListener listener=mDownload;
+            if (listener != null) listener.onDownloadStart(fromHost(f[2]), mSettings.getUserAgentString(), f[3], f[4], Long.parseLong(f[5]));
+            else getContext().startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(fromHost(f[2]))));
+            break;
+        }
+        case "H": {
+            final int status=Integer.parseInt(f[3]);
+            mClient.onReceivedHttpError(this,request(fromHost(f[2]),"GET",true,false,null),new WebResourceResponse(f[4],null,status,"HTTP "+status,null,null));
+            break;
+        }
         case "s": {
             String url = fromHost(f[2]);
             mUrl = url; mProgress = 10;
@@ -651,7 +674,7 @@ public class WebView extends AbsoluteLayout implements android.view.ViewTreeObse
                 if (fh != null && mNetworkFirst.remove(fh) != null) {
                     Log.d(TAG, failed + ": not on the network: the app serves it");
                     mLocalSchemes.put(fu.getHost(), fu.getScheme());
-                    husk.Web.load(mId, toHost(failed), null, null);
+                    hostLoad(toHost(failed), null, null);
                     break;
                 }
             }
@@ -716,7 +739,7 @@ public class WebView extends AbsoluteLayout implements android.view.ViewTreeObse
         if (!override && main && isHttp(url) && isLocal(url) && !url.startsWith("huskapp:")) {
             // a link to an origin the app serves: load it through the huskapp scheme instead
             husk.Web.reply(call, "\u0001nav-cancel");
-            husk.Web.load(mId, toHost(url), null, null);
+            hostLoad(toHost(url), null, null);
             return;
         }
         if (!override && !web) Log.w(TAG, "nothing handles " + url);
