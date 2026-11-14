@@ -1,12 +1,12 @@
 {
-  "build": 158,
-  "source": "bb6d62848f94ed2451b9430ca854da83161f09c5",
-  "file_name": "Husk-3.4-build158-AnkiDroid.ipa",
-  "bytes": 149229291,
-  "sha256": "c0fe6052508b4fe78a7bbd77b5f740400627bb71d9eecb8a72e58903d280b93a",
-  "asset_id": 748813199,
-  "draft_release_id": 445598632,
-  "download_url": "https://release-assets.githubusercontent.com/github-production-release-asset/1451482305/90d92524-c353-48e1-8ae7-1d61d91953cd?sp=r&sv=2018-11-09&sr=b&spr=https&se=2026-11-14T22%3A15%3A41Z&rscd=attachment%3B+filename%3DHusk-3.4-build158-AnkiDroid.ipa&rsct=application%2Foctet-stream&skoid=96c2d410-5711-43a1-aedd-ab1947aa7ab0&sktid=398a6654-997b-47e9-b12b-9515b896b4de&skt=2026-11-14T21%3A15%3A32Z&ske=2026-11-14T22%3A15%3A41Z&sks=b&skv=2018-11-09&sig=gb01HBTk2SPloblgqeRnya%2BVpj9FCKKmOJJ0zpdKA5A%3D&jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmVsZWFzZS1hc3NldHMuZ2l0aHVidXNlcmNvbnRlbnQuY29tIiwia2V5Ijoia2V5MSIsImV4cCI6MTc5NDY5NDk0NCwibmJmIjoxNzk0NjkxMzQ0LCJwYXRoIjoicmVsZWFzZWFzc2V0cHJvZHVjdGlvbi5ibG9iLmNvcmUud2luZG93cy5uZXQifQ.HidqFf9EfZK1-KbdgWVd0TwzRiBzRlUvV2vuXW2ohyc&response-content-disposition=attachment%3B%20filename%3DHusk-3.4-build158-AnkiDroid.ipa&response-content-type=application%2Foctet-stream",
-  "created_at": "2026-11-14T21:22:24Z",
-  "workflow_run_id": 43642443857
+  "build": 159,
+  "source": "6210a8bbc71bebc130b2602bd1de18b100153aab",
+  "file_name": "Husk-3.4-build159-AnkiDroid.ipa",
+  "bytes": 149246741,
+  "sha256": "63f3cad3fcbc4f72fd73ff2245de59882a1e7b0a5b623df9bf291b0fe22809a8",
+  "asset_id": 748911368,
+  "draft_release_id": 445620281,
+  "download_url": "https://release-assets.githubusercontent.com/github-production-release-asset/1451482305/2ee85cb5-8614-4c0f-b377-ac7ecda5b38c?sp=r&sv=2018-11-09&sr=b&spr=https&se=2026-11-14T22%3A54%3A37Z&rscd=attachment%3B+filename%3DHusk-3.4-build159-AnkiDroid.ipa&rsct=application%2Foctet-stream&skoid=96c2d410-5711-43a1-aedd-ab1947aa7ab0&sktid=398a6654-997b-47e9-b12b-9515b896b4de&skt=2026-11-14T21%3A53%3A41Z&ske=2026-11-14T22%3A54%3A37Z&sks=b&skv=2018-11-09&sig=cRHmQ%2BLX75R6Eor4%2FBIGh2jO20S0sZjZsEuLPfI8nTE%3D&jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmVsZWFzZS1hc3NldHMuZ2l0aHVidXNlcmNvbnRlbnQuY29tIiwia2V5Ijoia2V5MSIsImV4cCI6MTc5NDY5NzM2NSwibmJmIjoxNzk0NjkzNzY1LCJwYXRoIjoicmVsZWFzZWFzc2V0cHJvZHVjdGlvbi5ibG9iLmNvcmUud2luZG93cy5uZXQifQ.uNaxxVZcdx1of8fruoU-VozVpVER2SrHXUEuhk4eJ6I&response-content-disposition=attachment%3B%20filename%3DHusk-3.4-build159-AnkiDroid.ipa&response-content-type=application%2Foctet-stream",
+  "created_at": "2026-11-14T22:02:45Z",
+  "workflow_run_id": 43645947499
 }
