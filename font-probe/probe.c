@@ -21,14 +21,7 @@ static int actual_weight(CTFontRef f) {
   }
   if(axes)CFRelease(axes);
  }
- if(values)CFRelease(values);CFRelease(key);
- if(weight<0) {
-  CFStringRef name=CTFontCopyPostScriptName(f);char text[256];CFStringGetCString(name,text,sizeof(text),kCFStringEncodingUTF8);CFRelease(name);
-  printf("UNREPORTED AXIS FACE name=%s\n",text);fflush(stdout);
-  CFDictionaryRef traits=CTFontCopyTraits(f);CFShow(traits);if(traits)CFRelease(traits);
-  return 400; /* diagnostic continuation only; not a weight assertion */
- }
- return (int)weight;
+ if(values)CFRelease(values);CFRelease(key);assert(weight>=0);return (int)weight;
 }
 static double coverage(CTFontRef font) {
  int width=1100,height=100;uint8_t *pixels=calloc((size_t)width*height,4);
@@ -54,7 +47,12 @@ int main(int argc,char **argv) {
  gface *medium=face_family("sans-serif-medium",0);assert(actual_weight(medium->base)==500);
  gface *light=face_family("sans-serif-light",0);assert(actual_weight(light->base)==300);
  gface *bold=face_family("sans-serif",1);assert(actual_weight(bold->base)==700);
- CTFontRef italic=with_weight(base,400,true);assert(actual_weight(italic)==400 && (CTFontGetSymbolicTraits(italic)&kCTFontItalicTrait));
+ CTFontRef italic=with_weight(base,400,true);assert(actual_weight(italic)==400);
+ int italTag=0x6974616c;CFNumberRef italKey=CFNumberCreate(NULL,kCFNumberIntType,&italTag);
+ CFDictionaryRef italValues=CTFontCopyVariation(italic);double italValue=0;
+ assert(italValues && CFNumberGetValue(CFDictionaryGetValue(italValues,italKey),kCFNumberDoubleType,&italValue) && italValue==1);
+ CFStringRef family=CTFontCopyFamilyName(italic);assert(CFStringFind(family,CFSTR("Roboto"),0).location!=kCFNotFound);
+ CFRelease(family);CFRelease(italValues);CFRelease(italKey);
  double oldCoverage=coverage(thin),fixedCoverage=coverage(normal->base);
  assert(oldCoverage>0 && fixedCoverage>oldCoverage*1.25);
  printf("CoreText regular100->400, sized cache, light300/medium500/bold700/italic preserved; same-size glyph coverage %.0f -> %.0f passed\n",oldCoverage,fixedCoverage);
