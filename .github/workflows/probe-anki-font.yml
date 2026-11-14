@@ -1,0 +1,41 @@
+name: Inspect packaged Android font selection
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/probe-anki-font.yml', 'font-probe/**']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  probe:
+    runs-on: xcode-27
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: build/anki-download159-final
+          path: reviewed-source
+      - uses: actions/download-artifact@v4
+        with:
+          name: Husk-Duo-IPA
+          path: probe-package
+          run-id: 43645357487
+          github-token: ${{ github.token }}
+      - name: Inspect actual packaged Roboto through actual font selection code
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import zipfile
+          from pathlib import Path
+          ipa=next(Path('probe-package').rglob('*.ipa'))
+          with zipfile.ZipFile(ipa) as z:
+              Path('Roboto-Regular.ttf').write_bytes(z.read('Payload/Husk.app/android-system/fonts/Roboto-Regular.ttf'))
+          PY
+          clang -O1 -fblocks -ffunction-sections -fdata-sections -Ireviewed-source/src/translation-layer-next -Ireviewed-source/src/translation-layer font-probe/probe.c -framework CoreGraphics -framework CoreText -framework ImageIO -Wl,-dead_strip -Wl,-undefined,dynamic_lookup -o font-probe/probe
+          font-probe/probe "$PWD/Roboto-Regular.ttf" 2>&1 | tee font-probe/result.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Husk-Font-Selection-Probe
+          path: font-probe/result.txt
