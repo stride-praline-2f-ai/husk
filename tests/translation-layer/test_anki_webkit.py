@@ -11,7 +11,7 @@ class Server(http.server.BaseHTTPRequestHandler):
   if self.path=='/rate':
    self.send_response(429);self.send_header('Content-Type','text/html');self.end_headers();self.wfile.write(b'<p>Login required</p>');return
   self.send_response(200);self.send_header('Content-Type','text/html');self.end_headers()
-  self.wfile.write(b'<html><body><script type="module">document.body.textContent="ANKI-MODULE-READY"</script></body></html>')
+  self.wfile.write(b'<html><body><script type="module">document.body.innerHTML=`ANKI-MODULE-READY<button id="download">Download</button>`;document.querySelector("#download").onclick=()=>{window.location.href="/deck"}</script></body></html>')
 PROGRAM=r'''
 #import <Cocoa/Cocoa.h>
 #include <assert.h>
@@ -20,6 +20,7 @@ PROGRAM=r'''
 #include "husk-tl-dvm-web.m"
 void tl_log_line(const char *format,...) { (void)format; }
 void tl_javaapp_web_events(void) {}
+const char *tl_jni_string(jobj *value) { return (const char *)value; }
 const char *tl_data_dir(void) { return "/tmp"; }
 static BOOL has_event(NSString *kind) {
  BOOL found=NO;
@@ -34,7 +35,8 @@ static void pump(void) {
  [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:.01]];
  // A test navigation has no guest override; deliver its actual parked completion.
  for(NSNumber *key in g_pending.allKeys) if(g_pending[key].kind==HuskWebNavigation) {
-  HuskWebPending *p=pending_take(key.intValue);((void(^)(WKNavigationActionPolicy))p.value)(WKNavigationActionPolicyAllow);
+  jvalue reply[2]={0},result={0};reply[0].i=key.intValue;reply[1].l=(jobj *)"\1nav-allow";
+  W_reply(NULL,reply,&result);
  }
 }
 int main(int argc,char **argv) { @autoreleasepool {
@@ -53,7 +55,8 @@ int main(int argc,char **argv) { @autoreleasepool {
  __block BOOL evaluated=NO;__block NSString *text=nil;
  [h.web evaluateJavaScript:@"document.body.textContent" completionHandler:^(id result,NSError *error){assert(!error);text=result;evaluated=YES;}];
  for(int i=0;i<500 && !evaluated;i++)pump();assert(evaluated && [text containsString:@"ANKI-MODULE-READY"] && !h.web.hidden && h.web.frame.size.width==600);
- h.apiLoad=YES;[h.web loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:[base stringByAppendingString:@"deck"]]]];
+ // AnkiWeb's real button assigns window.location.href; do not bypass its navigation-policy reply.
+ [h.web evaluateJavaScript:@"document.querySelector('#download').click()" completionHandler:nil];
  for(int i=0;i<1000 && !has_event(@"d");i++)pump();assert(has_event(@"d"));
  h.apiLoad=YES;[h.web loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:[base stringByAppendingString:@"rate"]]]];
  for(int i=0;i<1000 && !has_event(@"H");i++)pump();assert(has_event(@"H"));

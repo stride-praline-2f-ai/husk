@@ -1,0 +1,16 @@
+{
+  "plan": "M0/ANKI-FONT-RUNTIME-v1",
+  "run_id": 43649649411,
+  "job_id": 132615042139,
+  "workflow": "de2f79c2419dbe3ae2aea69ab13f6e875c5a3583",
+  "reviewed_source": "6210a8bbc71bebc130b2602bd1de18b100153aab",
+  "font_sha256": "9e157d5ff70ae52cc8c527b36e89d9b3c69c6c814da79fa6237a0bf0895abc7c",
+  "result": "Old actual CoreText selection chose Roboto-Thin for default normal and weight400; weight500/700 selected Medium/Bold",
+  "proof_lines": [
+    "2026-11-14T22:44:35.7917160Z descriptor-first name=Roboto-Thin",
+    "2026-11-14T22:44:35.7917470Z husk-normal name=Roboto-Thin",
+    "2026-11-14T22:44:35.7917770Z weight400 name=Roboto-Thin",
+    "2026-11-14T22:44:35.7918030Z weight500 name=Roboto-Medium",
+    "2026-11-14T22:44:35.7918350Z weight700 name=Roboto-Bold"
+  ]
+}
