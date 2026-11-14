@@ -1736,9 +1736,15 @@ _Static_assert(__builtin_offsetof(guest_sigcontext, reserved) == 288, "the kerne
 static void host_signal_entry(int dsig, siginfo_t *info, void *uctx)
 {
     int gsig = tl_signal_from_darwin(dsig);
-    sig_trace("delivered", gsig);
     void *h = g_guest_sig[gsig > 0 && gsig <= 64 ? gsig : 0].handler;
     if (!h || h == (void *)1) return;
+    /* libandroidio's empty interrupt handler needs no register context. In
+     * particular, do not allocate or log from this asynchronous close signal. */
+    if (gsig == 34 && !(g_guest_sig[gsig].flags & 4 /* Linux SA_SIGINFO */)) {
+        ((void (*)(int))h)(gsig);
+        return;
+    }
+    sig_trace("delivered", gsig);
 #if defined(__arm64__)
     ucontext_t *uc = uctx;
     if (!uc || !uc->uc_mcontext) { ((guest_handler)h)(gsig, info, uctx); return; }
