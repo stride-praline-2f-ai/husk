@@ -1,0 +1,18 @@
+{
+  "source": "bb4a6c2fd2399a2076a5aeaa022160f1d54a8217",
+  "tree": "f1b7b4145a489defc0d8ee32a69ab309aec301e8",
+  "run_id": 43651564366,
+  "job_id": 132620961640,
+  "result": "success; strict actual CoreText axis/family/cache/glyph checks",
+  "font_sha256": "9e157d5ff70ae52cc8c527b36e89d9b3c69c6c814da79fa6237a0bf0895abc7c",
+  "metrics": {
+    "classification": "MEASURED",
+    "scope": "Apple CoreText component; same1100x100 bitmap and42pixel font",
+    "thin100_grayscale_ink_sum": 626302,
+    "regular400_grayscale_ink_sum": 1432549,
+    "units": "sum of255-red channel per pixel; not device visual quality or energy"
+  },
+  "proof_lines": [
+    "2026-11-14T23:07:02.2475390Z CoreText regular100->400, sized cache, light300/medium500/bold700/italic preserved; same-size glyph coverage 626302 -> 1432549 passed"
+  ]
+}

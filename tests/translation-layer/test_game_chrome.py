@@ -38,6 +38,13 @@ let alreadyBelowControls = CGRect(x: 0, y: 52, width: 1376, height: 980)
 check(GameChromeLayout.clearance(view: alreadyBelowControls, safe: safe, status: status, hostedTopBoundary: 52).top == 0)
 // Geometry already converted into a scaled guest's local points by UIKit.
 check(GameChromeLayout.clearance(view: full, safe: full, status: nil, hostedTopBoundary: 32).top == 32)
+// Java-only native toolbar: reserve max(system, host clearance) once, then toolbar height.
+check(JavaAppChromeLayout.pixelInsets(system: [0, 0, 0, 0], chromeClearance: 0, keyboard: 0, scale: 3) == [0, 156, 0, 0, 0])
+check(JavaAppChromeLayout.pixelInsets(system: [0, 24, 0, 20], chromeClearance: 24, keyboard: 200, scale: 2) == [0, 152, 0, 40, 400])
+check(JavaAppChromeLayout.pixelInsets(system: [0, 24, 0, 20], chromeClearance: 0, keyboard: 0, scale: 2) == [0, 152, 0, 40, 0])
+check(JavaAppChromeLayout.pixelInsets(system: [0, 0, 0, 0], chromeClearance: 52, keyboard: 0, scale: 3) == [0, 312, 0, 0, 0])
+check(JavaAppChromeLayout.pixelInsets(system: [44, 0, 44, 20], chromeClearance: nil, keyboard: 0, scale: 3) == [132, 0, 132, 60, 0]) // hidden restores guest safe area
+check(JavaAppChromeLayout.pixelInsets(system: [0, 0, 0, 0], chromeClearance: nil, keyboard: 100, scale: 2) == [0, 0, 0, 0, 200]) // floating window keeps keyboard
 let returned = GameChromeLayout.clearance(view: full, safe: safe, status: status, hostedTopBoundary: 24)
 check(returned == hosted) // returning from system UI restores the same layout
 ''')

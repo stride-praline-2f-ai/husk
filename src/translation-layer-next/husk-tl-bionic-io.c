@@ -1709,7 +1709,7 @@ static int b_clock_nanosleep(int clock, int flags, const struct timespec *req, s
 typedef struct { int sa_flags; int pad; void *handler; uint64_t sa_mask; void *restorer; } guest_sigaction;
 typedef void (*guest_handler)(int, void *, void *);
 
-static struct { void *handler; int flags; } g_guest_sig[32];
+static struct { void *handler; int flags; } g_guest_sig[65];
 
 static int g_sig_trace = -1;
 static void sig_trace(const char *what, int g)
@@ -1737,7 +1737,7 @@ static void host_signal_entry(int dsig, siginfo_t *info, void *uctx)
 {
     int gsig = tl_signal_from_darwin(dsig);
     sig_trace("delivered", gsig);
-    void *h = g_guest_sig[gsig < 32 ? gsig : 0].handler;
+    void *h = g_guest_sig[gsig > 0 && gsig <= 64 ? gsig : 0].handler;
     if (!h || h == (void *)1) return;
 #if defined(__arm64__)
     ucontext_t *uc = uctx;
@@ -1776,7 +1776,7 @@ static int is_fault_signal(int g) { return g == 4 || g == 5 || g == 6 || g == 7 
 
 static int b_sigaction(int sig, const guest_sigaction *act, guest_sigaction *old)
 {
-    if (sig <= 0 || sig >= 32) { tl_set_guest_errno(22); return -1; }
+    if (sig <= 0 || sig > 64) { tl_set_guest_errno(22); return -1; }
     int d = tl_signal_to_darwin(sig);
     if (d <= 0) { tl_set_guest_errno(22); return -1; }
     if (old) {
@@ -1819,8 +1819,8 @@ static int b_sigdelset(uint64_t *s, int sig) { if (sig < 1 || sig > 64) { tl_set
 static int b_sigsuspend(const uint64_t *mask)
 {
     uint32_t m = 0;
-    for (int s = 1; s < 32; s++) if (*mask & (1ull << (s - 1))) { int d = tl_signal_to_darwin(s); if (d > 0) m |= 1u << (d - 1); }
-    sigset_t ds; memcpy(&ds, &m, sizeof(m));
+    for (int s = 1; s <= 64; s++) if (*mask & (1ull << (s - 1))) { int d = tl_signal_to_darwin(s); if (d > 0 && d < 32) m |= 1u << (d - 1); }
+    sigset_t ds = {0}; memcpy(&ds, &m, sizeof(m));
     sig_trace("sigsuspend begins, mask", (int)*mask);
     TL_ERRNO_BEGIN(); int r = sigsuspend(&ds); TL_ERRNO_END();
     sig_trace("sigsuspend returned", 0);

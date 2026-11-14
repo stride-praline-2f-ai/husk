@@ -81,19 +81,25 @@ static const int k_sig_to_darwin[65] = {
     [19] = SIGSTOP, [20] = SIGTSTP, [21] = SIGTTIN, [22] = SIGTTOU, [23] = SIGURG, [24] = SIGXCPU,
     [25] = SIGXFSZ, [26] = SIGVTALRM, [27] = SIGPROF, [28] = SIGWINCH, [29] = SIGIO,
     [30] = SIGINFO /* SIGPWR: Boehm's stop-the-world signal */, [31] = SIGSYS,
+    /* libandroidio uses bionic's reserved __SIGRTMIN + 2 (34) to interrupt
+     * blocked I/O during Java socket close. Darwin has no real-time signals;
+     * SIGEMT is otherwise unused by this translation table. Keep SIGUSR1/2,
+     * SIGINFO and the host's fault signals available for their existing users.
+     * This is one nonqueued interrupt signal, not general POSIX RT support. */
+    [34] = SIGEMT,
 };
 
 int tl_signal_to_darwin(int s)
 {
     if (s < 0 || s > 64) return -1;
-    if (s >= 32) return -1;
     if (s == 0) return 0;
     return k_sig_to_darwin[s] ? k_sig_to_darwin[s] : -1;
 }
 
 int tl_signal_from_darwin(int d)
 {
-    for (int i = 1; i < 32; i++) if (k_sig_to_darwin[i] == d) return i;
+    if (d <= 0) return d;
+    for (int i = 1; i <= 64; i++) if (k_sig_to_darwin[i] == d) return i;
     return d;
 }
 
