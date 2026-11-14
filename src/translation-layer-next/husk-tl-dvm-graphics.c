@@ -173,7 +173,9 @@ static CTFontRef with_weight(CTFontRef f, int weight, bool italic)
 {
     CTFontRef out = NULL;
     CFArrayRef axes = CTFontCopyVariationAxes(f);
-    if (axes && CFArrayGetCount(axes) > 0 && weight != 400) {
+    /* CoreText may select the first named instance (Roboto Thin) from a variable-font file.
+       Apply regular weight too: skipping 400 leaves normal Android text at that instance's 100. */
+    if (axes && CFArrayGetCount(axes) > 0) {
         int tag = 0x77676874; /* 'wght' */
         CFNumberRef k = CFNumberCreate(NULL, kCFNumberIntType, &tag);
         double w = weight;

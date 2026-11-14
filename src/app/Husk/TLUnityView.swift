@@ -535,6 +535,9 @@ final class TLUnityUIView: UIView, UIKeyInput {
             started = husk_cocos_launch(apk, dataDir, layerPtr, Int32(width), Int32(height), angle, ca)
         case .java:
             // Husk's Dalvik runtime: libcore, ICU and Husk's Java framework, carried in the app.
+            let javaBuild = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown"
+            let javaSource = Bundle.main.object(forInfoDictionaryKey: "HuskBuildCommit") as? String ?? "unknown"
+            HuskLog.log("tl", "java runtime bundle: Husk build \(javaBuild), source \(javaSource); framework comes from this installed app bundle")
             husk_java_set_runtime((Bundle.main.resourcePath ?? "") + "/java-runtime", Float(contentScaleFactor))
             husk_java_set_night_mode(traitCollection.userInterfaceStyle == .dark ? 1 : 0)
             // The notch and the home indicator, in surface pixels: the app's window keeps its content out of them.
