@@ -1,9 +1,9 @@
 {
-  "build": 158,
-  "run_id": 43642000743,
-  "artifact_id": 14132248959,
-  "source": "bb6d62848f94ed2451b9430ca854da83161f09c5",
-  "file_name": "Husk-3.4-build158-AnkiDroid.ipa",
-  "bytes": 149229291,
-  "sha256": "c0fe6052508b4fe78a7bbd77b5f740400627bb71d9eecb8a72e58903d280b93a"
+  "build": 159,
+  "run_id": 43645357487,
+  "artifact_id": 14133837271,
+  "source": "6210a8bbc71bebc130b2602bd1de18b100153aab",
+  "file_name": "Husk-3.4-build159-AnkiDroid.ipa",
+  "bytes": 149246741,
+  "sha256": "63f3cad3fcbc4f72fd73ff2245de59882a1e7b0a5b623df9bf291b0fe22809a8"
 }
