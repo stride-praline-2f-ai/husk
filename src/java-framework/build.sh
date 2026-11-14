@@ -12,6 +12,11 @@ python3 "$HERE/gen/gles20.py" "$HERE/src/android/opengl" "$HERE/../translation-l
 if ! "$JDK/bin/javac" -nowarn --release 8 -encoding UTF-8 -Xmaxerrs 100000 -cp "$TMP/stubs" -d "$TMP/classes" $(find "$HERE/src" "$HERE/gen-src" -name '*.java') 2> "$TMP/javac.log"; then
     grep -v "^Note:" "$TMP/javac.log" > "${JAVAC_LOG:-/dev/stderr}"; echo "javac failed" >&2; exit 1
 fi
+# Optional host regression classpath. The app still receives only DEX files.
+if [ -n "${HUSK_JAVA_TEST_CLASSES:-}" ]; then
+    mkdir -p "$HUSK_JAVA_TEST_CLASSES"
+    cp -R "$TMP/classes/." "$HUSK_JAVA_TEST_CLASSES/"
+fi
 (cd "$TMP/classes" && "$JDK/bin/jar" cf "$TMP/classes.jar" .)
 "$JDK/bin/java" -cp "$D8" com.android.tools.r8.D8 --min-api 26 --output "$TMP" "$TMP/classes.jar"
 mkdir -p "$(dirname "$OUT")"

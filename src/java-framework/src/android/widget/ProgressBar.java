@@ -22,6 +22,9 @@ public class ProgressBar extends View {
     private final Paint mPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private long mStart = android.os.SystemClock.uptimeMillis();
     private boolean mAnimating;
+    // Material subclasses install their own typed drawables after super() returns.
+    // Do not dispatch their invalidate() while this base constructor is reading the theme.
+    private boolean mInitializing = true;
     public ProgressBar(Context c) { this(c, null); }
     public ProgressBar(Context c, AttributeSet a) { this(c, a, android.R.attr.progressBarStyle); }
     public ProgressBar(Context c, AttributeSet a, int s) { this(c, a, s, 0); }
@@ -57,18 +60,19 @@ public class ProgressBar extends View {
         a.recycle();
         if (!mHorizontal) mIndeterminate = true;
         refreshProgress();
+        mInitializing = false;
     }
     private float dp(float v) { return v * getResources().getDisplayMetrics().density; }
     public synchronized boolean isIndeterminate() { return mIndeterminate; }
     public synchronized void setIndeterminate(boolean i) { if ((!mOnlyIndeterminate || i) && i != mIndeterminate) { mIndeterminate = i; if (i) startAnimation(); else stopAnimation(); invalidate(); } }
-    /* never null, as on Android (Flipboard tints it): the one drawn, else the theme's that Husk draws its own spinner in place of */
+    // Return the actual drawable (including a themed vector we draw with our own spinner).
+    // Android permits null: fabricating a ColorDrawable breaks covariant Material getters.
     private Drawable mThemeIndeterminate;
     public Drawable getIndeterminateDrawable() {
         if (mIndeterminateDrawable != null) return mIndeterminateDrawable;
-        if (mThemeIndeterminate == null) mThemeIndeterminate = new android.graphics.drawable.ColorDrawable(0);
         return mThemeIndeterminate;
     }
-    public void setIndeterminateDrawable(Drawable d) { if (mIndeterminateDrawable != null) mIndeterminateDrawable.setCallback(null); mIndeterminateDrawable = d; mAppIndeterminate = d != null; if (d != null) d.setCallback(this); requestLayout(); invalidate(); }
+    public void setIndeterminateDrawable(Drawable d) { if (mIndeterminateDrawable != null) mIndeterminateDrawable.setCallback(null); mIndeterminateDrawable = d; mThemeIndeterminate = d; mAppIndeterminate = d != null; if (d != null) d.setCallback(this); requestLayout(); if (!mInitializing) invalidate(); }
     public void setIndeterminateDrawableTiled(Drawable d) { setIndeterminateDrawable(d); }
     public void setIndeterminateTintList(ColorStateList t) { mIndeterminateTint = t; invalidate(); }
     public ColorStateList getIndeterminateTintList() { return mIndeterminateTint; }
@@ -106,7 +110,7 @@ public class ProgressBar extends View {
                 if (sp != null) sp.setLevel((int) (scale2 * MAX_LEVEL));
             } else mProgressDrawable.setLevel((int) (scale * MAX_LEVEL));
         }
-        invalidate();
+        if (!mInitializing) invalidate();
     }
     void onProgressRefresh(float scale, boolean fromUser, int progress) {}
     public synchronized void setProgress(int p) { setProgressInternal(p, false, false); }

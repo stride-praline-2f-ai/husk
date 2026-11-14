@@ -152,6 +152,21 @@ jobs:
         if: ${{ !cancelled() && steps.source.outcome == 'success' }}
         continue-on-error: true
         run: python3 scripts/stage_verified_shaders.py "$HUSK_TOOL_CACHE/donors/Husk-3.4.ipa"
+      - name: Set up Java compiler for Android framework repair
+        id: java_tools
+        if: ${{ !cancelled() && steps.resources.outcome == 'success' }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Rebuild and exercise the repaired Java framework
+        id: java_framework
+        if: ${{ !cancelled() && steps.java_tools.outcome == 'success' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/build_java_framework_for_ipa.sh 2>&1 | tee build/logs/java-framework.log
       - name: Verify unchanged driver independently
         id: driver
         if: ${{ !cancelled() && steps.source.outcome == 'success' }}
@@ -200,7 +215,7 @@ jobs:
           import json,os
           from pathlib import Path
           steps=json.loads(os.environ['PREFLIGHT_STEPS'])
-          required=['platform','regressions','tools','shaders','resources','driver','pairing','project']
+          required=['platform','regressions','tools','shaders','resources','java_framework','driver','pairing','project']
           report={name:steps.get(name,{}).get('outcome','missing') for name in required}
           Path('build/logs/setup-summary.json').write_text(json.dumps(report,indent=2))
           for name,outcome in report.items(): print(name+': '+outcome)
