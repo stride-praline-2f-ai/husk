@@ -21,6 +21,9 @@ public final class Web {
     /** status 0: not the app's, the host fetches reason (the real URL); below 0: failed */
     public static native void respond(int call, int status, String reason, String mime, String encoding, String[] headers, byte[] body);
     public static native String[] poll();
+    public static native void downloadStart(long id, String url, String destination, String[] headers);
+    public static native String[] downloadQuery(long id);
+    public static native boolean downloadRemove(long id);
     // the app's own website data (a WebKit data store per package) and its cookies, for CookieManager
     private static native void app(String packageName);
     public static native boolean cookieSet(String url, String setCookie);
@@ -37,6 +40,7 @@ public final class Web {
         for (String e : ev) {
             String[] f = e.split("\u001f", -1);
             if (f.length < 2) continue;
+            if ("D".equals(f[0]) && f.length>2) { android.app.DownloadManager.huskComplete(Long.parseLong(f[2])); continue; }
             int id;
             try { id = Integer.parseInt(f[1]); } catch (NumberFormatException x) { continue; }
             android.webkit.WebView w = android.webkit.WebView.huskById(id);

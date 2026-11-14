@@ -1,0 +1,41 @@
+{
+  "source": "bb6d62848f94ed2451b9430ca854da83161f09c5",
+  "tree": "53a6c8640ad74e8cdd27654969501943ebaf6a31",
+  "workflow_commit": "24ff79ddf0151774d3e15b3035641c8626cd812f",
+  "run_id": 43642000743,
+  "job_id": 132591397331,
+  "artifact": {
+    "id": 14132248959,
+    "name": "Husk-Duo-IPA",
+    "size_in_bytes": 149229429,
+    "url": "https://api.github.com/repos/stride-praline-2f-ai/husk/actions/artifacts/14132248959",
+    "archive_download_url": "https://api.github.com/repos/stride-praline-2f-ai/husk/actions/artifacts/14132248959/zip",
+    "expired": false,
+    "created_at": "2026-11-14T21:19:53Z",
+    "expires_at": "2026-11-21T21:19:51Z",
+    "updated_at": "2026-11-14T21:19:53Z",
+    "digest": "sha256:08f28593d272ca8a566d541614121707122579f68b529a30de2fa3d016f753ba",
+    "workflow_run": {
+      "id": 43642000743,
+      "repository_id": 1451482305,
+      "head_repository_id": 1451482305,
+      "head_branch": "main",
+      "head_sha": "24ff79ddf0151774d3e15b3035641c8626cd812f"
+    }
+  },
+  "run_status": "success",
+  "run_started_at": "2026-11-14T21:17:15Z",
+  "run_updated_at": "2026-11-14T21:20:00Z",
+  "total_unittest_runs": 51,
+  "total_unittests": 440,
+  "required49_tests": 428,
+  "proof_lines": [
+    "2026-11-14T21:17:39.8192490Z test_host_locks_are_released_before_guest_allocation (__main__.WebResilience.test_host_locks_are_released_before_guest_allocation) ... ok",
+    "2026-11-14T21:17:40.4344070Z test_input_is_bounded_coalesced_and_does_not_wait_on_guest_lock (__main__.WebResilience.test_input_is_bounded_coalesced_and_does_not_wait_on_guest_lock) ... ok",
+    "2026-11-14T21:17:41.1122770Z test_pending_exact_once_owner_cleanup_deadlines_and_idle_timer (__main__.WebResilience.test_pending_exact_once_owner_cleanup_deadlines_and_idle_timer) ... ok",
+    "2026-11-14T21:18:14.2338890Z Failed suites: []",
+    "2026-11-14T21:18:16.0564410Z Verified component cache hit: java",
+    "2026-11-14T21:18:16.7086010Z Verified component cache hit: driver",
+    "2026-11-14T21:19:40.6823060Z ** BUILD SUCCEEDED **"
+  ]
+}
