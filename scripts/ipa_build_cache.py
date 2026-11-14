@@ -25,7 +25,8 @@ def keys(root, platform):
     driver = reuse.INPUTS + ['scripts/build_spatial_moltenvk_ios.sh', 'scripts/reuse_spatial_driver.py', 'scripts/ipa_build_cache.py']
     driver += [str(p.relative_to(root)) for p in (root / 'patches').glob('husk-spirv-cross-*.patch')]
     java = [str(p.relative_to(root)) for p in (root / 'src/java-framework').rglob('*') if p.is_file() and p.suffix in {'.java', '.py', '.sh'} and '__pycache__' not in p.parts]
-    java += ['scripts/build_java_framework_for_ipa.sh', 'scripts/ipa_build_cache.py', 'tests/java-framework/ProgressBarContract.java', 'tests/java-framework/run_progress_bar.py']
+    java += ['scripts/build_java_framework_for_ipa.sh', 'scripts/ipa_build_cache.py']
+    java += [str(p.relative_to(root)) for p in (root / 'tests/java-framework').glob('*') if p.suffix in {'.java', '.py'}]
     return {'driver': digest_files(root, driver, platform), 'java': digest_files(root, java, platform),
             'tools': hashlib.sha256((VERSION + platform).encode()).hexdigest()}
 
