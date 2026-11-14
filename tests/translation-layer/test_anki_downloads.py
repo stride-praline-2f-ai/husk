@@ -60,6 +60,14 @@ int main(int argc,char **argv) { @autoreleasepool {
  download_start(5,[base stringByAppendingString:@"/slow"],slow,headers);
  usleep(80000);assert(download_remove(5));assert(!download_remove(5));usleep(150000);
  assert(!download_snapshot(5) && ![NSFileManager.defaultManager fileExistsAtPath:slow]);
+ // Cancel after registration while session creation may still be in progress.
+ dispatch_group_t group=dispatch_group_create();
+ NSString *startup=[dir stringByAppendingPathComponent:@"startup-cancel.apkg"];
+ dispatch_group_async(group,dispatch_get_global_queue(QOS_CLASS_UTILITY,0),^{download_start(6,[base stringByAppendingString:@"/slow"],startup,headers);});
+ for(int i=0;i<5000 && !download_snapshot(6);i++)usleep(1000);
+ assert(download_remove(6));
+ assert(dispatch_group_wait(group,dispatch_time(DISPATCH_TIME_NOW,5*NSEC_PER_SEC))==0);usleep(100000);
+ assert(!download_snapshot(6) && ![NSFileManager.defaultManager fileExistsAtPath:startup]);
  assert(download_remove(1) && ![NSFileManager.defaultManager fileExistsAtPath:file]);
  printf("actual NSURLSession download/redirect/headers/HTTP429/no-overwrite/sandbox/cancel/remove passed\n");
  return 0;

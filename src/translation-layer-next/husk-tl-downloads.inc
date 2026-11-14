@@ -7,8 +7,8 @@ static NSMutableDictionary<NSNumber *, HuskDownload *> *g_downloads;
 @property int status, reason;
 @property BOOL removed;
 @property(nonatomic,copy) NSString *destination;
-@property(nonatomic,strong) NSURLSession *session;
-@property(nonatomic,strong) NSURLSessionDownloadTask *task;
+@property(atomic,strong) NSURLSession *session;
+@property(atomic,strong) NSURLSessionDownloadTask *task;
 @end
 static void download_finish(HuskDownload *d, int status, int reason)
 {
@@ -75,8 +75,14 @@ static void download_start(int64_t identifier, NSString *url, NSString *destinat
     config.timeoutIntervalForResource=3600; config.URLCache=nil;
     request.cachePolicy=NSURLRequestReloadIgnoringLocalCacheData;
     NSOperationQueue *queue=[NSOperationQueue new]; queue.maxConcurrentOperationCount=1; queue.qualityOfService=NSQualityOfServiceUtility;
-    d.session=[NSURLSession sessionWithConfiguration:config delegate:d delegateQueue:queue];
-    d.task=[d.session downloadTaskWithRequest:request]; [d.task resume];
+    // Publish a complete task/session pair, so remove cannot invalidate a session before task creation.
+    NSURLSession *session=[NSURLSession sessionWithConfiguration:config delegate:d delegateQueue:queue];
+    NSURLSessionDownloadTask *task=[session downloadTaskWithRequest:request];
+    pthread_mutex_lock(&g_dl_lock); BOOL removed=d.removed;
+    if (!removed) { d.session=session; d.task=task; }
+    pthread_mutex_unlock(&g_dl_lock);
+    if (removed) { [task cancel]; [session invalidateAndCancel]; }
+    else [task resume];
 }
 static NSArray<NSString *> *download_snapshot(int64_t identifier)
 {
@@ -88,11 +94,12 @@ static NSArray<NSString *> *download_snapshot(int64_t identifier)
 static BOOL download_remove(int64_t identifier)
 {
     pthread_mutex_lock(&g_dl_lock); HuskDownload *d=g_downloads[@(identifier)];
+    BOOL completed=d.status==8;
     if (d) { d.removed=YES; [g_downloads removeObjectForKey:@(identifier)]; }
     pthread_mutex_unlock(&g_dl_lock);
     if (!d) return NO;
     [d.task cancel]; [d.session invalidateAndCancel];
     // Only a successfully published file belongs to this download; never remove an existing destination on failure.
-    if (d.status==8) [NSFileManager.defaultManager removeItemAtPath:d.destination error:NULL];
+    if (completed) [NSFileManager.defaultManager removeItemAtPath:d.destination error:NULL];
     return YES;
 }
