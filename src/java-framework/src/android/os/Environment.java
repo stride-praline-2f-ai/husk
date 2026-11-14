@@ -106,7 +106,8 @@ public class Environment {
     public static boolean isExternalStorageEmulated(java.io.File p0) { return false; }
     public static boolean isExternalStorageLegacy() { return false; }
     public static boolean isExternalStorageLegacy(java.io.File p0) { return false; }
-    public static boolean isExternalStorageManager(java.io.File p0) { return false; }
+    // Android's per-path query has the same grant inside Husk's virtual external storage.
+    public static boolean isExternalStorageManager(java.io.File p0) { return isExternalStorageManager(); }
     public static boolean isExternalStorageRemovable(java.io.File p0) { return false; }
     public static boolean isStandardDirectory(java.lang.String p0) { return false; }
     public static java.io.File maybeTranslateEmulatedPathToInternal(java.io.File p0) { return null; }

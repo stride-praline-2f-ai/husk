@@ -25,14 +25,17 @@ export HUSK_JAVA_TEST_CLASSES="$ROOT/build/java-framework-test-classes"
 rm -rf "$HUSK_JAVA_TEST_CLASSES"
 bash src/java-framework/build.sh "$ROOT/build/java-runtime/husk-framework.dex"
 python3 tests/java-framework/run_progress_bar.py "$HUSK_JAVA_TEST_CLASSES"
+python3 tests/java-framework/run_storage_paths.py "$HUSK_JAVA_TEST_CLASSES"
 python3 - <<'PY'
 import hashlib,json
 from pathlib import Path
 root=Path('build/java-runtime')
 files=['husk-framework.dex','husk-framework-core.dex']
 receipt={'schema':1,'r8':'8.5.35','min_api':26,'regression':'ProgressBarContract:10 checks',
+         'storage_regression':'StoragePathContract',
          'files':{f:{'bytes':(root/f).stat().st_size,'sha256':hashlib.sha256((root/f).read_bytes()).hexdigest()}for f in files},
-         'progressbar_source_sha256':hashlib.sha256(Path('src/java-framework/src/android/widget/ProgressBar.java').read_bytes()).hexdigest()}
+         'progressbar_source_sha256':hashlib.sha256(Path('src/java-framework/src/android/widget/ProgressBar.java').read_bytes()).hexdigest(),
+         'storage_sources':{f:hashlib.sha256(Path(f).read_bytes()).hexdigest()for f in ['src/java-framework/src/husk/StoragePaths.java','src/java-framework/src/android/content/HuskSharedPreferences.java','src/java-framework/src/android/os/Environment.java']}}
 (root/'husk-framework-build.json').write_text(json.dumps(receipt,indent=2)+'\n')
 print(json.dumps(receipt,indent=2))
 PY

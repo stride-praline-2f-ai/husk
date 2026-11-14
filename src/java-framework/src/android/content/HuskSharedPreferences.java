@@ -6,13 +6,15 @@ import java.util.*;
 /** SharedPreferences kept in a file of typed lines ("i key value"), written on every commit. */
 public final class HuskSharedPreferences implements SharedPreferences {
     private final File file;
+    private final String currentDataRoot;
     private final HashMap<String, Object> map = new HashMap<>();
     private final java.util.concurrent.CopyOnWriteArrayList<OnSharedPreferenceChangeListener> listeners = new java.util.concurrent.CopyOnWriteArrayList<>();
     private static final android.os.Handler MAIN = new android.os.Handler(android.os.Looper.getMainLooper());
     private static final java.util.concurrent.ExecutorService WRITER = java.util.concurrent.Executors.newSingleThreadExecutor(r -> { Thread t = new Thread(r, "SharedPreferencesWriter"); t.setDaemon(true); return t; });
     private final java.util.concurrent.atomic.AtomicBoolean writePending = new java.util.concurrent.atomic.AtomicBoolean();
 
-    public HuskSharedPreferences(File f) { file = f; load(); }
+    public HuskSharedPreferences(File f) { this(f, f.getAbsoluteFile().getParentFile().getParent()); }
+    HuskSharedPreferences(File f, String root) { file = f; currentDataRoot = root; load(); }
 
     private static String esc(String s) { return s.replace("\\", "\\\\").replace("\n", "\\n"); }
     private static String unesc(String s) {
@@ -22,6 +24,8 @@ public final class HuskSharedPreferences implements SharedPreferences {
     }
     private void load() {
         if (!file.exists()) return;
+        boolean relocated = false;
+        boolean readComplete = false;
         try (BufferedReader r = new BufferedReader(new InputStreamReader(new FileInputStream(file), "UTF-8"))) {
             String line;
             while ((line = r.readLine()) != null) {
@@ -31,19 +35,28 @@ public final class HuskSharedPreferences implements SharedPreferences {
                 if (sp < 0) continue;
                 String k = unesc(line.substring(2, sp)), v = line.substring(sp + 1);
                 switch (t) {
-                case 's': map.put(k, unesc(v)); break;
+                case 's': {
+                    String old = unesc(v), now = husk.StoragePaths.rebaseOwnDataPath(old, currentDataRoot);
+                    map.put(k, now); relocated |= !old.equals(now); break;
+                }
                 case 'i': map.put(k, Integer.parseInt(v)); break;
                 case 'l': map.put(k, Long.parseLong(v)); break;
                 case 'f': map.put(k, Float.parseFloat(v)); break;
                 case 'b': map.put(k, Boolean.parseBoolean(v)); break;
-                case 'S': { HashSet<String> set = new HashSet<>(); for (String p : v.split("\u0001", -1)) if (!p.isEmpty()) set.add(unesc(p)); map.put(k, set); break; }
+                case 'S': { HashSet<String> set = new HashSet<>(); for (String p : v.split("\u0001", -1)) if (!p.isEmpty()) { String old = unesc(p), now = husk.StoragePaths.rebaseOwnDataPath(old, currentDataRoot); set.add(now); relocated |= !old.equals(now); } map.put(k, set); break; }
                 }
             }
+            readComplete = true;
         } catch (IOException e) { }
+        // Repair before Application.onCreate reads the deck folder. A failed write leaves
+        // the old on-disk preferences intact; this launch still sees the repaired value.
+        if (relocated && readComplete) save();
     }
     private synchronized boolean save() {
         file.getParentFile().mkdirs();
-        try (Writer w = new OutputStreamWriter(new FileOutputStream(file), "UTF-8")) {
+        File temporary = new File(file.getParentFile(), file.getName() + ".husk-prefs-new");
+        try {
+          try (Writer w = new OutputStreamWriter(new FileOutputStream(temporary), "UTF-8")) {
             for (Map.Entry<String, Object> e : map.entrySet()) {
                 Object v = e.getValue(); String k = esc(e.getKey()).replace(" ", "\\ ");
                 if (v instanceof String) w.write("s " + k + " " + esc((String) v) + "\n");
@@ -53,8 +66,10 @@ public final class HuskSharedPreferences implements SharedPreferences {
                 else if (v instanceof Boolean) w.write("b " + k + " " + v + "\n");
                 else if (v instanceof Set) { StringBuilder b = new StringBuilder(); for (Object o : (Set<?>) v) b.append(esc(String.valueOf(o))).append('\u0001'); w.write("S " + k + " " + b + "\n"); }
             }
-            return true;
-        } catch (IOException e) { return false; }
+          }
+          if (!temporary.renameTo(file)) throw new IOException("Could not replace preferences");
+          return true;
+        } catch (IOException e) { temporary.delete(); return false; }
     }
     public synchronized Map<String, ?> getAll() { return new HashMap<>(map); }
     public synchronized String getString(String k, String d) { Object v = map.get(k); return v instanceof String ? (String) v : d; }
