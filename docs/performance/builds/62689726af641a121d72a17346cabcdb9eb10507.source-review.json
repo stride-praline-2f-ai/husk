@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "source": "62689726af641a121d72a17346cabcdb9eb10507",
+  "tree": "4ea04aa7f4c65afdb1d063dc50e33df5bd7f65a7",
+  "plan_ids": [
+    "M3",
+    "M5",
+    "M6",
+    "M8",
+    "M9",
+    "M10"
+  ],
+  "subsystem": "source_metal4_native_compiler_and_framegen",
+  "observation_time_utc": "2026-11-15T03:52:14.561674+00:00",
+  "scope": [
+    "Actual pinned Metal library/PSO entrypoints and descriptor options",
+    "Per-key deduplication and bounded cache ownership",
+    "Shared compiler epoch admission/rotation/Utility serialization",
+    "Native archive namespace, validation, retention, symlink rejection and fallback",
+    "Actual WSI acquire/present/destroy and primary/replay commit feedback",
+    "MRC completion-block texture ownership and residency sets",
+    "Pause/swapchain generation retirement and separate controls/rollback",
+    "Real-render-target worker admission, relative rollback and retained safety guards",
+    "Full/windowed app path plus source package manifest admission",
+    "Original Java/fonts/shared-memory/graphics baseline preservation"
+  ],
+  "review_outcome": "Named mechanisms implemented; final Apple app/package gates running. No physical GPU/energy acceptance inferred.",
+  "unavailable": [
+    "Physical A20/Duo images/input/audio/latency/energy",
+    "Verified depth/motion/jitter interfaces for native MetalFX temporal interpolation",
+    "External supported power/temperature attachment and actual readings"
+  ],
+  "portable_tests_passed": 106,
+  "portable_apple_archive_status_tests_deferred": 1,
+  "source_input_sha256": {
+    "patches/metal4/HuskMetal4Compiler.mm": "442cb7cd52fc2c4e1c173d71369eeb22c717300855a0dff36a73f8e69b8c9f1c",
+    "patches/metal4/HuskMetal4Framegen.mm": "bed129c92d8e58da5b77dada6da471d2ce3fc66fd44efbab288b5c3a881e8f96",
+    "scripts/prepare_metal4_source.py": "41d66444e6294d368e346db34a20b54fe60bf1c4288b58c58cba50c7ba31e154",
+    "src/translation-layer-next/husk-tl-thread-policy.c": "bff595c73c6fca485fbe6ebb68c6327a1e4232d6d9c21ad48bfdbc6f4f309e00"
+  },
+  "original_implementation_source": "c1d9df374bb81503716fccf18a05df388608f6a5",
+  "additional_lifecycle_native_tests_passed": 4,
+  "prior_attempt": "c1d9df3 regression fixture declaration/order repaired; real checkpoint retained and once-only ordering now asserted"
+}

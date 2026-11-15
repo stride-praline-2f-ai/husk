@@ -28,6 +28,31 @@ int main(){@autoreleasepool{
     tl_fg_config config={1,sizeof(config),0,1816,1280,0};assert(vkHuskFramegenConfigure(&config));
     config.version++;assert(!vkHuskFramegenConfigure(&config));config.version--;
     HuskFGPresenter *p=[HuskFGPresenter new];p->_work=dispatch_queue_create("com.husk.contract",DISPATCH_QUEUE_SERIAL);
+    // Reproduce build165's C acquire boundary on a thread whose outer pool
+    // spans the game loop: releasing the caller's ownership cannot drain the
+    // extra autoreleased lease. The original four-slot pool then stalls.
+    @autoreleasepool {
+        for(unsigned i=0;i<4;i++){
+            id oldBoundary=[huskFramegenDrawable(p,nil) retain];assert(oldBoundary);
+            [oldBoundary release];assert(p->_used[i]);
+        }
+        assert(!huskFramegenDrawable(p,nil));
+    }
+    for(unsigned i=0;i<4;i++)assert(!p->_used[i]);
+    // Exercise the real C bridge repeatedly inside one long-lived outer pool.
+    // WSI's release must return every completed lease without a caller drain.
+    for(unsigned i=0;i<32;i++){
+        auto *owned=(HuskFGDrawable *)husk_metal4_framegen_drawable(p,nullptr);
+        assert(owned);assert(p->_used[owned->_slot]);
+        auto *completion=[ContractFeedbackOptions new];
+        husk_metal4_framegen_feedback(completion,owned);
+        [owned present];assert(!p->_ready.count);
+        [completion fire:NO];dispatch_sync(p->_work,^{});assert(p->_ready.count==1);
+        dispatch_sync(p->_work,^{[p resetHistory];});
+        [owned release];[completion release];
+        for(unsigned slot=0;slot<4;slot++)assert(!p->_used[slot]);
+    }
+    fgRendered=0;fgDropped=0;
     HuskFGDrawable *frame=lease(p,0);ContractFeedbackOptions *opt=[ContractFeedbackOptions new];
     husk_metal4_framegen_feedback(opt,frame);
     assert(fgRendered==0&&p->_ready.count==0); // CPU submission cannot publish.

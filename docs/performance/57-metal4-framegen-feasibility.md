@@ -26,3 +26,8 @@ The reusable algorithm today is **Husk colour-flow interpolation**, not a claim 
 ## Definition of done before exposing combined mode
 
 A real producer/interop implementation and backend capability admission; lifetime/synchronization and resource-loss tests; actual GPU producer→interpolator→present tests (no manufactured input); pinned Apple driver/app/package build; then Dungeons visible quality/input/latency/cadence/lifecycle/rollback checks. Energy benefit is separate. The current candidate fixes a reproducible nativeMetal4 cache-startup defect first and preserves existing choices; no dummy combined-mode switch or claimed implementation is added.
+
+
+## Superseding source implementation — build165
+
+The164status above is historical. [Actual completed bridge/compiler implementation](58-metal4-full-integration.md) and [verified165 handover](builds/62689726af641a121d72a17346cabcdb9eb10507.md) implement the source-built WSI/residency/real Metal4 completion and colour-flow presentation route, plus native archive/library reuse.459Apple tests/zero test skips, source-driver exports/imports, fresh app/package and rawIPA verification pass. Combined mode is now an explicit enhancement option; physical game images/input/audio/lifecycle/latency/energy remain pending. This is colour-flow30rendered→60output, not engine-vector native MetalFX temporal generation.

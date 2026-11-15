@@ -1,0 +1,35 @@
+{
+  "download_url": "https://filebin.net/e7a6c61d44102d7551fa88a2/Husk-3.4-build165-Metal4-Complete.ipa",
+  "file": {
+    "filename": "Husk-3.4-build165-Metal4-Complete.ipa",
+    "content-type": "application/zip",
+    "bytes": 154255964,
+    "bytes_readable": "154 MB",
+    "md5": "LG3duEEYRtbm/oPJBjS6hg==",
+    "sha1": "9c90088b375050c1e0c6284dcb1fdfcf04020a06",
+    "sha256": "70f0021fccc200318ea7cdd8c89c8693e1394cc98401f2793723005ef24a83c6",
+    "updated_at": "2026-11-15T03:59:11.012575Z",
+    "updated_at_relative": "now",
+    "created_at": "2026-11-15T03:59:11.012575Z",
+    "created_at_relative": "now"
+  },
+  "bin": {
+    "id": "e7a6c61d44102d7551fa88a2",
+    "readonly": false,
+    "bytes": 0,
+    "bytes_readable": "0 B",
+    "files": 0,
+    "updated_at": "2026-11-15T03:59:11.021589Z",
+    "updated_at_relative": "now",
+    "created_at": "2026-11-15T03:59:03.742854Z",
+    "created_at_relative": "now",
+    "expired_at": "2026-11-22T03:59:11.021588Z",
+    "expired_at_relative": "6 days from now"
+  },
+  "anonymous_full_download_verified": true,
+  "downloaded_bytes": 154255964,
+  "downloaded_sha256": "70f0021fccc200318ea7cdd8c89c8693e1394cc98401f2793723005ef24a83c6",
+  "magic": "504b0304",
+  "source": "62689726af641a121d72a17346cabcdb9eb10507",
+  "candidate_build": "165"
+}
