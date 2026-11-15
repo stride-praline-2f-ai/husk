@@ -79,7 +79,7 @@ import Metal
         HuskLog.log("frame-evidence", "[M3/M9] \(record["state"]!); capture \(id), app \(app.id); local only, no automatic upload")
         prune(keeping: id)
         if result == 1 { return "Capture armed. Return to the scene only if comfortable; one matched pair saves after about 3 seconds of rendered frames. No recording needed." }
-        if inUse { return "Capture is unavailable in the running renderer or another capture is busy. Keep existing files; use source Metal4 Enhancements with FG on if you later choose to capture." }
+        if inUse { return "Capture is unavailable in the running renderer or another capture is finishing. Existing files are kept. Capture requires a supported renderer with frame generation enabled." }
         return "One capture is queued for the next full game launch with FG enabled. No continuous recording. You do not need to keep watching if it is uncomfortable."
     }
     static func consume(apk: String) -> String? {

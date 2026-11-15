@@ -480,6 +480,11 @@ struct TLAppSettingsView: View {
                 }
             }
             Section("Display") {
+                if !settings.usesSharpGraphics(for: app) {
+                    Picker("Game-default resolution", selection: $settings.resolution) {
+                        ForEach(TLAppSettings.Resolution.allCases) { Text($0.title).tag($0) }
+                    }
+                }
                 Picker("Orientation", selection: $settings.orientation) {
                     ForEach(TLAppSettings.Orientation.allCases) { Text($0.title).tag($0) }
                 }
@@ -516,7 +521,7 @@ struct TLAppSettingsView: View {
                     }
                 }
                 if !settings.metal4Renderer || settings.enhancedMetal4 {
-                    Picker("Native pipeline cache", selection: Binding(get: { settings.nativePipelineArchiveMode == 2 }, set: { settings.nativePipelineArchiveMode = $0 ? 2 : 0 })) {
+                    Picker("Native pipeline cache", selection: Binding(get: { settings.nativePipelineArchiveMode == 2 && !(settings.duoAutomaticActive(for: app) && !settings.metal4Renderer) }, set: { settings.nativePipelineArchiveMode = $0 ? 2 : 0 })) {
                         Text("Off").tag(false); Text("On").tag(true)
                     }.disabled(settings.duoAutomaticActive(for: app) && !settings.metal4Renderer)
                 }
