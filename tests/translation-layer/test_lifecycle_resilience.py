@@ -96,11 +96,12 @@ int main(void) {
 #include <assert.h>
 #include <pthread.h>
 #include <stdarg.h>
-static pthread_t owner;static int phase,checkpoints,audio;
+static pthread_t owner;static int phase,checkpoints,metal4_checkpoints,audio;
 static struct {int na;struct {void(*onPause)(int*);void(*onResume)(int*);void(*onWindowFocusChanged)(int*,int);}callbacks;}N;
 static void tl_log_line(const char *s,...){(void)s;}
 static void tl_thread_policy_suspend(void){assert(pthread_equal(owner,pthread_self()));}
 static void tl_pc_checkpoint_async(void){checkpoints++;}
+static void tl_vk_metal4_checkpoint(void){assert(pthread_equal(owner,pthread_self())&&phase==0&&checkpoints==0&&audio==0);metal4_checkpoints++;}
 static void tl_audio_set_paused(bool b){assert((b&&phase==2)||(!b&&phase==4));audio++;}
 static void focus(int*n,int f){assert(n==&N.na);phase=f?4:1;}
 static void pause_(int*n){assert(n==&N.na&&phase==1);phase=2;tl_lifecycle_request(false);} // reentrant producer, no lock held
@@ -110,7 +111,7 @@ static void *foreign(void*p){(void)p;deliver_lifecycle();assert(phase==0);return
 int main(void){owner=pthread_self();N.callbacks.onPause=pause_;N.callbacks.onResume=resume_;N.callbacks.onWindowFocusChanged=focus;
  tl_lifecycle_bind(0,0);tl_lifecycle_ready(false);tl_lifecycle_request(true);
  pthread_t t;assert(!pthread_create(&t,0,foreign,0));pthread_join(t,0);deliver_lifecycle();
- tl_lifecycle_stats s;tl_lifecycle_snapshot(&s);assert(phase==4&&audio==2&&checkpoints==1&&s.transitions==2&&!s.applied_paused&&!s.applying);return 0;}
+ tl_lifecycle_stats s;tl_lifecycle_snapshot(&s);assert(phase==4&&audio==2&&checkpoints==1&&metal4_checkpoints==1&&s.transitions==2&&!s.applied_paused&&!s.applying);return 0;}
 '''.replace('/* DELIVERY */',delivery),['husk-tl-lifecycle.c'])
 
     def test_fatal_signal_records_re_raises_and_preserves_jit_guards(self):
