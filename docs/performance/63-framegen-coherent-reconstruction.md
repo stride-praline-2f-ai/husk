@@ -24,9 +24,15 @@ ringing. Integer positions use an exact single read. Current source illumination
 is retained, not averaged between exposures. This is still colour-only
 reprojection, not perfect optical flow or native MetalFX temporal generation.
 
-The existing16-pixel tile search gains a half-pixel final refinement, weighted
+The existing16-pixel tile search gains filtered coarse scales, a half-pixel final refinement, weighted
 RGB residual instead of cancellation-prone luminance difference, a reduced
 tie-breaking motion penalty and separate unpenalized residual confidence.
+Two private motion-only mip pyramids are copied/generated on the GPU before
+flow estimation; the guest/WSI textures and their mip-level contract remain
+unchanged. Coarse matching uses filtered levels2/1 before original level0,
+with a four-pixel coarse grid and a separate optimum per scale. An actual
+textured-flow regression is required as well as the injected known-motion
+sequence; ramp-only success is insufficient. No CPU readback or queue-idle wait.
 The tile count/search radius remain bounded. Forward/backward confidence,
 in-image boundaries, nonzero motion and current-frame fallback for genuinely
 unreliable fields remain. Static HUD preservation requires temporal support
@@ -39,8 +45,15 @@ all game blur is gone: coarse flow can still be wrong at depth/occlusion
 boundaries, exact engine vectors/depth/jitter are unavailable, and30realFPS
 still differs from60realFPS. Rejected fields/boundaries can repeat real pixels.
 No output resolution, scene quality CVar, worker policy, presenter chronology,
-resource lifetime, cache compiler compatibility or native renderer is changed.
+lease lifetime, cache compiler compatibility or native renderer is changed.
 Both source-built colour-flow frameworks must rebuild with the exact shader.
+
+Scratch allocation is owned/released with the presenter. Admission now includes
+all four source images, both complete mip pyramids and both flow fields in the
+existing96MiB logical texture budget:62,131,376bytes at1816×1280 and91,007,040
+at2128×1600. Actual Metal allocation overhead/physical residency are not promised
+by this logical estimate. Unsupported larger targets preserve their original
+rendered FPS through the existing preflight fallback; no resolution reduction.
 
 ## Quality regression and checks
 
@@ -54,6 +67,13 @@ Frozen166 must still fail its original stationary-HUD case. Existing4/16pixel
 flow, HUD, moving-thin-object, equal-luminance colour and boundary cases remain.
 Actual estimated3/3.5pixel motion and unreliable-field rejection are also required.
 
+First168sourcee059591ef383d4bddb6278c2d28eb6ce87108424 passed its early GPU
+controlled-sequence check but was superseded before delivery after review found
+the missing end-to-end textured correspondence case. Its unfiltered shader is
+frozen as another GPU negative control. The final filtered shader must pass
+actual texture motion that rejects that preliminary shader. Its first workflow
+43712641855 is historical, not the final delivered artifact.
+
 The workflow runs this one GPU check before heavy driver compilation, then
 retains the full required regression/setup/app/package gates. Linux portable
 cache tests9/9 pass; spatial4pass/1Apple-only deferred. Actual Apple shader/GPU,
@@ -61,7 +81,7 @@ both driver rebuilds, full regressions, fresh app/three extensions/sign/package
 and independent exact-source/raw delivery remain **pending** at this entry.
 No candidate IPA is ready from portable checks alone.
 
-Extra fractional search/colour arithmetic and cubic texture reads cost GPU work.
+Extra pyramid copies/filtering, fractional search/colour arithmetic and cubic texture reads cost GPU work.
 The removed dual-source blend/read path and integer fast path do not establish
 a net saving. Actual A20 GPU duration, presentation uniformity, input latency
 and energy remain UNKNOWN; no code-only cooling/performance promise.

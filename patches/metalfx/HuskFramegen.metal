@@ -41,16 +41,22 @@ kernel void huskFlow(texture2d<float,access::sample> previous [[texture(0)]],
     // Keep the bounded tile search, then resolve odd/fractional movement.
     // The regularizer breaks ties; it must not dominate real correspondence
     // or be reported as the photometric confidence error.
-    for(uint level=0;level<3;level++){
-        float step=level==0?8.0f:(level==1?2.0f:0.5f);
-        float radius=level==0?16.0f:(level==1?4.0f:1.0f);
-        float2 origin=level?displacement:float2(0);
+    for(uint stage=0;stage<3;stage++){
+        float step=stage==0?4.0f:(stage==1?2.0f:0.5f);
+        uint lod=min(2-stage,previous.get_num_mip_levels()-1);
+        float spacing=3.0f*float(1u<<lod);
+        float radius=stage==0?16.0f:(stage==1?4.0f:1.0f);
+        float2 origin=stage?displacement:float2(0);
+        // Each filtered scale has a different residual distribution. Refine
+        // its own optimum instead of comparing a fine residual to a blurrier
+        // coarse residual and accidentally retaining the coarse displacement.
+        best=INFINITY;
         for(float y=-radius;y<=radius;y+=step)for(float x=-radius;x<=radius;x+=step){
             float2 candidate=origin+float2(x,y);float error=0;
             for(int v=-1;v<=1;v++)for(int u=-1;u<=1;u++){
-                float2 p=centre+float2(u,v)*3.0f;
-                float3 a=previous.sample(fgSampler,(p+candidate)/size).rgb;
-                float3 b=current.sample(fgSampler,p/size).rgb;
+                float2 p=centre+float2(u,v)*spacing;
+                float3 a=previous.sample(fgSampler,(p+candidate)/size,level(float(lod))).rgb;
+                float3 b=current.sample(fgSampler,p/size,level(float(lod))).rgb;
                 error+=dot(abs(a-b),float3(0.2126f,0.7152f,0.0722f));
             }
             error=error/9.0f;

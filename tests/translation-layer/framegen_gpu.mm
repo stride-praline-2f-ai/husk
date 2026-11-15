@@ -10,8 +10,8 @@
 #include <algorithm>
 #include <initializer_list>
 
-static id<MTLTexture> texture(id<MTLDevice> device,NSUInteger w,NSUInteger h,MTLPixelFormat format){
-    auto*d=[MTLTextureDescriptor texture2DDescriptorWithPixelFormat:format width:w height:h mipmapped:NO];
+static id<MTLTexture> texture(id<MTLDevice> device,NSUInteger w,NSUInteger h,MTLPixelFormat format,bool mips=false){
+    auto*d=[MTLTextureDescriptor texture2DDescriptorWithPixelFormat:format width:w height:h mipmapped:mips];
     d.storageMode=MTLStorageModeShared;d.usage=MTLTextureUsageShaderRead|MTLTextureUsageShaderWrite;
     return [device newTextureWithDescriptor:d];
 }
@@ -32,11 +32,12 @@ int main(int argc,char**argv){@autoreleasepool{
     auto flow=[device newComputePipelineStateWithFunction:f error:&error];
     auto interpolate=[device newComputePipelineStateWithFunction:i error:&error];
     auto copy=[device newComputePipelineStateWithFunction:c error:&error];assert(flow&&interpolate&&copy);
-    auto a=texture(device,64,64,MTLPixelFormatRGBA8Unorm),b=texture(device,64,64,MTLPixelFormatRGBA8Unorm);
+    auto a=texture(device,64,64,MTLPixelFormatRGBA8Unorm,true),b=texture(device,64,64,MTLPixelFormatRGBA8Unorm,true);
     auto forward=texture(device,4,4,MTLPixelFormatRGBA16Float),backward=texture(device,4,4,MTLPixelFormatRGBA16Float);
     auto out=texture(device,64,64,MTLPixelFormatRGBA8Unorm);assert(a&&b&&forward&&backward&&out);
     uint8_t pixels[64*64*4];
     auto queue=[device newCommandQueue];
+    auto prepareMotion=[&](id<MTLCommandBuffer> command){auto blit=[command blitCommandEncoder];[blit generateMipmapsForTexture:a];[blit generateMipmapsForTexture:b];[blit endEncoding];};
     for(unsigned motion=4;motion<=16;motion+=12){
     for(unsigned shift=0;shift<2;shift++){
         for(unsigned y=0;y<64;y++)for(unsigned x=0;x<64;x++){
@@ -46,6 +47,7 @@ int main(int argc,char**argv){@autoreleasepool{
         [(shift?b:a) replaceRegion:MTLRegionMake2D(0,0,64,64) mipmapLevel:0 withBytes:pixels bytesPerRow:256];
     }
     auto command=[queue commandBuffer];
+    prepareMotion(command);
     for(unsigned reverse=0;reverse<2;reverse++){
         auto e=[command computeCommandEncoder];[e setTexture:reverse?b:a atIndex:0];[e setTexture:reverse?a:b atIndex:1];
         [e setTexture:reverse?backward:forward atIndex:2];dispatch(e,flow,4,4);[e endEncoding];
@@ -178,6 +180,40 @@ int main(int argc,char**argv){@autoreleasepool{
         [out getBytes:pixels bytesPerRow:256 fromRegion:MTLRegionMake2D(0,0,64,64) mipmapLevel:0];
         assert(!memcmp(pixels,currentPixels,sizeof pixels));
     }
+    // End-to-end textured flow, not only an injected perfect field. A
+    // four-pixel move must be found at the filtered coarse scale and refined.
+    for(unsigned image=0;image<2;image++){
+        for(unsigned y=0;y<64;y++)for(unsigned x=0;x<64;x++){
+            unsigned world=x+128-image*4,q=(y*64+x)*4;
+            unsigned seed=(world*1973u+y*9277u);seed=(seed^(seed>>7))*26699u;
+            for(unsigned ch=0;ch<3;ch++)pixels[q+ch]=(uint8_t)(30+((seed>>(ch*5))&127));
+            pixels[q+3]=255;
+        }
+        [(image?b:a) replaceRegion:MTLRegionMake2D(0,0,64,64) mipmapLevel:0 withBytes:pixels bytesPerRow:256];
+        if(image)memcpy(currentPixels,pixels,sizeof pixels);
+    }
+    {
+        auto command=[queue commandBuffer];prepareMotion(command);
+        for(unsigned reverse=0;reverse<2;reverse++){
+            auto e=[command computeCommandEncoder];[e setTexture:reverse?b:a atIndex:0];[e setTexture:reverse?a:b atIndex:1];
+            [e setTexture:reverse?backward:forward atIndex:2];dispatch(e,flow,4,4);[e endEncoding];
+        }
+        auto e=[command computeCommandEncoder];[e setTexture:a atIndex:0];[e setTexture:b atIndex:1];[e setTexture:forward atIndex:2];
+        [e setTexture:backward atIndex:3];[e setTexture:out atIndex:4];dispatch(e,interpolate,64,64);[e endEncoding];
+        [command commit];[command waitUntilCompleted];assert(command.status==MTLCommandBufferStatusCompleted);
+        [out getBytes:pixels bytesPerRow:256 fromRegion:MTLRegionMake2D(0,0,64,64) mipmapLevel:0];
+        __fp16 vectors[64];[forward getBytes:vectors bytesPerRow:32 fromRegion:MTLRegionMake2D(0,0,4,4) mipmapLevel:0];
+        for(unsigned y=1;y<3;y++)for(unsigned x=1;x<3;x++){
+            if(fabs((float)vectors[(y*4+x)*4]+4)>0.01f||fabs((float)vectors[(y*4+x)*4+1])>0.01f){
+                fprintf(stderr,"QUALITY_REJECT: textured motion was not recovered by actual flow\n");return 4;
+            }
+        }
+        for(unsigned y=24;y<38;y++)for(unsigned x=30;x<38;x++)for(unsigned ch=0;ch<3;ch++){
+            if(abs((int)pixels[(y*64+x)*4+ch]-(int)currentPixels[(y*64+x+2)*4+ch])>1){
+                fprintf(stderr,"QUALITY_REJECT: estimated textured flow did not preserve intermediate phase\n");return 4;
+            }
+        }
+    }
     // Odd/fractional translations on a known band-limited linear signal.
     for(float motion:{3.0f,3.5f}){
         for(unsigned image=0;image<2;image++){
@@ -189,6 +225,7 @@ int main(int argc,char**argv){@autoreleasepool{
             [(image?b:a) replaceRegion:MTLRegionMake2D(0,0,64,64) mipmapLevel:0 withBytes:pixels bytesPerRow:256];
         }
         auto command=[queue commandBuffer];
+        prepareMotion(command);
         for(unsigned reverse=0;reverse<2;reverse++){
             auto e=[command computeCommandEncoder];[e setTexture:reverse?b:a atIndex:0];[e setTexture:reverse?a:b atIndex:1];
             [e setTexture:reverse?backward:forward atIndex:2];dispatch(e,flow,4,4);[e endEncoding];
