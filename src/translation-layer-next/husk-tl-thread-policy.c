@@ -24,6 +24,7 @@ static atomic_uint log_events;
 static atomic_uint revision;
 static atomic_int fast_workers = 1, capacity_cpus;
 static atomic_bool trial_active;
+static atomic_int render_target_fps = 60;
 static pthread_mutex_t controller_mu = PTHREAD_MUTEX_INITIALIZER;
 static int64_t stable_ns, cooldown_until, last_sample;
 static int previous_power = -1;
@@ -79,6 +80,7 @@ void tl_thread_policy_summary(tl_worker_summary *out) {
     out->requested_mode=atomic_load(&requested_mode);out->active_mode=atomic_load(&active_mode);
     out->revision=atomic_load(&revision);out->capacity_hint=atomic_load(&capacity_cpus);
     out->fast_worker_budget=atomic_load(&fast_workers);out->trial_requested=atomic_load(&trial_active);
+    out->render_target_fps=(uint32_t)atomic_load(&render_target_fps);
     out->admissions=atomic_load(&admissions);out->rollback_requests=atomic_load(&rollbacks);
     out->caps_applied=atomic_load(&caps);out->restores_applied=atomic_load(&restores);
     out->query_failures=atomic_load(&query_failures);out->set_failures=atomic_load(&set_failures);
@@ -122,11 +124,24 @@ void tl_thread_policy_suspend(void)
     set_trial(false, "pause or power/thermal change"); stable_ns = last_sample = 0; reset_baseline(); last_reason = NULL;
     pthread_mutex_unlock(&controller_mu);
 }
+void tl_thread_policy_render_target(int fps)
+{
+    int target = fps == 30 || fps == 45 || fps == 60 ? fps : 0;
+    if (atomic_load(&render_target_fps) == target) return;
+    pthread_mutex_lock(&controller_mu);
+    if (atomic_exchange(&render_target_fps, target) != target) {
+        set_trial(false, "render target changed"); stable_ns = last_sample = 0;
+        reset_baseline(); last_reason = NULL;
+    }
+    pthread_mutex_unlock(&controller_mu);
+}
 void tl_thread_policy_frame(int64_t now, int64_t interval_ns)
 {
     static _Thread_local unsigned misses;
     if (!trial_mode(atomic_load(&active_mode)) || !atomic_load(&trial_active)) { misses = 0; return; }
-    if (interval_ns <= (atomic_load(&active_mode)==4?22000000LL:20500000LL)) { misses = 0; return; }
+    int target = atomic_load(&render_target_fps);
+    int64_t period_delta = target > 0 ? 1000000000LL / target - 1000000000LL / 60 : 0;
+    if (target > 0 && interval_ns <= (atomic_load(&active_mode)==4?22000000LL:20500000LL) + period_delta) { misses = 0; return; }
     if (++misses < 6 && interval_ns <= 50000000LL) return;
     if (pthread_mutex_trylock(&controller_mu)) return;
     set_trial(false, "frame spike"); cooldown_until = now + 60000000000LL; stable_ns = 0; misses = 0;
@@ -151,9 +166,13 @@ void tl_thread_policy_sample(int64_t now, int64_t span, double fps, double p95_m
     bool valid = span >= 8000000000LL && span <= 15000000000LL && !discontinuity;
     bool relative=atomic_load(&active_mode)==4;
     bool admitted=atomic_load(&trial_active);
-    double minimum_fps=relative?(admitted?baseline_fps*0.98:55.0):59.0;
-    double maximum_p95=relative?(admitted?baseline_p95+0.5:21.5):20.5;
+    int target=atomic_load(&render_target_fps);
+    double scale=target/60.0;
+    double period_delta=target>0?1000.0/target-1000.0/60:0;
+    double minimum_fps=relative?(admitted?baseline_fps*0.98:55.0*scale):59.0*scale;
+    double maximum_p95=relative?(admitted?baseline_p95+0.5:21.5+period_delta):20.5+period_delta;
     const char *reason = !valid ? "sample gap/loading" : transition ? "LPM transition" :
+        !target ? "render target unavailable" :
         relative && low_power ? "low power mode" :
         thermal != 0 ? "thermal pressure" : pipeline_inflight ? "pipeline in flight" :
         pipeline_max_ns > TL_WORKER_PIPELINE_MAX_NS || pipeline_ns > (uint64_t)span / 200 ? "pipeline cost" :
@@ -170,7 +189,7 @@ void tl_thread_policy_sample(int64_t now, int64_t span, double fps, double p95_m
         if(relative){
             if(!stable_ns){baseline_low=baseline_high=fps;baseline_p95=p95_ms;}
             else {if(fps<baseline_low)baseline_low=fps;if(fps>baseline_high)baseline_high=fps;}
-            if(baseline_high-baseline_low>2.0){stable_ns=0;baseline_low=baseline_high=fps;baseline_p95=p95_ms;}
+            if(baseline_high-baseline_low>2.0*scale){stable_ns=0;baseline_low=baseline_high=fps;baseline_p95=p95_ms;}
             if(p95_ms>baseline_p95)baseline_p95=p95_ms;
             baseline_fps=baseline_low; /* Conservative observed reference, not spare-capacity evidence. */
         }
@@ -180,8 +199,8 @@ void tl_thread_policy_sample(int64_t now, int64_t span, double fps, double p95_m
     if (!atomic_load(&trial_active)) {
         if (!reason) reason = now < cooldown_until ? "cooldown" : "collecting healthy cadence";
         if (!last_reason || strcmp(last_reason, reason) || now - reason_at >= 30000000000LL) {
-            tl_log_line("thread-policy adaptive: waiting: %s; stable %.1f/20 s, pipeline total %.3f ms max %.3f ms in-flight %u; heuristic limits 2 ms/call and 0.5%%/window",
-                        reason, stable_ns / 1e9, pipeline_ns / 1e6, pipeline_max_ns / 1e6, pipeline_inflight);
+            tl_log_line("thread-policy adaptive: waiting: %s; stable %.1f/20 s, render target %d FPS, pipeline total %.3f ms max %.3f ms in-flight %u; heuristic limits 2 ms/call and 0.5%%/window",
+                        reason, stable_ns / 1e9, target, pipeline_ns / 1e6, pipeline_max_ns / 1e6, pipeline_inflight);
             last_reason = reason; reason_at = now;
         }
     } else last_reason = NULL;
@@ -202,6 +221,7 @@ void tl_thread_policy_activate(const char *project)
     pthread_mutex_lock(&observation_mu);memset(worker_records,0,sizeof(worker_records));pthread_mutex_unlock(&observation_mu);
     atomic_store(&log_events, 0);
     atomic_store(&trial_active, false); atomic_fetch_add(&revision, 1);
+    atomic_store(&render_target_fps, 60);
     stable_ns = cooldown_until = last_sample = 0; previous_power = -1; cadence_rejected = false;
     last_reason = NULL; reason_at = 0; reset_baseline();
     if (trial_mode(mode)) tl_log_line("thread-policy adaptive: runtime CPU capacity hint %d, reserved normal-worker budget %d; caller override or capacity heuristic, no core affinity", atomic_load(&capacity_cpus), atomic_load(&fast_workers));

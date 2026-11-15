@@ -21,6 +21,9 @@ void tl_thread_policy_sample(int64_t now, int64_t span, double fps, double p95_m
                             uint64_t pipeline_ns, uint64_t pipeline_max_ns, unsigned pipeline_inflight);
 void tl_thread_policy_pipeline_completed(int64_t now, int64_t elapsed_ns);
 void tl_thread_policy_suspend(void);
+/* Actual accepted game render cap, never generated-output FPS. Unsupported or
+ * game-controlled targets retain Balanced instead of inventing headroom. */
+void tl_thread_policy_render_target(int fps);
 void tl_thread_policy_frame(int64_t now, int64_t interval_ns);
 void tl_thread_policy_checkpoint(void);
 int tl_thread_policy_fast_worker_budget(void);
@@ -41,6 +44,7 @@ typedef struct {
  double stable_seconds, cooldown_remaining_seconds,baseline_fps,baseline_p95_ms;
  bool relative_trial;
  char waiting_reason[96];
+ uint32_t render_target_fps;
 } tl_worker_summary;
 void tl_thread_policy_summary(tl_worker_summary *out);
 uint32_t tl_thread_policy_observations(tl_worker_observation *out, uint32_t capacity);

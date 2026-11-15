@@ -285,6 +285,7 @@ final class EfficiencyDiagnostics: ObservableObject {
                 "restores_applied_since_launch": s.restores_applied, "query_failures_since_launch": s.query_failures,
                 "set_failures_since_launch": s.set_failures, "dropped_observations_since_launch": s.dropped_observations,
                 "relative_trial": s.relative_trial, "admission_baseline_fps": s.baseline_fps,
+                "render_target_fps": s.render_target_fps,
                 "admission_baseline_p95_ms": s.baseline_p95_ms,
                 "relative_guard_limits": "20s stable >=55 FPS / p95<=21.5ms; rollback >2% FPS loss or >0.5ms p95 growth, 6 >22ms frames, >50ms frame; unchanged thermal/pipeline guards",
                 "stable_seconds": s.stable_seconds, "cooldown_remaining_seconds": s.cooldown_remaining_seconds,
@@ -911,12 +912,16 @@ struct EfficiencyDiagnosticsView: View {
                         monitor.exportNativeArchiveInspection()
                         inspectionSharing = !monitor.archiveInspectionFiles.isEmpty
                     }.disabled(monitor.nativePreparing)
-                    Button("Pause game and prepare captured pipelines") { monitor.prepareNativeArchive() }
-                        .disabled(monitor.running || monitor.exporting || monitor.nativePreparing)
+                    if tl_vk_archive_automatic() {
+                        Text("Metal 4 saves native pipelines automatically when Archive Enabled was selected before launch. Compatible saved pipelines are reused after restart; first-use compilation can still occur.")
+                    } else {
+                        Button("Pause game and prepare captured pipelines") { monitor.prepareNativeArchive() }
+                            .disabled(monitor.running || monitor.exporting || monitor.nativePreparing)
+                    }
                     if monitor.running { Text("Stop and export the lightweight test before preparing pipelines.").font(.caption) }
                     else if monitor.exporting { Text("Wait for the export to finish before preparing pipelines.").font(.caption) }
                     Button("Share preparation receipt") { archiveSharing = true }.disabled(monitor.archiveFiles.isEmpty || monitor.nativePreparing)
-                    Text("Archive mode must be enabled before launch. Only up to eight observed slow native requests are prepared. This costs CPU/time while the game pauses and cannot remove the same first-ever hitch. No power saving is assumed.")
+                    Text(tl_vk_archive_automatic() ? "Archive counts describe actual lookups and writes. A saved file does not guarantee every pipeline is present or that energy use improves." : "Archive mode must be enabled before launch. Only up to eight observed slow native requests are prepared. This costs CPU/time while the game pauses and cannot remove the same first-ever hitch. No power saving is assumed.")
                 } header: { Text("Native Pipeline Preparation · Experimental") }
                 Section {
                     Text("Return to gameplay after starting. This panel, background time and detached game views are excluded. Mark other interruptions explicitly. Tests remain in memory until stopped/exported; export before closing Husk.")

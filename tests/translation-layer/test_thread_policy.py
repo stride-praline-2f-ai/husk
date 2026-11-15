@@ -135,6 +135,7 @@ void exercise_naming(int path, const char *name, int failure) {
         cls.lib.tl_thread_policy_sample.argtypes = [ctypes.c_int64, ctypes.c_int64, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_int, ctypes.c_bool, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint]
         cls.lib.tl_thread_policy_pipeline_completed.argtypes = [ctypes.c_int64, ctypes.c_int64]
         cls.lib.tl_thread_policy_frame.argtypes = [ctypes.c_int64, ctypes.c_int64]
+        cls.lib.tl_thread_policy_render_target.argtypes = [ctypes.c_int]
         cls.lib.external_qos.argtypes = [ctypes.c_uint, ctypes.c_int]
         cls.lib.exercise_naming.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int]
 
@@ -150,6 +151,38 @@ void exercise_naming(int path, const char *name, int failure) {
     def admit(self):
         self.sample(10); self.sample(20)
         self.assertTrue(self.lib.tl_thread_policy_trial_active())
+
+    def test_explicit_30_render_target_admits_and_compares_real_frames(self):
+        self.reset(mode=4);self.lib.tl_thread_policy_render_target(30)
+        self.sample(10,fps=30,p95=35,maximum=39);self.sample(20,fps=30,p95=35,maximum=39)
+        self.assertTrue(self.lib.tl_thread_policy_trial_active())
+        for i in range(12):self.lib.tl_thread_policy_frame(21_000_000_000+i*33_333_333,33_333_333)
+        self.assertTrue(self.lib.tl_thread_policy_trial_active())
+        self.sample(30,fps=28,p95=35,maximum=39)
+        self.assertFalse(self.lib.tl_thread_policy_trial_active())
+
+    def test_30_render_target_keeps_power_thermal_and_pipeline_guards(self):
+        for bad in [dict(thermal=1),dict(low=True),dict(pipeline_max_ms=3),dict(inflight=1)]:
+            self.reset(mode=4);self.lib.tl_thread_policy_render_target(30)
+            self.sample(10,fps=30,p95=35,maximum=39,**bad);self.sample(20,fps=30,p95=35,maximum=39,**bad)
+            self.assertFalse(self.lib.tl_thread_policy_trial_active())
+
+    def test_45_target_and_cap_change_restore_balanced_before_re_admission(self):
+        self.reset(mode=4);self.lib.tl_thread_policy_render_target(45)
+        self.sample(10,fps=45,p95=25,maximum=29);self.sample(20,fps=45,p95=25,maximum=29)
+        self.assertTrue(self.lib.tl_thread_policy_trial_active())
+        self.lib.tl_thread_policy_render_target(30)
+        self.assertFalse(self.lib.tl_thread_policy_trial_active())
+        self.sample(30,fps=30,p95=35,maximum=39);self.sample(40,fps=30,p95=35,maximum=39)
+        self.assertTrue(self.lib.tl_thread_policy_trial_active())
+        self.lib.tl_thread_policy_frame(41_000_000_000,50_000_001)
+        self.assertFalse(self.lib.tl_thread_policy_trial_active())
+
+    def test_unknown_render_target_never_invents_trial_headroom(self):
+        for cap in (0,-1,1,240):
+            self.reset(mode=4);self.lib.tl_thread_policy_render_target(cap)
+            self.sample(10);self.sample(20)
+            self.assertFalse(self.lib.tl_thread_policy_trial_active())
 
     def test_a20_two_worker_allowance_preserves_critical_threads_and_rolls_back(self):
         self.reset(qos=NORMAL,mode=4)

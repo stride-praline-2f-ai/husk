@@ -27,3 +27,7 @@ This can restore compatible Vulkan cache persistence and explicit bounded Mesa N
 Candidate164 preserves163's Anki fixes/Java DEX, renderer exclusivity, output-rate/wait diagnostics, helpers/extensions, shader/driver pins and rollback controls. NativeMetal4 itself is unchanged. Portable cache regression and relevant suites must pass, then full Apple/fresh app/package and independent verification. Warm-restart persistence and actual scene/FPS benefit remain phone gates. Build163 and its active returned test remain available; no larger generic gameplay capture is requested.
 
 After a verified164: keep resolution/FPS/worker/backend settings fixed, reach the same scene briefly, leave via normal pause/Close so a checkpoint can finish, then fully restart and revisit it once. Look for cache-store activation, a compatible saved checkpoint and subsequent restored/accepted seed; hit/benefit remain distinct. No cache clearing. This checks cache plumbing before independently testing any timing policy or new framegen port.
+
+## Final164 build disposition
+
+[Verified164 handover and receipts](builds/1d431a2d6ed7069f02e107e5e5fa696075211a7c.md):452Apple tests/58invocations/zero test skips plus font paths, fresh app/helper/sign/package and independent compiled-code/retainedJava+driver+extension verification pass. Full anonymous rawIPA download matches SHA256. Physical activation/save/restart/restore and actual benefit remain pending; combinedMetal4/framegen remains unimplemented. Use only the short cache-focused check in that handover.

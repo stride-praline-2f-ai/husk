@@ -1,0 +1,27 @@
+{
+  "scope": "METAL4-FULL-v1 candidate165",
+  "environment": "Linux portable production-code checks",
+  "tests": {
+    "input": 11,
+    "graphics": 18,
+    "thread": 43,
+    "timing": 11,
+    "store": 11,
+    "buildcache": 9,
+    "settings": 3
+  },
+  "passed": 106,
+  "deferred_locally": [
+    "Apple compiler/feedback component controls",
+    "Swift manifest/selection/profile tests",
+    "Apple archive-status SDK test",
+    "native source driver/app/package"
+  ],
+  "prior_apple_source_probe": {
+    "run_id": 43671503963,
+    "control_tests": 2,
+    "driver_compile_import_export": "passed",
+    "limits": "Control Metal objects do not establish real GPU archive hits/output or energy. Final safety/application changes require full final gates."
+  },
+  "physical_energy": "pending / unavailable"
+}

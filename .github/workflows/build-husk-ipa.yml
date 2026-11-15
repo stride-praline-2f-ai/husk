@@ -65,6 +65,7 @@ jobs:
         run: |
           python3 tests/translation-layer/test_ipa_build_cache.py
           python3 scripts/ipa_build_cache.py keys >> "$GITHUB_OUTPUT"
+          python3 scripts/metal4_build_cache.py key >> "$GITHUB_OUTPUT"
       - name: Restore pinned tools downloads and Rust dependencies
         uses: actions/cache@v4
         with:
@@ -89,6 +90,12 @@ jobs:
         with:
           path: build/cache/java
           key: husk-java-v1-${{ steps.cache_keys.outputs.java }}
+      - name: Restore source-matched Metal4 source component
+        id: metal4_cache
+        uses: actions/cache/restore@v4
+        with:
+          path: build/cache/metal4
+          key: husk-metal4-source-v1-${{ steps.cache_keys.outputs.metal4 }}
       - name: Check every platform signing and packaging prerequisite
         id: platform
         if: ${{ !cancelled() && steps.source.outcome == 'success' }}
@@ -157,6 +164,7 @@ jobs:
           python3 tests/translation-layer/test_anki_socket_close.py 2>&1 | tee build/logs/anki-socket-close.log
           python3 tests/translation-layer/test_host_topology.py 2>&1 | tee build/logs/host-topology.log
           python3 tests/translation-layer/test_metal4_admission.py 2>&1 | tee build/logs/metal4-admission.log
+          python3 tests/translation-layer/test_metal4_components.py 2>&1 | tee build/logs/metal4-components.log
           python3 scripts/run_mac_regressions.py 2>&1 | tee build/logs/regressions.log
       - name: Prepare clean cloud Mac build tools and check Vulkan SDK ABI
         id: tools
@@ -254,6 +262,30 @@ jobs:
         with:
           path: build/cache/driver
           key: husk-driver-v1-${{ steps.cache_keys.outputs.driver }}
+      - name: Build and verify separate source Metal4 enhancements
+        id: metal4_source
+        if: ${{ !cancelled() && steps.driver.outcome == 'success' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          if python3 scripts/metal4_build_cache.py restore '${{ steps.cache_keys.outputs.metal4 }}'; then
+            echo 'Source-matched native Metal4 framework restored; fresh app still required'
+          else
+            bash scripts/build_metal4_source_ios.sh 2>&1 | tee build/logs/metal4-source-build.log
+            python3 scripts/metal4_build_cache.py save '${{ steps.cache_keys.outputs.metal4 }}'
+          fi
+          xcrun lipo -archs build/ios-arm64/lib/HuskKosmicKrisp.framework/HuskKosmicKrisp
+          xcrun nm -gU build/ios-arm64/lib/HuskKosmicKrisp.framework/HuskKosmicKrisp > build/logs/metal4-source-exports.txt
+          for symbol in ArchiveConfigure ArchiveSnapshot ArchivePrepare ArchiveForget FramegenConfigure FramegenSnapshot FramegenPause Metal4Checkpoint; do
+            grep -E "_vkHusk${symbol}$" build/logs/metal4-source-exports.txt
+          done
+      - name: Save verified source Metal4 framework for future app-only builds
+        if: ${{ steps.metal4_source.outcome == 'success' && steps.metal4_cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: build/cache/metal4
+          key: husk-metal4-source-v1-${{ steps.cache_keys.outputs.metal4 }}
       - name: Build pairing library with cached dependencies
         id: pairing
         if: ${{ !cancelled() && steps.source.outcome == 'success' }}
@@ -276,7 +308,7 @@ jobs:
           import json,os
           from pathlib import Path
           steps=json.loads(os.environ['PREFLIGHT_STEPS'])
-          required=['platform','regressions','tools','shaders','resources','java_framework','driver','pairing','project']
+          required=['platform','regressions','tools','shaders','resources','java_framework','driver','metal4_source','pairing','project']
           report={name:steps.get(name,{}).get('outcome','missing') for name in required}
           Path('build/logs/setup-summary.json').write_text(json.dumps(report,indent=2))
           for name,outcome in report.items(): print(name+': '+outcome)

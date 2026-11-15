@@ -1,0 +1,44 @@
+name: Validate source-built Metal4 driver toolchain
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/metal4-toolchain.yml'
+      - '.github/ci/build_metal4_probe.sh'
+      - 'patches/metal4/**'
+      - 'patches/metalfx/HuskFramegen*'
+      - 'scripts/prepare_metal4_source.py'
+      - 'scripts/build_metal4_source_ios.sh'
+      - 'tests/translation-layer/metal4*'
+      - 'tests/translation-layer/test_metal4_components.py'
+      - 'src/translation-layer-next/husk-tl-framegen.h'
+      - 'src/translation-layer-next/husk-tl-native-archive.h'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: husk-metal4-source
+  cancel-in-progress: false
+jobs:
+  metal4:
+    runs-on: xcode-27
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build source Metal4 bridge and component contracts
+        shell: bash
+        env:
+          HUSK_SOURCE_ROOT: ${{ github.workspace }}
+          HUSK_METAL4_UPSTREAM_ONLY: '0'
+        run: |
+          set -euo pipefail
+          bash scripts/build_metal4_source_ios.sh 2>&1 | tee metal4-source-build.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Metal4-Source-Toolchain
+          path: |
+            metal4-source-build.log
+            third_party/build/metal4-source/*/meson-logs/meson-log.txt
+            build/ios-arm64/lib/HuskKosmicKrisp.framework
+          retention-days: 7

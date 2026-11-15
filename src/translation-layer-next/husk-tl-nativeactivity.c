@@ -378,18 +378,18 @@ bool tl_na_start(const tl_ga_config *cfg)
     }
     if (project && !strcmp(project, "Dungeons") && tl_ue4_sharp_graphics_enabled()) {
         char cache_dir[768];
-        const char *name = tl_vk_is_metal4() ? "husk-pipeline-cache-metal4-v1" :
+        const char *name = tl_vk_metal4_extended() ? "husk-pipeline-cache-metal4-extended-v1" : tl_vk_is_metal4() ? "husk-pipeline-cache-metal4-v1" :
             tl_vk_spatial_active() ? "husk-pipeline-cache-spatial-v1" : "husk-pipeline-cache-v1";
         int n = snprintf(cache_dir, sizeof(cache_dir), "%s/%s", N.internal_dir, name);
         if (n > 0 && n < (int)sizeof(cache_dir)) tl_pc_configure(cache_dir);
         if (tl_vk_is_metal4()) {
-            n = snprintf(cache_dir, sizeof(cache_dir), "%s/husk-metal4-shader-cache-v1", N.internal_dir);
+            n = snprintf(cache_dir, sizeof(cache_dir), "%s/%s", N.internal_dir, tl_vk_metal4_extended()?"husk-metal4-shader-cache-extended-v1":"husk-metal4-shader-cache-v1");
             if (n <= 0 || n >= (int)sizeof(cache_dir) || !tl_pc_prepare_mesa_disk_cache(cache_dir))
                 tl_log_line("[M2/M3 METAL4 cache] game disk-cache defaults unavailable; existing driver behaviour retained");
         }
     }
     char archive_dir[1024];
-    int archive_len=snprintf(archive_dir,sizeof(archive_dir),"%s/husk-native-pipeline-archive-v1",N.internal_dir);
+    int archive_len=snprintf(archive_dir,sizeof(archive_dir),"%s/%s",N.internal_dir,tl_vk_is_metal4()?"husk-metal4-native-archive-v1":"husk-native-pipeline-archive-v1");
     if(archive_len>0&&archive_len<(int)sizeof(archive_dir))tl_vk_archive_configure(project,archive_dir);
     if (!tl_ue4_graphics_prepare(N.internal_dir, N.ext_dir, project))
         tl_log_line("ue4: graphics config could not be prepared completely; launch arguments will still be supplied");
@@ -433,6 +433,7 @@ static void deliver_lifecycle(void)
     for(unsigned i=0;i<8&&tl_lifecycle_next(&paused,&sequence);i++){
         tl_log_line("[M1/M6/M9 lifecycle] apply begin sequence %llu paused %d on activity UiThread",(unsigned long long)sequence,paused);
         if(paused){
+            tl_vk_metal4_checkpoint();
             tl_thread_policy_suspend();tl_pc_checkpoint_async();
             if(N.callbacks.onWindowFocusChanged)N.callbacks.onWindowFocusChanged(&N.na,0);
             if(N.callbacks.onPause)N.callbacks.onPause(&N.na);

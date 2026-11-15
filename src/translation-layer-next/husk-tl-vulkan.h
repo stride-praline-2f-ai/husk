@@ -29,6 +29,8 @@ void *tl_vk_resolve(const char *name);
 bool tl_vk_available(void);
 /* Ready driver identity, not GPU performance or feature admission. */
 bool tl_vk_is_metal4(void);
+bool tl_vk_metal4_extended(void);
+void tl_vk_metal4_checkpoint(void);
 
 unsigned long tl_vk_frames_presented(void);
 
