@@ -1,6 +1,6 @@
 # NX18-HENGE-A20-v1 — transferable mechanisms and candidate 162
 
-15 November 2026. M3/M6/M8/M10 follow-through on the user's explicit request to adapt NX18 and Henge A20/native Metal 4 improvements for Minecraft Dungeons. Depends on the existing METAL4-FG-v1 backend and the separately prepared [ANKI-EDITOR-v1 fix](53-ankidroid-editor-ios.md). This is source work, not a verified IPA or a physical-device performance result.
+15 November 2026. M3/M6/M8/M10 follow-through on the user's explicit request to adapt NX18 and Henge A20/native Metal 4 improvements for Minecraft Dungeons. Depends on the existing METAL4-FG-v1 backend and the separately prepared [ANKI-EDITOR-v1 fix](53-ankidroid-editor-ios.md). [Final verified162 build/handover](builds/a597f11bff10ce403d1b8b77f7aed0f3f2d0ba88.md) now supersedes source-only Apple gating. This remains no physical-device performance result.
 
 ## Exact reference sources
 
@@ -40,9 +40,9 @@ The reported Add freeze has a concrete packaged-library signal failure and a pas
 
 ## Validation and release gates
 
-[Local check receipt](runs/NX18-HENGE-A20-v1.local-checks.json): **77 passed, 9 Apple-only checks skipped** across the nine relevant suites; `git diff --check` passed. Portable checks execute production topology/mapping/thread-policy code and verify complete/unknown/invalid layouts, concurrent one-time initialization, actual blocked `accept()` interruption, preserved standard signals and policy behavior. Apple-only Swift, Metal object, WebKit and full IPA checks remain required; a Linux skip is not an Apple pass.
+[Local check receipt](runs/NX18-HENGE-A20-v1.local-checks.json): **77 passed, 9 Apple-only checks skipped** across the nine relevant suites; `git diff --check` passed. Portable checks execute production topology/mapping/thread-policy code and verify complete/unknown/invalid layouts, concurrent one-time initialization, actual blocked `accept()` interruption, preserved standard signals and policy behavior. Subsequent Apple Swift/Metal/WebKit/fullIPA checks passed in run43658021067 attempt3 (448tests/zero skips); initial Linux skips are preserved as local evidence, not counted as passes. Metal4 admission correctly declined the runner GPU; capable-device rendering remains unverified.
 
-The private Husk runs `43655114047` (including one rerun) and `43655343175` fail with no runner and no steps. Both `xcode-27` and `macos-latest` were tried; the service has not provided a reason through the available tools. Public Henge Apple jobs succeeding does not establish that private Husk can allocate a runner. Do not publish private Husk source into public Henge as a workaround. No candidate 161 or 162 IPA exists at the time of this record.
+The private Husk runs `43655114047` (including one rerun) and `43655343175` fail with no runner and no steps. Both `xcode-27` and `macos-latest` were tried; the service has not provided a reason through the available tools. Public Henge Apple jobs succeeding does not establish that private Husk can allocate a runner. Do not publish private Husk source into public Henge as a workaround. After the user fixed GitHub, candidate162 attempt3 succeeded and the raw IPA was independently verified/delivered; no161 IPA was produced. Earlier failures remain in the build history.
 
 Required next sequence:
 
@@ -51,4 +51,4 @@ Required next sequence:
 3. Short Anki check: open Add, type front/back, return; repeat preview teardown and verify host toolbar no longer covers guest actions. Preserve collections and caches.
 4. Dungeons: keep chosen resolution and real FPS target; first test native Metal 4 with frame generation OFF. Evaluate A20 worker policy independently, using the existing admission/rollback evidence. Compare matched conditions before claiming efficiency. M4 evidence does not validate A20.
 
-Readiness checklist NX18-HENGE-A20-v1 v1: source applicability inventory and transferable changes prepared; Apple build/package **pending**; device reliability **pending**; measured benefit/energy **unavailable**. Existing weighted roadmap scores receive no new credit from this source-only batch. This is not whole-plan or full-emulator completion.
+Readiness checklist NX18-HENGE-A20-v1 v1: source applicability inventory and transferable changes prepared; Apple build/package **passed**; device reliability **pending**; measured benefit/energy **unavailable**. Existing weighted roadmap scores receive no new credit from build-only evidence. This is not whole-plan or full-emulator completion.
