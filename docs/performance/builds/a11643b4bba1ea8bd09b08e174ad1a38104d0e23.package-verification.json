@@ -1,0 +1,302 @@
+{
+  "download_sha256": "3e6de901c1c6631bc6c07393d4c04597629371a0b7b768dc0e929fc75d5c2e5f",
+  "download_bytes": 154471840,
+  "info": {
+    "UIStatusBarHidden": true,
+    "CFBundleURLTypes": [
+      {
+        "CFBundleURLName": "com.husk.app",
+        "CFBundleURLSchemes": [
+          "husk"
+        ]
+      }
+    ],
+    "BGTaskSchedulerPermittedIdentifiers": [
+      "com.husk.app.pairing.*",
+      "com.husk.app.downloads.*",
+      "com.husk.app.*"
+    ],
+    "UIBackgroundModes": [
+      "audio"
+    ],
+    "UISupportedInterfaceOrientations": [
+      "UIInterfaceOrientationPortrait",
+      "UIInterfaceOrientationLandscapeLeft",
+      "UIInterfaceOrientationLandscapeRight"
+    ],
+    "DTSDKName": "iphoneos27.1",
+    "CFBundleSupportedPlatforms": [
+      "iPhoneOS"
+    ],
+    "HuskBuildCommit": "a11643b4bba1ea8bd09b08e174ad1a38104d0e23-dirty",
+    "HuskBuildDate": "2026-11-15 19:15 UTC",
+    "DTCompiler": "com.apple.compilers.llvm.clang.1_0",
+    "DTSDKBuild": "24A94232",
+    "CFBundleIdentifier": "com.husk.app",
+    "DTXcode": "2710",
+    "CFBundleDocumentTypes": [
+      {
+        "CFBundleTypeName": "Android App",
+        "CFBundleTypeRole": "Viewer",
+        "LSItemContentTypes": [
+          "com.android.package-archive",
+          "app.husk.xapk",
+          "app.husk.apkm",
+          "app.husk.apks"
+        ],
+        "LSHandlerRank": "Alternate"
+      },
+      {
+        "CFBundleTypeName": "PS4 Package",
+        "CFBundleTypeRole": "Viewer",
+        "LSItemContentTypes": [
+          "com.apple.installer-package-archive"
+        ],
+        "LSHandlerRank": "Alternate"
+      }
+    ],
+    "DTXcodeBuild": "27A9275",
+    "UISupportedInterfaceOrientations~ipad": [
+      "UIInterfaceOrientationPortrait",
+      "UIInterfaceOrientationPortraitUpsideDown",
+      "UIInterfaceOrientationLandscapeLeft",
+      "UIInterfaceOrientationLandscapeRight"
+    ],
+    "NSLocalNetworkUsageDescription": "Husk uses the local network to pair with this iPhone for JIT, without a computer.",
+    "UTImportedTypeDeclarations": [
+      {
+        "UTTypeIdentifier": "com.android.package-archive",
+        "UTTypeConformsTo": [
+          "public.data",
+          "public.archive"
+        ],
+        "UTTypeDescription": "Android App",
+        "UTTypeTagSpecification": {
+          "public.mime-type": [
+            "application/vnd.android.package-archive"
+          ],
+          "public.filename-extension": [
+            "apk"
+          ]
+        }
+      },
+      {
+        "UTTypeIdentifier": "app.husk.xapk",
+        "UTTypeConformsTo": [
+          "public.data",
+          "public.archive"
+        ],
+        "UTTypeDescription": "Android App Bundle (XAPK)",
+        "UTTypeTagSpecification": {
+          "public.filename-extension": [
+            "xapk"
+          ]
+        }
+      },
+      {
+        "UTTypeIdentifier": "app.husk.apkm",
+        "UTTypeConformsTo": [
+          "public.data",
+          "public.archive"
+        ],
+        "UTTypeDescription": "Android App Bundle (APKM)",
+        "UTTypeTagSpecification": {
+          "public.filename-extension": [
+            "apkm"
+          ]
+        }
+      },
+      {
+        "UTTypeIdentifier": "app.husk.apks",
+        "UTTypeConformsTo": [
+          "public.data",
+          "public.archive"
+        ],
+        "UTTypeDescription": "Android App Bundle (APKS)",
+        "UTTypeTagSpecification": {
+          "public.filename-extension": [
+            "apks"
+          ]
+        }
+      }
+    ],
+    "DTPlatformName": "iphoneos",
+    "CFBundleExecutable": "Husk",
+    "UIDeviceFamily": [
+      1,
+      2
+    ],
+    "CFBundlePackageType": "APPL",
+    "CFBundleIcons~ipad": {
+      "CFBundleAlternateIcons": {
+        "AppIconTintedDark": {
+          "CFBundleIconName": "AppIconTintedDark"
+        },
+        "AppIconClearLight": {
+          "CFBundleIconName": "AppIconClearLight"
+        },
+        "AppIconTintedLight": {
+          "CFBundleIconName": "AppIconTintedLight"
+        },
+        "AppIconClearDark": {
+          "CFBundleIconName": "AppIconClearDark"
+        }
+      },
+      "CFBundlePrimaryIcon": {
+        "CFBundleIconFiles": [
+          "AppIcon60x60",
+          "AppIcon76x76"
+        ],
+        "CFBundleIconName": "AppIcon"
+      }
+    },
+    "CFBundleInfoDictionaryVersion": "6.0",
+    "MinimumOSVersion": "15.5",
+    "DTPlatformBuild": "24A94232",
+    "CFBundleVersion": "172",
+    "LSApplicationQueriesSchemes": [
+      "stikjit",
+      "stikdebug",
+      "stosdebug",
+      "apple-magnifier",
+      "localdevvpn"
+    ],
+    "NSAppTransportSecurity": {
+      "NSAllowsArbitraryLoads": true
+    },
+    "LSSupportsOpeningDocumentsInPlace": true,
+    "UIRequiresFullScreen": false,
+    "CFBundleDevelopmentRegion": "en",
+    "UIFileSharingEnabled": true,
+    "NSSupportsLiveActivities": true,
+    "CFBundleIcons": {
+      "CFBundleAlternateIcons": {
+        "AppIconTintedDark": {
+          "CFBundleIconName": "AppIconTintedDark"
+        },
+        "AppIconClearLight": {
+          "CFBundleIconName": "AppIconClearLight"
+        },
+        "AppIconTintedLight": {
+          "CFBundleIconName": "AppIconTintedLight"
+        },
+        "AppIconClearDark": {
+          "CFBundleIconName": "AppIconClearDark"
+        }
+      },
+      "CFBundlePrimaryIcon": {
+        "CFBundleIconFiles": [
+          "AppIcon60x60"
+        ],
+        "CFBundleIconName": "AppIcon"
+      }
+    },
+    "UILaunchScreen": {},
+    "CFBundleShortVersionString": "3.4",
+    "CFBundleName": "Husk",
+    "CFBundleDisplayName": "Husk",
+    "UIViewControllerBasedStatusBarAppearance": false,
+    "CFBundleLocalizations": [
+      "en",
+      "zh-Hans",
+      "ja"
+    ],
+    "DTPlatformVersion": "27.1",
+    "NSBonjourServices": [
+      "_remotepairing-pairable-host._tcp",
+      "_remotepairing._tcp"
+    ],
+    "BuildMachineOSBuild": "26A434",
+    "NSSupportsLiveActivitiesFrequentUpdates": true,
+    "UIRequiredDeviceCapabilities": [
+      "arm64"
+    ]
+  },
+  "host_code_sha256": "f2140456822011eb8ce30a1658f2f92ffaadd8da8ad961e2b8a41dda67dfc091",
+  "drivers": {
+    "HuskMoltenVK": {
+      "manifest": {
+        "schema": 1,
+        "upstream_commit": "db66022459ffb663aa2b50f6b018bc2e124f5edf",
+        "upstream_version": "1.4.2",
+        "husk_spatial_patch_sha256": "d5da11be87bf230abdb4971c9debc8814a86809a43f1c3c837262f3dc07d5f26",
+        "husk_native_pipeline_patch_sha256": "d5da11be87bf230abdb4971c9debc8814a86809a43f1c3c837262f3dc07d5f26",
+        "native_archive_abi": 2,
+        "native_archive_cache_schema": 2,
+        "native_archive_compatibility_id": "a734100aa2a773b1e782c33b541593c02e7bba35aa28a5524ea30f2025202c50",
+        "native_archive_compatibility_inputs": {
+          "schema": 2,
+          "upstream_commit": "db66022459ffb663aa2b50f6b018bc2e124f5edf",
+          "spirv_cross_revision": "6c09849fe88c48eaed08413aa022aaa136a3a057",
+          "compiler_contract": "husk-native-default-mvk-compiler-contract-v1",
+          "archive_format_owner": "Metal binary archive"
+        },
+        "feature": "M9-SPATIAL-v3+M5-NATIVE-ARCHIVE-v1+M4-DISPLAY-v1+M9-FLOW-FRAMEGEN-v1",
+        "default_enabled": false,
+        "framegen_capture_abi": 1
+      },
+      "code_sha256": "4d7d7bd54fc32e550cad7825a463d5e6b6617297ef6da065a640ccb0bc5a1174",
+      "exact_shader": true,
+      "patch_source_matches": true
+    },
+    "HuskKosmicKrisp": {
+      "manifest": {
+        "schema": 2,
+        "backend": "KosmicKrisp",
+        "api": "Metal 4",
+        "source": "26620bf5319a0f5a5cca47cfecec797cafe45493",
+        "mesa": "b39d173ca9369c19fda2635be6655d308067e52d",
+        "husk_bridge_abi": 1,
+        "native_archive_abi": 2,
+        "frame_generation": true,
+        "framegen_capture_abi": 1,
+        "metalfx_spatial": false,
+        "minimum_ios": "26.0",
+        "compiler_contract": "husk-kk-native-v1",
+        "patch_sha256": "f0607ea7827a96e667647f1b24bd5897e94ab6c5df0868ff2698582e722486f8",
+        "code_sha256": "2ce5c7090e4d49c9fcdf1354ee9cc03453255532ed8d934958de813bc39c7daf",
+        "binary_sha256_before_signing": "4f93d04c14ce4b556f87d9abcaf062508e319dec5a0fe9731d55c704daad5c1b",
+        "sdk_build": "24A94232",
+        "xcode": "Xcode 27.1\nBuild version 27A9275",
+        "host_llvm": "23.1.4",
+        "husk_source_at_compile": "687a18e2cc28fd48479c4d2c84b8db2b6fbdc42c"
+      },
+      "code_sha256": "2ce5c7090e4d49c9fcdf1354ee9cc03453255532ed8d934958de813bc39c7daf",
+      "exact_shader": true,
+      "patch_source_matches": true
+    }
+  },
+  "extensions": [
+    "HuskDownloadsWidget.appex",
+    "HuskJITHelper.appex",
+    "HuskMemoryDonor.appex"
+  ],
+  "java": {
+    "schema": 1,
+    "r8": "8.5.35",
+    "min_api": 26,
+    "regression": "ProgressBarContract:10 checks",
+    "storage_regression": "StoragePathContract",
+    "anki_interactions": "AnkiInteractionContract:14 checks",
+    "download_manager": "DownloadManagerContract:16 checks",
+    "files": {
+      "husk-framework.dex": {
+        "bytes": 7900676,
+        "sha256": "e6558fe64e8337d405dcc6cfad5dd27670f6dcb2853ef5b601fa2d2cac507fd3"
+      },
+      "husk-framework-core.dex": {
+        "bytes": 4226472,
+        "sha256": "359eb8dd2284f090b6bf3a60e4a28efa35b5ed09e6f0cda98ef6ec6d6aa0106c"
+      }
+    },
+    "progressbar_source_sha256": "a8fc213d9333fd3c0c58f3b66e7b76304677243d38fc0eff00fbf72a57f3dc7c",
+    "storage_sources": {
+      "src/java-framework/src/husk/StoragePaths.java": "447787131a41eba70482c96d1c84a8ec2123d6b678e82d98ffd070a3c60d68df",
+      "src/java-framework/src/android/content/HuskSharedPreferences.java": "47bbf4836cdcf7f625a9b2f6160101215841ecd4e2e39f065b5c4f33557b99de",
+      "src/java-framework/src/android/os/Environment.java": "d2d673c2488b1b5f677f87c4dcb5e0499fe17b6757c767f67e251d5e41aad96e"
+    }
+  },
+  "ipa_bytes": 154471702,
+  "ipa_sha256": "05f25e43e9c775ead8b5cd6bb50fefe1f499d830aa572d04475c1dda7cf7aa68",
+  "source": "a11643b4bba1ea8bd09b08e174ad1a38104d0e23"
+}

@@ -1,0 +1,1163 @@
+{
+  "schema": 1,
+  "binary_source": "a11643b4bba1ea8bd09b08e174ad1a38104d0e23",
+  "build": 172,
+  "runs": [
+    {
+      "run_id": 43748103902,
+      "source": "687a18e2cc28fd48479c4d2c84b8db2b6fbdc42c",
+      "scope": "479 test executions/65 invocations/zero skips, fresh verified both drivers and all setup gates; superseded during app compilation",
+      "jobs": [
+        {
+          "id": 132915787020,
+          "run_id": 43748103902,
+          "workflow_name": "Build Husk Duo IPA on GitHub-hosted Xcode 27",
+          "head_branch": "main",
+          "run_url": "https://api.github.com/repos/stride-praline-2f-ai/husk/actions/runs/43748103902",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVoPcwc8AAAAe8mX1DA",
+          "head_sha": "8dcad846167ef311d041c005f94d0bb8a9832ec8",
+          "url": "https://api.github.com/repos/stride-praline-2f-ai/husk/actions/jobs/132915787020",
+          "html_url": "https://github.com/stride-praline-2f-ai/husk/actions/runs/43748103902/job/132915787020",
+          "status": "completed",
+          "conclusion": "cancelled",
+          "created_at": "2026-11-15T18:40:50Z",
+          "started_at": "2026-11-15T18:40:55Z",
+          "completed_at": "2026-11-15T18:58:14Z",
+          "name": "Build Duo IPA with GitHub-hosted Xcode 27",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-11-15T18:40:55Z",
+              "completed_at": "2026-11-15T18:40:57Z"
+            },
+            {
+              "name": "Check out private build repository",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-11-15T18:40:57Z",
+              "completed_at": "2026-11-15T18:41:05Z"
+            },
+            {
+              "name": "Restore exact reviewed source",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-11-15T18:41:05Z",
+              "completed_at": "2026-11-15T18:41:09Z"
+            },
+            {
+              "name": "Check generated-frame sequence quality before rebuilding drivers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-11-15T18:41:09Z",
+              "completed_at": "2026-11-15T18:41:41Z"
+            },
+            {
+              "name": "Fingerprint reusable build components",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-11-15T18:41:41Z",
+              "completed_at": "2026-11-15T18:41:44Z"
+            },
+            {
+              "name": "Restore pinned tools downloads and Rust dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-11-15T18:41:44Z",
+              "completed_at": "2026-11-15T18:42:14Z"
+            },
+            {
+              "name": "Restore source-matched native driver component",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-11-15T18:42:14Z",
+              "completed_at": "2026-11-15T18:42:15Z"
+            },
+            {
+              "name": "Restore source-matched Java component",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-11-15T18:42:15Z",
+              "completed_at": "2026-11-15T18:42:16Z"
+            },
+            {
+              "name": "Restore source-matched Metal4 source component",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-11-15T18:42:16Z",
+              "completed_at": "2026-11-15T18:42:16Z"
+            },
+            {
+              "name": "Check every platform signing and packaging prerequisite",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-11-15T18:42:16Z",
+              "completed_at": "2026-11-15T18:42:19Z"
+            },
+            {
+              "name": "Run full regression suite including actual Duo policy",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-11-15T18:42:19Z",
+              "completed_at": "2026-11-15T18:44:25Z"
+            },
+            {
+              "name": "Prepare clean cloud Mac build tools and check Vulkan SDK ABI",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-11-15T18:44:25Z",
+              "completed_at": "2026-11-15T18:44:26Z"
+            },
+            {
+              "name": "Stage matching release resources",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-11-15T18:44:27Z",
+              "completed_at": "2026-11-15T18:44:30Z"
+            },
+            {
+              "name": "Verify exact unchanged release Metal shaders",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-11-15T18:44:30Z",
+              "completed_at": "2026-11-15T18:44:32Z"
+            },
+            {
+              "name": "Set up Java compiler for Android framework repair",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-11-15T18:44:32Z",
+              "completed_at": "2026-11-15T18:44:32Z"
+            },
+            {
+              "name": "Rebuild and exercise the repaired Java framework",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 16,
+              "started_at": "2026-11-15T18:44:32Z",
+              "completed_at": "2026-11-15T18:44:33Z"
+            },
+            {
+              "name": "Save verified Java component for future app-only builds",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 17,
+              "started_at": "2026-11-15T18:44:34Z",
+              "completed_at": "2026-11-15T18:44:34Z"
+            },
+            {
+              "name": "Verify unchanged driver independently",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-11-15T18:44:34Z",
+              "completed_at": "2026-11-15T18:50:36Z"
+            },
+            {
+              "name": "Save verified native driver for future app-only builds",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19,
+              "started_at": "2026-11-15T18:50:36Z",
+              "completed_at": "2026-11-15T18:50:37Z"
+            },
+            {
+              "name": "Build and verify separate source Metal4 enhancements",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 20,
+              "started_at": "2026-11-15T18:50:37Z",
+              "completed_at": "2026-11-15T18:56:47Z"
+            },
+            {
+              "name": "Save verified source Metal4 framework for future app-only builds",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 21,
+              "started_at": "2026-11-15T18:56:47Z",
+              "completed_at": "2026-11-15T18:56:49Z"
+            },
+            {
+              "name": "Build pairing library with cached dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 22,
+              "started_at": "2026-11-15T18:56:49Z",
+              "completed_at": "2026-11-15T18:57:05Z"
+            },
+            {
+              "name": "Check staged project and every required library",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 23,
+              "started_at": "2026-11-15T18:57:05Z",
+              "completed_at": "2026-11-15T18:57:12Z"
+            },
+            {
+              "name": "Report all setup failures together before app compilation",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 24,
+              "started_at": "2026-11-15T18:57:12Z",
+              "completed_at": "2026-11-15T18:57:12Z"
+            },
+            {
+              "name": "Build and package fresh Duo IPA",
+              "status": "completed",
+              "conclusion": "cancelled",
+              "number": 25,
+              "started_at": "2026-11-15T18:57:12Z",
+              "completed_at": "2026-11-15T18:58:00Z"
+            },
+            {
+              "name": "Upload installable IPA",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 26,
+              "started_at": "2026-11-15T18:58:00Z",
+              "completed_at": "2026-11-15T18:58:00Z"
+            },
+            {
+              "name": "Save private build result",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 27,
+              "started_at": "2026-11-15T18:58:00Z",
+              "completed_at": "2026-11-15T18:58:02Z"
+            },
+            {
+              "name": "Upload build logs on failure",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 28,
+              "started_at": "2026-11-15T18:58:02Z",
+              "completed_at": "2026-11-15T18:58:02Z"
+            },
+            {
+              "name": "Post Set up Java compiler for Android framework repair",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 54,
+              "started_at": "2026-11-15T18:58:02Z",
+              "completed_at": "2026-11-15T18:58:03Z"
+            },
+            {
+              "name": "Post Restore pinned tools downloads and Rust dependencies",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 55,
+              "started_at": "2026-11-15T18:58:03Z",
+              "completed_at": "2026-11-15T18:58:03Z"
+            },
+            {
+              "name": "Post Check out private build repository",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 56,
+              "started_at": "2026-11-15T18:58:03Z",
+              "completed_at": "2026-11-15T18:58:05Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 57,
+              "started_at": "2026-11-15T18:58:05Z",
+              "completed_at": "2026-11-15T18:58:12Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/stride-praline-2f-ai/husk/check-runs/132915787020",
+          "labels": [
+            "xcode-27"
+          ],
+          "runner_id": 1000000735,
+          "runner_name": "GitHub Actions 1000000735",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        }
+      ]
+    },
+    {
+      "run_id": 43749684075,
+      "source": "af1fb9c403444147d6f34431bc9c1284fc570a3a",
+      "scope": "GPU/full regressions and setup pass; app missing Swift renderer-status declaration; fixed",
+      "jobs": [
+        {
+          "id": 132920768394,
+          "run_id": 43749684075,
+          "workflow_name": "Build Husk Duo IPA on GitHub-hosted Xcode 27",
+          "head_branch": "main",
+          "run_url": "https://api.github.com/repos/stride-praline-2f-ai/husk/actions/runs/43749684075",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVoPcwc8AAAAe8rH3ig",
+          "head_sha": "18bd305697e9b76da7a89a070c567a11b24beeb3",
+          "url": "https://api.github.com/repos/stride-praline-2f-ai/husk/actions/jobs/132920768394",
+          "html_url": "https://github.com/stride-praline-2f-ai/husk/actions/runs/43749684075/job/132920768394",
+          "status": "completed",
+          "conclusion": "failure",
+          "created_at": "2026-11-15T18:58:14Z",
+          "started_at": "2026-11-15T18:58:17Z",
+          "completed_at": "2026-11-15T19:01:40Z",
+          "name": "Build Duo IPA with GitHub-hosted Xcode 27",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-11-15T18:58:17Z",
+              "completed_at": "2026-11-15T18:58:18Z"
+            },
+            {
+              "name": "Check out private build repository",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-11-15T18:58:18Z",
+              "completed_at": "2026-11-15T18:58:21Z"
+            },
+            {
+              "name": "Restore exact reviewed source",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-11-15T18:58:21Z",
+              "completed_at": "2026-11-15T18:58:24Z"
+            },
+            {
+              "name": "Check generated-frame sequence quality before rebuilding drivers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-11-15T18:58:24Z",
+              "completed_at": "2026-11-15T18:58:46Z"
+            },
+            {
+              "name": "Fingerprint reusable build components",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-11-15T18:58:46Z",
+              "completed_at": "2026-11-15T18:58:48Z"
+            },
+            {
+              "name": "Restore pinned tools downloads and Rust dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-11-15T18:58:48Z",
+              "completed_at": "2026-11-15T18:59:15Z"
+            },
+            {
+              "name": "Restore source-matched native driver component",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-11-15T18:59:15Z",
+              "completed_at": "2026-11-15T18:59:16Z"
+            },
+            {
+              "name": "Restore source-matched Java component",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-11-15T18:59:16Z",
+              "completed_at": "2026-11-15T18:59:18Z"
+            },
+            {
+              "name": "Restore source-matched Metal4 source component",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-11-15T18:59:18Z",
+              "completed_at": "2026-11-15T18:59:19Z"
+            },
+            {
+              "name": "Check every platform signing and packaging prerequisite",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-11-15T18:59:19Z",
+              "completed_at": "2026-11-15T18:59:21Z"
+            },
+            {
+              "name": "Run full regression suite including actual Duo policy",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-11-15T18:59:21Z",
+              "completed_at": "2026-11-15T19:00:43Z"
+            },
+            {
+              "name": "Prepare clean cloud Mac build tools and check Vulkan SDK ABI",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-11-15T19:00:43Z",
+              "completed_at": "2026-11-15T19:00:44Z"
+            },
+            {
+              "name": "Stage matching release resources",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-11-15T19:00:44Z",
+              "completed_at": "2026-11-15T19:00:45Z"
+            },
+            {
+              "name": "Verify exact unchanged release Metal shaders",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-11-15T19:00:45Z",
+              "completed_at": "2026-11-15T19:00:46Z"
+            },
+            {
+              "name": "Set up Java compiler for Android framework repair",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-11-15T19:00:46Z",
+              "completed_at": "2026-11-15T19:00:46Z"
+            },
+            {
+              "name": "Rebuild and exercise the repaired Java framework",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 16,
+              "started_at": "2026-11-15T19:00:46Z",
+              "completed_at": "2026-11-15T19:00:47Z"
+            },
+            {
+              "name": "Save verified Java component for future app-only builds",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 17,
+              "started_at": "2026-11-15T19:00:47Z",
+              "completed_at": "2026-11-15T19:00:47Z"
+            },
+            {
+              "name": "Verify unchanged driver independently",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-11-15T19:00:47Z",
+              "completed_at": "2026-11-15T19:00:49Z"
+            },
+            {
+              "name": "Save verified native driver for future app-only builds",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 19,
+              "started_at": "2026-11-15T19:00:49Z",
+              "completed_at": "2026-11-15T19:00:49Z"
+            },
+            {
+              "name": "Build and verify separate source Metal4 enhancements",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 20,
+              "started_at": "2026-11-15T19:00:49Z",
+              "completed_at": "2026-11-15T19:00:50Z"
+            },
+            {
+              "name": "Save verified source Metal4 framework for future app-only builds",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 21,
+              "started_at": "2026-11-15T19:00:50Z",
+              "completed_at": "2026-11-15T19:00:50Z"
+            },
+            {
+              "name": "Build pairing library with cached dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 22,
+              "started_at": "2026-11-15T19:00:50Z",
+              "completed_at": "2026-11-15T19:00:57Z"
+            },
+            {
+              "name": "Check staged project and every required library",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 23,
+              "started_at": "2026-11-15T19:00:57Z",
+              "completed_at": "2026-11-15T19:01:02Z"
+            },
+            {
+              "name": "Report all setup failures together before app compilation",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 24,
+              "started_at": "2026-11-15T19:01:02Z",
+              "completed_at": "2026-11-15T19:01:03Z"
+            },
+            {
+              "name": "Build and package fresh Duo IPA",
+              "status": "completed",
+              "conclusion": "failure",
+              "number": 25,
+              "started_at": "2026-11-15T19:01:03Z",
+              "completed_at": "2026-11-15T19:01:32Z"
+            },
+            {
+              "name": "Upload installable IPA",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 26,
+              "started_at": "2026-11-15T19:01:32Z",
+              "completed_at": "2026-11-15T19:01:32Z"
+            },
+            {
+              "name": "Save private build result",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 27,
+              "started_at": "2026-11-15T19:01:32Z",
+              "completed_at": "2026-11-15T19:01:33Z"
+            },
+            {
+              "name": "Upload build logs on failure",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 28,
+              "started_at": "2026-11-15T19:01:33Z",
+              "completed_at": "2026-11-15T19:01:35Z"
+            },
+            {
+              "name": "Post Set up Java compiler for Android framework repair",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 54,
+              "started_at": "2026-11-15T19:01:35Z",
+              "completed_at": "2026-11-15T19:01:35Z"
+            },
+            {
+              "name": "Post Restore pinned tools downloads and Rust dependencies",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 55,
+              "started_at": "2026-11-15T19:01:35Z",
+              "completed_at": "2026-11-15T19:01:35Z"
+            },
+            {
+              "name": "Post Check out private build repository",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 56,
+              "started_at": "2026-11-15T19:01:35Z",
+              "completed_at": "2026-11-15T19:01:36Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 57,
+              "started_at": "2026-11-15T19:01:36Z",
+              "completed_at": "2026-11-15T19:01:36Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/stride-praline-2f-ai/husk/check-runs/132920768394",
+          "labels": [
+            "xcode-27"
+          ],
+          "runner_id": 1000000739,
+          "runner_name": "GitHub Actions 1000000739",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        }
+      ]
+    },
+    {
+      "run_id": 43750363619,
+      "source": "77eac144693622ae7b657fcc9c7ea2fc8de18f4c",
+      "scope": "shader witnesses pass; existing presenter test races timing writer; fixed with writer synchronization",
+      "jobs": [
+        {
+          "id": 132922744170,
+          "run_id": 43750363619,
+          "workflow_name": "Build Husk Duo IPA on GitHub-hosted Xcode 27",
+          "head_branch": "main",
+          "run_url": "https://api.github.com/repos/stride-praline-2f-ai/husk/actions/runs/43750363619",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVoPcwc8AAAAe8tAdag",
+          "head_sha": "f3fc7f2fa53112c5eb4d900adfebf7a36691549b",
+          "url": "https://api.github.com/repos/stride-praline-2f-ai/husk/actions/jobs/132922744170",
+          "html_url": "https://github.com/stride-praline-2f-ai/husk/actions/runs/43750363619/job/132922744170",
+          "status": "completed",
+          "conclusion": "failure",
+          "created_at": "2026-11-15T19:04:47Z",
+          "started_at": "2026-11-15T19:04:49Z",
+          "completed_at": "2026-11-15T19:05:33Z",
+          "name": "Build Duo IPA with GitHub-hosted Xcode 27",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-11-15T19:04:50Z",
+              "completed_at": "2026-11-15T19:04:52Z"
+            },
+            {
+              "name": "Check out private build repository",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-11-15T19:04:52Z",
+              "completed_at": "2026-11-15T19:04:56Z"
+            },
+            {
+              "name": "Restore exact reviewed source",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-11-15T19:04:56Z",
+              "completed_at": "2026-11-15T19:05:00Z"
+            },
+            {
+              "name": "Check generated-frame sequence quality before rebuilding drivers",
+              "status": "completed",
+              "conclusion": "failure",
+              "number": 4,
+              "started_at": "2026-11-15T19:05:00Z",
+              "completed_at": "2026-11-15T19:05:26Z"
+            },
+            {
+              "name": "Fingerprint reusable build components",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 5,
+              "started_at": "2026-11-15T19:05:26Z",
+              "completed_at": "2026-11-15T19:05:26Z"
+            },
+            {
+              "name": "Restore pinned tools downloads and Rust dependencies",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 6,
+              "started_at": "2026-11-15T19:05:26Z",
+              "completed_at": "2026-11-15T19:05:26Z"
+            },
+            {
+              "name": "Restore source-matched native driver component",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 7,
+              "started_at": "2026-11-15T19:05:26Z",
+              "completed_at": "2026-11-15T19:05:26Z"
+            },
+            {
+              "name": "Restore source-matched Java component",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 8,
+              "started_at": "2026-11-15T19:05:26Z",
+              "completed_at": "2026-11-15T19:05:26Z"
+            },
+            {
+              "name": "Restore source-matched Metal4 source component",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 9,
+              "started_at": "2026-11-15T19:05:26Z",
+              "completed_at": "2026-11-15T19:05:26Z"
+            },
+            {
+              "name": "Check every platform signing and packaging prerequisite",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 10,
+              "started_at": "2026-11-15T19:05:26Z",
+              "completed_at": "2026-11-15T19:05:26Z"
+            },
+            {
+              "name": "Run full regression suite including actual Duo policy",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 11,
+              "started_at": "2026-11-15T19:05:26Z",
+              "completed_at": "2026-11-15T19:05:26Z"
+            },
+            {
+              "name": "Prepare clean cloud Mac build tools and check Vulkan SDK ABI",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 12,
+              "started_at": "2026-11-15T19:05:26Z",
+              "completed_at": "2026-11-15T19:05:26Z"
+            },
+            {
+              "name": "Stage matching release resources",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 13,
+              "started_at": "2026-11-15T19:05:26Z",
+              "completed_at": "2026-11-15T19:05:26Z"
+            },
+            {
+              "name": "Verify exact unchanged release Metal shaders",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 14,
+              "started_at": "2026-11-15T19:05:26Z",
+              "completed_at": "2026-11-15T19:05:26Z"
+            },
+            {
+              "name": "Set up Java compiler for Android framework repair",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 15,
+              "started_at": "2026-11-15T19:05:26Z",
+              "completed_at": "2026-11-15T19:05:26Z"
+            },
+            {
+              "name": "Rebuild and exercise the repaired Java framework",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 16,
+              "started_at": "2026-11-15T19:05:26Z",
+              "completed_at": "2026-11-15T19:05:26Z"
+            },
+            {
+              "name": "Save verified Java component for future app-only builds",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 17,
+              "started_at": "2026-11-15T19:05:26Z",
+              "completed_at": "2026-11-15T19:05:26Z"
+            },
+            {
+              "name": "Verify unchanged driver independently",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 18,
+              "started_at": "2026-11-15T19:05:26Z",
+              "completed_at": "2026-11-15T19:05:26Z"
+            },
+            {
+              "name": "Save verified native driver for future app-only builds",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 19,
+              "started_at": "2026-11-15T19:05:26Z",
+              "completed_at": "2026-11-15T19:05:26Z"
+            },
+            {
+              "name": "Build and verify separate source Metal4 enhancements",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 20,
+              "started_at": "2026-11-15T19:05:26Z",
+              "completed_at": "2026-11-15T19:05:26Z"
+            },
+            {
+              "name": "Save verified source Metal4 framework for future app-only builds",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 21,
+              "started_at": "2026-11-15T19:05:26Z",
+              "completed_at": "2026-11-15T19:05:26Z"
+            },
+            {
+              "name": "Build pairing library with cached dependencies",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 22,
+              "started_at": "2026-11-15T19:05:26Z",
+              "completed_at": "2026-11-15T19:05:26Z"
+            },
+            {
+              "name": "Check staged project and every required library",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 23,
+              "started_at": "2026-11-15T19:05:26Z",
+              "completed_at": "2026-11-15T19:05:26Z"
+            },
+            {
+              "name": "Report all setup failures together before app compilation",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 24,
+              "started_at": "2026-11-15T19:05:26Z",
+              "completed_at": "2026-11-15T19:05:26Z"
+            },
+            {
+              "name": "Build and package fresh Duo IPA",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 25,
+              "started_at": "2026-11-15T19:05:26Z",
+              "completed_at": "2026-11-15T19:05:26Z"
+            },
+            {
+              "name": "Upload installable IPA",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 26,
+              "started_at": "2026-11-15T19:05:26Z",
+              "completed_at": "2026-11-15T19:05:26Z"
+            },
+            {
+              "name": "Save private build result",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 27,
+              "started_at": "2026-11-15T19:05:26Z",
+              "completed_at": "2026-11-15T19:05:29Z"
+            },
+            {
+              "name": "Upload build logs on failure",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 28,
+              "started_at": "2026-11-15T19:05:29Z",
+              "completed_at": "2026-11-15T19:05:30Z"
+            },
+            {
+              "name": "Post Check out private build repository",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 56,
+              "started_at": "2026-11-15T19:05:30Z",
+              "completed_at": "2026-11-15T19:05:31Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 57,
+              "started_at": "2026-11-15T19:05:31Z",
+              "completed_at": "2026-11-15T19:05:32Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/stride-praline-2f-ai/husk/check-runs/132922744170",
+          "labels": [
+            "xcode-27"
+          ],
+          "runner_id": 1000000744,
+          "runner_name": "GitHub Actions 1000000744",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        }
+      ]
+    },
+    {
+      "run_id": 43750636336,
+      "source": "a11643b4bba1ea8bd09b08e174ad1a38104d0e23",
+      "scope": "477 test executions/64 invocations/zero skips, all51 suites/font/SDK/all10 setup, matching drivers reused, fresh app/three extensions/package; downloaded IPA verified",
+      "jobs": [
+        {
+          "id": 132923575069,
+          "run_id": 43750636336,
+          "workflow_name": "Build Husk Duo IPA on GitHub-hosted Xcode 27",
+          "head_branch": "main",
+          "run_url": "https://api.github.com/repos/stride-praline-2f-ai/husk/actions/runs/43750636336",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVoPcwc8AAAAe8tzLHQ",
+          "head_sha": "13ee962c7aff678f2970dbd7e24d73cfea3bee1b",
+          "url": "https://api.github.com/repos/stride-praline-2f-ai/husk/actions/jobs/132923575069",
+          "html_url": "https://github.com/stride-praline-2f-ai/husk/actions/runs/43750636336/job/132923575069",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-11-15T19:07:29Z",
+          "started_at": "2026-11-15T19:07:32Z",
+          "completed_at": "2026-11-15T19:16:16Z",
+          "name": "Build Duo IPA with GitHub-hosted Xcode 27",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-11-15T19:07:33Z",
+              "completed_at": "2026-11-15T19:07:35Z"
+            },
+            {
+              "name": "Check out private build repository",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-11-15T19:07:35Z",
+              "completed_at": "2026-11-15T19:07:39Z"
+            },
+            {
+              "name": "Restore exact reviewed source",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-11-15T19:07:39Z",
+              "completed_at": "2026-11-15T19:07:45Z"
+            },
+            {
+              "name": "Check generated-frame sequence quality before rebuilding drivers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-11-15T19:07:45Z",
+              "completed_at": "2026-11-15T19:08:30Z"
+            },
+            {
+              "name": "Fingerprint reusable build components",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-11-15T19:08:30Z",
+              "completed_at": "2026-11-15T19:08:35Z"
+            },
+            {
+              "name": "Restore pinned tools downloads and Rust dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-11-15T19:08:35Z",
+              "completed_at": "2026-11-15T19:09:08Z"
+            },
+            {
+              "name": "Restore source-matched native driver component",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-11-15T19:09:08Z",
+              "completed_at": "2026-11-15T19:09:10Z"
+            },
+            {
+              "name": "Restore source-matched Java component",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-11-15T19:09:10Z",
+              "completed_at": "2026-11-15T19:09:12Z"
+            },
+            {
+              "name": "Restore source-matched Metal4 source component",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-11-15T19:09:12Z",
+              "completed_at": "2026-11-15T19:09:15Z"
+            },
+            {
+              "name": "Check every platform signing and packaging prerequisite",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-11-15T19:09:15Z",
+              "completed_at": "2026-11-15T19:09:18Z"
+            },
+            {
+              "name": "Run full regression suite including actual Duo policy",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-11-15T19:09:18Z",
+              "completed_at": "2026-11-15T19:11:11Z"
+            },
+            {
+              "name": "Prepare clean cloud Mac build tools and check Vulkan SDK ABI",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-11-15T19:11:11Z",
+              "completed_at": "2026-11-15T19:11:13Z"
+            },
+            {
+              "name": "Stage matching release resources",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-11-15T19:11:13Z",
+              "completed_at": "2026-11-15T19:11:16Z"
+            },
+            {
+              "name": "Verify exact unchanged release Metal shaders",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-11-15T19:11:16Z",
+              "completed_at": "2026-11-15T19:11:17Z"
+            },
+            {
+              "name": "Set up Java compiler for Android framework repair",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-11-15T19:11:17Z",
+              "completed_at": "2026-11-15T19:11:18Z"
+            },
+            {
+              "name": "Rebuild and exercise the repaired Java framework",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 16,
+              "started_at": "2026-11-15T19:11:18Z",
+              "completed_at": "2026-11-15T19:11:19Z"
+            },
+            {
+              "name": "Save verified Java component for future app-only builds",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 17,
+              "started_at": "2026-11-15T19:11:20Z",
+              "completed_at": "2026-11-15T19:11:20Z"
+            },
+            {
+              "name": "Verify unchanged driver independently",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-11-15T19:11:20Z",
+              "completed_at": "2026-11-15T19:11:26Z"
+            },
+            {
+              "name": "Save verified native driver for future app-only builds",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 19,
+              "started_at": "2026-11-15T19:11:26Z",
+              "completed_at": "2026-11-15T19:11:26Z"
+            },
+            {
+              "name": "Build and verify separate source Metal4 enhancements",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 20,
+              "started_at": "2026-11-15T19:11:26Z",
+              "completed_at": "2026-11-15T19:11:27Z"
+            },
+            {
+              "name": "Save verified source Metal4 framework for future app-only builds",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 21,
+              "started_at": "2026-11-15T19:11:27Z",
+              "completed_at": "2026-11-15T19:11:27Z"
+            },
+            {
+              "name": "Build pairing library with cached dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 22,
+              "started_at": "2026-11-15T19:11:27Z",
+              "completed_at": "2026-11-15T19:11:43Z"
+            },
+            {
+              "name": "Check staged project and every required library",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 23,
+              "started_at": "2026-11-15T19:11:43Z",
+              "completed_at": "2026-11-15T19:11:58Z"
+            },
+            {
+              "name": "Report all setup failures together before app compilation",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 24,
+              "started_at": "2026-11-15T19:11:58Z",
+              "completed_at": "2026-11-15T19:11:58Z"
+            },
+            {
+              "name": "Build and package fresh Duo IPA",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 25,
+              "started_at": "2026-11-15T19:11:58Z",
+              "completed_at": "2026-11-15T19:16:06Z"
+            },
+            {
+              "name": "Upload installable IPA",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 26,
+              "started_at": "2026-11-15T19:16:06Z",
+              "completed_at": "2026-11-15T19:16:10Z"
+            },
+            {
+              "name": "Save private build result",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 27,
+              "started_at": "2026-11-15T19:16:10Z",
+              "completed_at": "2026-11-15T19:16:11Z"
+            },
+            {
+              "name": "Upload build logs on failure",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 28,
+              "started_at": "2026-11-15T19:16:11Z",
+              "completed_at": "2026-11-15T19:16:11Z"
+            },
+            {
+              "name": "Post Set up Java compiler for Android framework repair",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 54,
+              "started_at": "2026-11-15T19:16:11Z",
+              "completed_at": "2026-11-15T19:16:12Z"
+            },
+            {
+              "name": "Post Restore pinned tools downloads and Rust dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 55,
+              "started_at": "2026-11-15T19:16:12Z",
+              "completed_at": "2026-11-15T19:16:12Z"
+            },
+            {
+              "name": "Post Check out private build repository",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 56,
+              "started_at": "2026-11-15T19:16:12Z",
+              "completed_at": "2026-11-15T19:16:12Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 57,
+              "started_at": "2026-11-15T19:16:12Z",
+              "completed_at": "2026-11-15T19:16:14Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/stride-praline-2f-ai/husk/check-runs/132923575069",
+          "labels": [
+            "xcode-27"
+          ],
+          "runner_id": 1000000745,
+          "runner_name": "GitHub Actions 1000000745",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        }
+      ]
+    }
+  ],
+  "artifact_id": 14175908315,
+  "artifact_url": "https://github.com/stride-praline-2f-ai/husk/actions/runs/43750636336/artifacts/14175908315",
+  "artifact_bytes": 154471840,
+  "artifact_sha256": "3e6de901c1c6631bc6c07393d4c04597629371a0b7b768dc0e929fc75d5c2e5f",
+  "ipa_bytes": 154471702,
+  "ipa_sha256": "05f25e43e9c775ead8b5cd6bb50fefe1f499d830aa572d04475c1dda7cf7aa68",
+  "physical_quality": "UNCONFIRMED; prior visual failure not erased by synthetic/build passes",
+  "energy": "UNMEASURED"
+}
