@@ -41,8 +41,8 @@ static void fgFail(){fgFailed=true;vkHuskFramegenPause(1);}
     CAMetalLayer* _layer;
     id<MTLDevice> _device;
     id<MTLCommandQueue> _queue;
-    id<MTLComputePipelineState> _flowPSO,_interpolatePSO,_copyPSO;
-    id<MTLTexture> _textures[4],_forward,_backward,_motionPrevious,_motionCurrent;
+    id<MTLComputePipelineState> _flowPSO,_interpolatePSO,_copyPSO,_coarsePSO,_regularizePSO,_qualityPSO;
+    id<MTLTexture> _textures[4],_forward,_backward,_motionPrevious,_motionCurrent,_coarseForward,_coarseBackward,_rawForward,_rawBackward,_quality;
     std::mutex _poolLock;
     std::condition_variable _poolWake;
     bool _used[4];
@@ -100,10 +100,11 @@ static void fgFail(){fgFailed=true;vkHuskFramegenPause(1);}
 @end
 
 static uint64_t fgStorageBytes(unsigned w,unsigned h){
+    uint64_t coarse=uint64_t((w+63)/64)*((h+63)/64)*16;
     uint64_t sources=uint64_t(w)*h*16,mips=0;
     uint64_t flow=uint64_t((w+15)/16)*((h+15)/16)*16;
     for(;;){mips+=uint64_t(w)*h*4;if(w==1&&h==1)break;w=std::max(1u,w/2);h=std::max(1u,h/2);}
-    return sources+2*mips+flow;
+    return sources+2*mips+flow+coarse+flow+16;
 }
 static id<MTLTexture> fgTexture(id<MTLDevice> device,NSUInteger w,NSUInteger h,MTLPixelFormat fmt,bool mipmapped=false){
     MTLTextureDescriptor* d=[MTLTextureDescriptor texture2DDescriptorWithPixelFormat:fmt width:w height:h mipmapped:mipmapped];
@@ -132,6 +133,11 @@ static void fgDispatch(id<MTLComputeCommandEncoder> e,id<MTLComputePipelineState
         if(flow)_flowPSO=[_device newComputePipelineStateWithFunction:flow error:&error];
         if(interp)_interpolatePSO=[_device newComputePipelineStateWithFunction:interp error:&error];
         if(copy)_copyPSO=[_device newComputePipelineStateWithFunction:copy error:&error];
+        id<MTLFunction> coarse=[lib newFunctionWithName:@"huskCoarseFlow"],regularize=[lib newFunctionWithName:@"huskRegularizeFlow"],quality=[lib newFunctionWithName:@"huskFlowQuality"];
+        if(coarse)_coarsePSO=[_device newComputePipelineStateWithFunction:coarse error:&error];
+        if(regularize)_regularizePSO=[_device newComputePipelineStateWithFunction:regularize error:&error];
+        if(quality)_qualityPSO=[_device newComputePipelineStateWithFunction:quality error:&error];
+        [coarse release];[regularize release];[quality release];
         [flow release];[interp release];[copy release];[lib release];
     }
     _queue=[_device newCommandQueue];
@@ -142,7 +148,11 @@ static void fgDispatch(id<MTLComputeCommandEncoder> e,id<MTLComputePipelineState
     _motionCurrent=fgTexture(_device,c.width,c.height,MTLPixelFormatBGRA8Unorm,true);
     NSUInteger fw=(c.width+15)/16,fh=(c.height+15)/16;
     _forward=fgTexture(_device,fw,fh,MTLPixelFormatRGBA16Float);_backward=fgTexture(_device,fw,fh,MTLPixelFormatRGBA16Float);
-    if(!_queue||!_flowPSO||!_interpolatePSO||!_copyPSO||!_textures[0]||!_textures[1]||!_textures[2]||!_textures[3]||!_forward||!_backward||!_motionPrevious||!_motionCurrent){[self release];return nil;}
+    _rawForward=fgTexture(_device,fw,fh,MTLPixelFormatRGBA16Float);_rawBackward=fgTexture(_device,fw,fh,MTLPixelFormatRGBA16Float);
+    _coarseForward=fgTexture(_device,(c.width+63)/64,(c.height+63)/64,MTLPixelFormatRGBA16Float);
+    _coarseBackward=fgTexture(_device,(c.width+63)/64,(c.height+63)/64,MTLPixelFormatRGBA16Float);
+    _quality=fgTexture(_device,1,1,MTLPixelFormatRGBA32Float);
+    if(!_coarsePSO||!_regularizePSO||!_qualityPSO||!_rawForward||!_rawBackward||!_coarseForward||!_coarseBackward||!_quality||!_queue||!_flowPSO||!_interpolatePSO||!_copyPSO||!_textures[0]||!_textures[1]||!_textures[2]||!_textures[3]||!_forward||!_backward||!_motionPrevious||!_motionCurrent){[self release];return nil;}
     dispatch_async(dispatch_get_main_queue(),^{
         if(_stopped.load())return;
         _link=[[CADisplayLink displayLinkWithTarget:self selector:@selector(tick:)] retain];
@@ -210,15 +220,23 @@ static void fgDispatch(id<MTLComputeCommandEncoder> e,id<MTLComputePipelineState
         }
         [reduce endEncoding];
         for(unsigned reverse=0;reverse<2;reverse++){
+            id<MTLTexture> prior=reverse?_motionCurrent:_motionPrevious,currentMotion=reverse?_motionPrevious:_motionCurrent;
+            id<MTLTexture> coarse=reverse?_coarseBackward:_coarseForward,raw=reverse?_rawBackward:_rawForward,final=reverse?_backward:_forward;
             id<MTLComputeCommandEncoder> e=[command computeCommandEncoder];
-            [e setTexture:reverse?_motionCurrent:_motionPrevious atIndex:0];
-            [e setTexture:reverse?_motionPrevious:_motionCurrent atIndex:1];
-            [e setTexture:reverse?_backward:_forward atIndex:2];
-            fgDispatch(e,_flowPSO,_forward.width,_forward.height);[e endEncoding];
+            [e setTexture:prior atIndex:0];[e setTexture:currentMotion atIndex:1];[e setTexture:coarse atIndex:2];
+            fgDispatch(e,_coarsePSO,coarse.width,coarse.height);[e endEncoding];
+            e=[command computeCommandEncoder];[e setTexture:prior atIndex:0];[e setTexture:currentMotion atIndex:1];[e setTexture:raw atIndex:2];[e setTexture:coarse atIndex:3];
+            fgDispatch(e,_flowPSO,raw.width,raw.height);[e endEncoding];
+            e=[command computeCommandEncoder];[e setTexture:prior atIndex:0];[e setTexture:currentMotion atIndex:1];[e setTexture:raw atIndex:2];[e setTexture:final atIndex:3];
+            fgDispatch(e,_regularizePSO,final.width,final.height);[e endEncoding];
         }
+        id<MTLComputeCommandEncoder> gate=[command computeCommandEncoder];
+        [gate setComputePipelineState:_qualityPSO];[gate setTexture:_forward atIndex:0];[gate setTexture:_backward atIndex:1];[gate setTexture:_quality atIndex:2];
+        uint32_t extent[2]={(uint32_t)output.width,(uint32_t)output.height};[gate setBytes:extent length:sizeof extent atIndex:0];
+        [gate dispatchThreadgroups:MTLSizeMake(1,1,1) threadsPerThreadgroup:MTLSizeMake(256,1,1)];[gate endEncoding];
         id<MTLComputeCommandEncoder> e=[command computeCommandEncoder];
         [e setTexture:previous.texture atIndex:0];[e setTexture:current.texture atIndex:1];
-        [e setTexture:_forward atIndex:2];[e setTexture:_backward atIndex:3];[e setTexture:output atIndex:4];
+        [e setTexture:_forward atIndex:2];[e setTexture:_backward atIndex:3];[e setTexture:output atIndex:4];[e setTexture:_quality atIndex:5];
         fgDispatch(e,_interpolatePSO,output.width,output.height);[e endEncoding];
     }else{
         id<MTLComputeCommandEncoder> e=[command computeCommandEncoder];[e setTexture:current.texture atIndex:0];[e setTexture:output atIndex:1];
@@ -234,7 +252,12 @@ static void fgDispatch(id<MTLComputeCommandEncoder> e,id<MTLComputePipelineState
                 fgCaptureCopy(command,current.texture,capture->_images[1],capture->_row)&&
                 fgCaptureCopy(command,output,capture->_images[2],capture->_row)&&
                 fgCaptureCopy(command,_forward,capture->_fields[0],capture->_flowRow)&&
-                fgCaptureCopy(command,_backward,capture->_fields[1],capture->_flowRow);
+                fgCaptureCopy(command,_backward,capture->_fields[1],capture->_flowRow)&&
+                fgCaptureCopy(command,_rawForward,capture->_fields[2],capture->_flowRow)&&
+                fgCaptureCopy(command,_rawBackward,capture->_fields[3],capture->_flowRow)&&
+                fgCaptureCopy(command,_coarseForward,capture->_fields[4],capture->_coarseRow)&&
+                fgCaptureCopy(command,_coarseBackward,capture->_fields[5],capture->_coarseRow)&&
+                fgCaptureCopy(command,_quality,capture->_quality,256);
             if(copied)_captureAwaitingReal=[capture retain];else fgCaptureFinish(capture,@"could not encode generated diagnostic copies");
         }
     }else if(_captureAwaitingReal&&_captureAwaitingReal->_currentSequence==current->_sequence){
@@ -265,6 +288,8 @@ static void fgDispatch(id<MTLComputeCommandEncoder> e,id<MTLComputePipelineState
     for(unsigned i=0;i<4;i++)[_textures[i] release];
     [_forward release];[_backward release];[_flowPSO release];[_interpolatePSO release];[_copyPSO release];
     [_motionPrevious release];[_motionCurrent release];
+    [_coarseForward release];[_coarseBackward release];[_rawForward release];[_rawBackward release];[_quality release];
+    [_coarsePSO release];[_regularizePSO release];[_qualityPSO release];
     [_queue release];[_device release];[_layer release];[_ready release];
     [_previous release];[_current release];
     if(_captureAwaitingReal){fgCaptureFinish(_captureAwaitingReal,@"presenter destroyed before capture completed");[_captureAwaitingReal release];}
@@ -282,7 +307,7 @@ extern "C" __attribute__((visibility("default"))) int vkHuskFramegenConfigure(co
     std::lock_guard<std::mutex> guard(fgManagerLock);if(!fgOwners.empty())return 0;
     if(c->enabled && (c->width<64||c->height<64||c->width>4096||c->height>4096||fgStorageBytes(c->width,c->height)>(96ULL<<20)))return 0;
     fgConfig=*c;fgFailed=false;fgPaused=false;
-    if(c->enabled)fprintf(stderr,"[M9-FRAMEGEN] model coherent-pyramid-continuous-v1; capture ABI1, opt-in only; logical textures %llu bytes; actual engine postprocessing is not observed\n",(unsigned long long)fgStorageBytes(c->width,c->height));return 1;
+    if(c->enabled)fprintf(stderr,"[M9-FRAMEGEN] model hierarchical-coherent-quality-v2; capture ABI1/schema2; consecutive opt-in output timestamps; whole-frame real fallback below80%% coherent tiles; slots are not unique generated images; capture ABI1, opt-in only; logical textures %llu bytes; actual engine postprocessing is not observed\n",(unsigned long long)fgStorageBytes(c->width,c->height));return 1;
 }
 extern "C" __attribute__((visibility("default"))) int vkHuskFramegenSnapshot(tl_fg_stats* s){
     if(!s||s->version!=1||s->size!=sizeof(*s))return 0;

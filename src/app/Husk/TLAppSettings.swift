@@ -398,7 +398,7 @@ struct TLAppSettingsView: View {
                     }
                     if settings.usesEfficientGraphics(for: app) && app.label.lowercased().contains("dungeons") {
                         Toggle("Dungeons Frame Generation (Beta)", isOn: Binding(get: { settings.frameGeneration }, set: { settings.selectFrameGeneration($0) }))
-                        Text(Metal4DriverCapabilities.current.frameGeneration ? "30 rendered → 60 output target, including generated images. With Metal 4 on, this enables Metal 4 Enhancements. May add artifacts and latency. Turn off to restore your rendered-FPS setting. Restart required." : "30 rendered → 60 output target, including generated images. May add artifacts and input latency. Enabling this selects MoltenVK and turns Metal 4 off. Restart required.")
+                        Text(Metal4DriverCapabilities.current.frameGeneration ? "30 rendered → 60 output target, including generated images. With Metal 4 on, this enables Metal 4 Enhancements. May add artifacts and latency; unreliable motion repeats a real frame. Turn off to restore your rendered-FPS setting. Restart required." : "30 rendered → 60 output target, including generated images. May add artifacts and input latency; unreliable motion repeats a real frame. Enabling this selects MoltenVK and turns Metal 4 off. Restart required.")
                             .font(.footnote).foregroundStyle(.secondary)
                         Button("Capture FG evidence") {
                             do { frameEvidenceMessage = try FramegenDiagnostics.arm(app: app, inUse: inUse) }

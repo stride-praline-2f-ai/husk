@@ -173,5 +173,10 @@ int main(){@autoreleasepool{
    self.assertEqual(half_pixel.returncode,5,half_pixel.stdout)
    self.assertIn('QUALITY_REJECT: camera pan quantized between independent tiles',half_pixel.stdout)
    print(half_pixel.stdout)
+   patchwork=subprocess.run([str(exe),str(ROOT/'tests/translation-layer/fixtures/framegen-169.metal')],text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=30)
+   self.assertEqual(patchwork.returncode,6,patchwork.stdout)
+   self.assertIn('QUALITY_REJECT: incoherent field produced patchwork intermediate',patchwork.stdout)
+   print(patchwork.stdout)
+
 
 if __name__=='__main__':unittest.main()

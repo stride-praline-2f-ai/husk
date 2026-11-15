@@ -9,6 +9,8 @@
 #include <cstring>
 #include <algorithm>
 #include <initializer_list>
+#include <vector>
+#include <array>
 
 static id<MTLTexture> texture(id<MTLDevice> device,NSUInteger w,NSUInteger h,MTLPixelFormat format,bool mips=false){
     auto*d=[MTLTextureDescriptor texture2DDescriptorWithPixelFormat:format width:w height:h mipmapped:mips];
@@ -18,6 +20,20 @@ static id<MTLTexture> texture(id<MTLDevice> device,NSUInteger w,NSUInteger h,MTL
 static void dispatch(id<MTLComputeCommandEncoder> encoder,id<MTLComputePipelineState> pipeline,NSUInteger w,NSUInteger h){
     [encoder setComputePipelineState:pipeline];
     [encoder dispatchThreads:MTLSizeMake(w,h,1) threadsPerThreadgroup:MTLSizeMake(8,8,1)];
+}
+static void motionPass(id<MTLCommandBuffer> command,id<MTLTexture> previous,id<MTLTexture> current,id<MTLTexture> output,
+                       id<MTLComputePipelineState> flow,id<MTLComputePipelineState> coarsePSO,id<MTLComputePipelineState> regularizePSO){
+    id<MTLTexture> raw=output,coarse=nil;
+    if(coarsePSO){
+        coarse=texture(previous.device,(previous.width+63)/64,(previous.height+63)/64,MTLPixelFormatRGBA16Float);
+        raw=texture(previous.device,output.width,output.height,MTLPixelFormatRGBA16Float);
+        auto e=[command computeCommandEncoder];[e setTexture:previous atIndex:0];[e setTexture:current atIndex:1];[e setTexture:coarse atIndex:2];dispatch(e,coarsePSO,coarse.width,coarse.height);[e endEncoding];
+    }
+    auto e=[command computeCommandEncoder];[e setTexture:previous atIndex:0];[e setTexture:current atIndex:1];[e setTexture:raw atIndex:2];if(coarse)[e setTexture:coarse atIndex:3];dispatch(e,flow,raw.width,raw.height);[e endEncoding];
+    if(coarse){
+        e=[command computeCommandEncoder];[e setTexture:previous atIndex:0];[e setTexture:current atIndex:1];[e setTexture:raw atIndex:2];[e setTexture:output atIndex:3];dispatch(e,regularizePSO,output.width,output.height);[e endEncoding];
+        [raw release];[coarse release];
+    }
 }
 int main(int argc,char**argv){@autoreleasepool{
     assert(argc==2);
@@ -35,6 +51,14 @@ int main(int argc,char**argv){@autoreleasepool{
     auto a=texture(device,64,64,MTLPixelFormatRGBA8Unorm,true),b=texture(device,64,64,MTLPixelFormatRGBA8Unorm,true);
     auto forward=texture(device,4,4,MTLPixelFormatRGBA16Float),backward=texture(device,4,4,MTLPixelFormatRGBA16Float);
     auto out=texture(device,64,64,MTLPixelFormatRGBA8Unorm);assert(a&&b&&forward&&backward&&out);
+    auto quality=texture(device,1,1,MTLPixelFormatRGBA32Float);
+    float allow[4]={1,0,0,1};[quality replaceRegion:MTLRegionMake2D(0,0,1,1) mipmapLevel:0 withBytes:allow bytesPerRow:16];
+    id<MTLFunction> cf=[library newFunctionWithName:@"huskCoarseFlow"],rf=[library newFunctionWithName:@"huskRegularizeFlow"],qf=[library newFunctionWithName:@"huskFlowQuality"];
+    id<MTLComputePipelineState> coarsePSO=cf?[device newComputePipelineStateWithFunction:cf error:&error]:nil;
+    id<MTLComputePipelineState> regularizePSO=rf?[device newComputePipelineStateWithFunction:rf error:&error]:nil;
+    id<MTLComputePipelineState> qualityPSO=qf?[device newComputePipelineStateWithFunction:qf error:&error]:nil;
+    if(cf||rf||qf)assert(coarsePSO&&regularizePSO&&qualityPSO);
+    [cf release];[rf release];[qf release];
     uint8_t pixels[64*64*4];
     auto queue=[device newCommandQueue];
     auto prepareMotion=[&](id<MTLCommandBuffer> command){auto blit=[command blitCommandEncoder];[blit generateMipmapsForTexture:a];[blit generateMipmapsForTexture:b];[blit endEncoding];};
@@ -49,11 +73,10 @@ int main(int argc,char**argv){@autoreleasepool{
     auto command=[queue commandBuffer];
     prepareMotion(command);
     for(unsigned reverse=0;reverse<2;reverse++){
-        auto e=[command computeCommandEncoder];[e setTexture:reverse?b:a atIndex:0];[e setTexture:reverse?a:b atIndex:1];
-        [e setTexture:reverse?backward:forward atIndex:2];dispatch(e,flow,4,4);[e endEncoding];
+        motionPass(command,reverse?b:a,reverse?a:b,reverse?backward:forward,flow,coarsePSO,regularizePSO);
     }
     auto e=[command computeCommandEncoder];[e setTexture:a atIndex:0];[e setTexture:b atIndex:1];
-    [e setTexture:forward atIndex:2];[e setTexture:backward atIndex:3];[e setTexture:out atIndex:4];dispatch(e,interpolate,64,64);[e endEncoding];
+    [e setTexture:forward atIndex:2];[e setTexture:backward atIndex:3];[e setTexture:out atIndex:4];[e setTexture:quality atIndex:5];dispatch(e,interpolate,64,64);[e endEncoding];
     [command commit];[command waitUntilCompleted];assert(command.status==MTLCommandBufferStatusCompleted);
     __fp16 vectors[4*4*4];[forward getBytes:vectors bytesPerRow:32 fromRegion:MTLRegionMake2D(0,0,4,4) mipmapLevel:0];
     assert(fabs((float)vectors[(2*4+2)*4]+(float)motion)<0.5f);
@@ -78,7 +101,7 @@ int main(int argc,char**argv){@autoreleasepool{
     auto interpolateOnly=[&]{
         auto command=[queue commandBuffer];auto e=[command computeCommandEncoder];
         [e setTexture:a atIndex:0];[e setTexture:b atIndex:1];[e setTexture:forward atIndex:2];
-        [e setTexture:backward atIndex:3];[e setTexture:out atIndex:4];dispatch(e,interpolate,64,64);[e endEncoding];
+        [e setTexture:backward atIndex:3];[e setTexture:out atIndex:4];[e setTexture:quality atIndex:5];dispatch(e,interpolate,64,64);[e endEncoding];
         [command commit];[command waitUntilCompleted];assert(command.status==MTLCommandBufferStatusCompleted);
         [out getBytes:pixels bytesPerRow:256 fromRegion:MTLRegionMake2D(0,0,64,64) mipmapLevel:0];
     };
@@ -195,11 +218,10 @@ int main(int argc,char**argv){@autoreleasepool{
     {
         auto command=[queue commandBuffer];prepareMotion(command);
         for(unsigned reverse=0;reverse<2;reverse++){
-            auto e=[command computeCommandEncoder];[e setTexture:reverse?b:a atIndex:0];[e setTexture:reverse?a:b atIndex:1];
-            [e setTexture:reverse?backward:forward atIndex:2];dispatch(e,flow,4,4);[e endEncoding];
+            motionPass(command,reverse?b:a,reverse?a:b,reverse?backward:forward,flow,coarsePSO,regularizePSO);
         }
         auto e=[command computeCommandEncoder];[e setTexture:a atIndex:0];[e setTexture:b atIndex:1];[e setTexture:forward atIndex:2];
-        [e setTexture:backward atIndex:3];[e setTexture:out atIndex:4];dispatch(e,interpolate,64,64);[e endEncoding];
+        [e setTexture:backward atIndex:3];[e setTexture:out atIndex:4];[e setTexture:quality atIndex:5];dispatch(e,interpolate,64,64);[e endEncoding];
         [command commit];[command waitUntilCompleted];assert(command.status==MTLCommandBufferStatusCompleted);
         [out getBytes:pixels bytesPerRow:256 fromRegion:MTLRegionMake2D(0,0,64,64) mipmapLevel:0];
         __fp16 vectors[64];[forward getBytes:vectors bytesPerRow:32 fromRegion:MTLRegionMake2D(0,0,4,4) mipmapLevel:0];
@@ -227,11 +249,10 @@ int main(int argc,char**argv){@autoreleasepool{
         auto command=[queue commandBuffer];
         prepareMotion(command);
         for(unsigned reverse=0;reverse<2;reverse++){
-            auto e=[command computeCommandEncoder];[e setTexture:reverse?b:a atIndex:0];[e setTexture:reverse?a:b atIndex:1];
-            [e setTexture:reverse?backward:forward atIndex:2];dispatch(e,flow,4,4);[e endEncoding];
+            motionPass(command,reverse?b:a,reverse?a:b,reverse?backward:forward,flow,coarsePSO,regularizePSO);
         }
         auto e=[command computeCommandEncoder];[e setTexture:a atIndex:0];[e setTexture:b atIndex:1];[e setTexture:forward atIndex:2];
-        [e setTexture:backward atIndex:3];[e setTexture:out atIndex:4];dispatch(e,interpolate,64,64);[e endEncoding];
+        [e setTexture:backward atIndex:3];[e setTexture:out atIndex:4];[e setTexture:quality atIndex:5];dispatch(e,interpolate,64,64);[e endEncoding];
         [command commit];[command waitUntilCompleted];assert(command.status==MTLCommandBufferStatusCompleted);
         __fp16 vectors[64];[forward getBytes:vectors bytesPerRow:32 fromRegion:MTLRegionMake2D(0,0,4,4) mipmapLevel:0];
         [out getBytes:pixels bytesPerRow:256 fromRegion:MTLRegionMake2D(0,0,64,64) mipmapLevel:0];
@@ -261,8 +282,7 @@ int main(int argc,char**argv){@autoreleasepool{
     {
         auto command=[queue commandBuffer];prepareMotion(command);
         for(unsigned reverse=0;reverse<2;reverse++){
-            auto e=[command computeCommandEncoder];[e setTexture:reverse?b:a atIndex:0];[e setTexture:reverse?a:b atIndex:1];
-            [e setTexture:reverse?backward:forward atIndex:2];dispatch(e,flow,4,4);[e endEncoding];
+            motionPass(command,reverse?b:a,reverse?a:b,reverse?backward:forward,flow,coarsePSO,regularizePSO);
         }
         [command commit];[command waitUntilCompleted];assert(command.status==MTLCommandBufferStatusCompleted);
         __fp16 vectors[64];[forward getBytes:vectors bytesPerRow:32 fromRegion:MTLRegionMake2D(0,0,4,4) mipmapLevel:0];
@@ -272,7 +292,59 @@ int main(int argc,char**argv){@autoreleasepool{
         }
     }
     puts("PASS: continuous two-axis textured camera pan is refined beyond half-pixel tile quantization");
+    // A coherent minority among inconsistent tiles must never produce a
+    // patchwork intermediate.169 admits scattered pixels from the minority.
+    for(unsigned v=0;v<16;v++){
+        bool valid=v%4<2;controlled[v*4]=valid?-4:20;controlled[v*4+1]=valid?0:20;controlled[v*4+2]=0;controlled[v*4+3]=1;
+    }
+    [forward replaceRegion:MTLRegionMake2D(0,0,4,4) mipmapLevel:0 withBytes:controlled bytesPerRow:32];
+    for(unsigned v=0;v<16;v++){controlled[v*4]=v%4<2?4:20;controlled[v*4+1]=v%4<2?0:20;}
+    [backward replaceRegion:MTLRegionMake2D(0,0,4,4) mipmapLevel:0 withBytes:controlled bytesPerRow:32];
+    if(qualityPSO){auto command=[queue commandBuffer];auto e=[command computeCommandEncoder];[e setComputePipelineState:qualityPSO];[e setTexture:forward atIndex:0];[e setTexture:backward atIndex:1];[e setTexture:quality atIndex:2];unsigned extent[2]={64,64};[e setBytes:extent length:sizeof extent atIndex:0];[e dispatchThreadgroups:MTLSizeMake(1,1,1) threadsPerThreadgroup:MTLSizeMake(256,1,1)];[e endEncoding];[command commit];[command waitUntilCompleted];assert(command.status==MTLCommandBufferStatusCompleted);}
+    [b getBytes:currentPixels bytesPerRow:256 fromRegion:MTLRegionMake2D(0,0,64,64) mipmapLevel:0];interpolateOnly();
+    if(memcmp(pixels,currentPixels,sizeof pixels)){fprintf(stderr,"QUALITY_REJECT: incoherent field produced patchwork intermediate\n");return 6;}
+    puts("PASS: poor field uses an exact whole-frame real fallback instead of scattered phase patches");
+    if(qualityPSO){
+        [quality getBytes:allow bytesPerRow:16 fromRegion:MTLRegionMake2D(0,0,1,1) mipmapLevel:0];assert(allow[0]<0.8f&&allow[3]==0);
+    }
+    if(qualityPSO){
+        // The quality guard must still admit genuine interpolation.
+        for(unsigned v=0;v<16;v++){controlled[v*4]=-4;controlled[v*4+1]=0;controlled[v*4+2]=0;controlled[v*4+3]=1;}
+        [forward replaceRegion:MTLRegionMake2D(0,0,4,4) mipmapLevel:0 withBytes:controlled bytesPerRow:32];
+        for(unsigned v=0;v<16;v++)controlled[v*4]=4;
+        [backward replaceRegion:MTLRegionMake2D(0,0,4,4) mipmapLevel:0 withBytes:controlled bytesPerRow:32];
+        auto command=[queue commandBuffer];auto e=[command computeCommandEncoder];[e setComputePipelineState:qualityPSO];[e setTexture:forward atIndex:0];[e setTexture:backward atIndex:1];[e setTexture:quality atIndex:2];unsigned extent[2]={64,64};[e setBytes:extent length:sizeof extent atIndex:0];[e dispatchThreadgroups:MTLSizeMake(1,1,1) threadsPerThreadgroup:MTLSizeMake(256,1,1)];[e endEncoding];[command commit];[command waitUntilCompleted];
+        [quality getBytes:allow bytesPerRow:16 fromRegion:MTLRegionMake2D(0,0,1,1) mipmapLevel:0];assert(allow[0]>=.8f&&allow[3]==1);
+        interpolateOnly();assert(memcmp(pixels,currentPixels,sizeof pixels));
+        puts("PASS: coherent field still produces a genuine intermediate; guard is not a blanket duplicate-frame mode");
+    }
+    // Repeated scenery, affine camera flow, temporal contamination/noise.
+    // This exercises multiple64px cells rather than a single clean translation.
+    {
+        const unsigned W=512,H=384,FW=W/16,FH=H/16;
+        auto previous=texture(device,W,H,MTLPixelFormatRGBA8Unorm,true),current=texture(device,W,H,MTLPixelFormatRGBA8Unorm,true);
+        auto result=texture(device,FW,FH,MTLPixelFormatRGBA16Float);
+        std::vector<uint8_t> scenePixels(W*H*4);
+        auto colour=[](float x,float y){return std::array<float,3>{105+32*sinf(.021f*x+.033f*y)+18*sinf(.91f*x+.23f*y)+9*cosf(.51f*x-.77f*y),110+29*cosf(.019f*x-.027f*y)+16*sinf(.71f*x-.43f*y)+11*cosf(.37f*x+.67f*y),100+33*sinf(.023f*x-.025f*y)+17*cosf(.83f*x+.29f*y)+10*sinf(.47f*x-.63f*y)};};
+        for(unsigned image=0;image<2;image++){
+            for(unsigned y=0;y<H;y++)for(unsigned x=0;x<W;x++){
+                auto original=colour(x,y),moved=colour(x+2.25f+.006f*y,y+7.25f+.012f*x);
+                for(unsigned c=0;c<3;c++){float value=image?.9f*moved[c]+.1f*original[c]+2*sinf(1.3f*x+.7f*y):original[c];scenePixels[(y*W+x)*4+c]=(uint8_t)std::clamp(lroundf(value),0L,255L);}
+                scenePixels[(y*W+x)*4+3]=255;
+            }
+            [(image?current:previous) replaceRegion:MTLRegionMake2D(0,0,W,H) mipmapLevel:0 withBytes:scenePixels.data() bytesPerRow:W*4];
+        }
+        auto command=[queue commandBuffer];auto blit=[command blitCommandEncoder];[blit generateMipmapsForTexture:previous];[blit generateMipmapsForTexture:current];[blit endEncoding];
+        motionPass(command,previous,current,result,flow,coarsePSO,regularizePSO);[command commit];[command waitUntilCompleted];assert(command.status==MTLCommandBufferStatusCompleted);
+        std::vector<__fp16> vectors(FW*FH*4);[result getBytes:vectors.data() bytesPerRow:FW*8 fromRegion:MTLRegionMake2D(0,0,FW,FH) mipmapLevel:0];std::vector<float> errors;
+        for(unsigned y=2;y<FH-2;y++)for(unsigned x=2;x<FW-2;x++){float px=(x+.5f)*16,py=(y+.5f)*16,dx=(float)vectors[(y*FW+x)*4]-(2.25f+.006f*py),dy=(float)vectors[(y*FW+x)*4+1]-(7.25f+.012f*px);errors.push_back(hypotf(dx,dy));}
+        std::sort(errors.begin(),errors.end());float p50=errors[errors.size()/2],p90=errors[errors.size()*9/10];
+        if(p50>.8f||p90>1.5f){fprintf(stderr,"QUALITY_REJECT: repeated scenery camera flow inaccurate (p50 %.4f p90 %.4f pixels)\n",p50,p90);return 7;}
+        printf("PASS: multi-cell repeated scenery with affine camera motion and temporal noise (p50 %.4f p90 %.4f pixels)\n",p50,p90);
+        [previous release];[current release];[result release];
+    }
     printf("PASS: real GPU shader compilation, bidirectional translation, intermediate image and real-frame copy on %s\n",device.name.UTF8String);
     [queue release];[a release];[b release];[forward release];[backward release];[out release];
+    [coarsePSO release];[regularizePSO release];[qualityPSO release];[quality release];
     [flow release];[interpolate release];[copy release];[f release];[i release];[c release];[library release];[options release];[device release];
 }return 0;}

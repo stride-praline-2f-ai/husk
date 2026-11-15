@@ -1014,7 +1014,7 @@ static void pace_efficient_frame(void)
         wait_requested_ns = wait_actual_ns = wait_excess_max_ns = wait_samples = 0;
     if(framegen_requested){
         tl_fg_stats fg;
-        if(tl_vk_framegen_snapshot(&fg))tl_log_line("[M9-FRAMEGEN] active %u failed %u; since-launch GPU-completed rendered %llu, presented real %llu/generated %llu, dropped %llu, resets %llu, GPU errors %llu; generated includes low-confidence real-image fallback; not energy or unique-pixel measurement",fg.active,fg.failed,(unsigned long long)fg.rendered,(unsigned long long)fg.presented_real,(unsigned long long)fg.generated,(unsigned long long)fg.dropped,(unsigned long long)fg.resets,(unsigned long long)fg.gpu_errors);
+        if(tl_vk_framegen_snapshot(&fg))tl_log_line("[M9-FRAMEGEN] active %u failed %u; since-launch GPU-completed rendered %llu, presented real %llu/generated %llu, dropped %llu, resets %llu, GPU errors %llu; generated slots include local or whole-frame real-image fallback; not energy or unique-pixel measurement",fg.active,fg.failed,(unsigned long long)fg.rendered,(unsigned long long)fg.presented_real,(unsigned long long)fg.generated,(unsigned long long)fg.dropped,(unsigned long long)fg.resets,(unsigned long long)fg.gpu_errors);
     }
         tl_dp_report();
         count = late = 0; report_at = now;

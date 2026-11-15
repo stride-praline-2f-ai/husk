@@ -22,47 +22,78 @@ float4 fgReproject(texture2d<float,access::sample> source,float2 uv){
     int2 base=int2(floor(pixel));float2 fraction=fract(pixel);
     if(all(fraction<0.00001f))return source.read(uint2(clamp(base,int2(0),extent-1)));
     float4 wx=fgCubicWeights(fraction.x),wy=fgCubicWeights(fraction.y);
+    float3 ax=float3(wx.x,wx.y+wx.z,wx.w),ay=float3(wy.x,wy.y+wy.z,wy.w);
+    float3 px=float3(float(base.x)-0.5f,float(base.x)+0.5f+wx.z/ax.y,float(base.x)+2.5f)/float(extent.x);
+    float3 py=float3(float(base.y)-0.5f,float(base.y)+0.5f+wy.z/ay.y,float(base.y)+2.5f)/float(extent.y);
     float4 value=0,low=INFINITY,high=-INFINITY;
-    for(int y=0;y<4;y++)for(int x=0;x<4;x++){
-        float4 texel=source.read(uint2(clamp(base+int2(x-1,y-1),int2(0),extent-1)));
-        value+=texel*wx[x]*wy[y];
-        if(x>=1&&x<=2&&y>=1&&y<=2){low=min(low,texel);high=max(high,texel);}
+    for(uint y=0;y<3;y++)for(uint x=0;x<3;x++)value+=source.sample(fgSampler,float2(px[x],py[y]))*ax[x]*ay[y];
+    for(int y=0;y<2;y++)for(int x=0;x<2;x++){
+        float4 texel=source.read(uint2(clamp(base+int2(x,y),int2(0),extent-1)));
+        low=min(low,texel);high=max(high,texel);
     }
     return clamp(value,low,high);
+}
+float fgPatchError(texture2d<float,access::sample> previous,
+                   texture2d<float,access::sample> current,float2 centre,
+                   float2 displacement,float spacing,uint lod){
+    float2 size=float2(current.get_width(),current.get_height());float error=0;
+    for(int y=-2;y<=2;y++)for(int x=-2;x<=2;x++){
+        float2 p=centre+float2(x,y)*spacing;
+        float3 a=previous.sample(fgSampler,(p+displacement)/size,level(float(lod))).rgb;
+        float3 b=current.sample(fgSampler,p/size,level(float(lod))).rgb;
+        error+=dot(abs(a-b),float3(0.2126f,0.7152f,0.0722f));
+    }
+    return error/25.0f;
+}
+// Estimate camera/surface motion on a64px grid FIRST. Independent wide
+// searches on every16px tile overfit grass/brick repetition and temporal noise.
+kernel void huskCoarseFlow(texture2d<float,access::sample> previous [[texture(0)]],
+                           texture2d<float,access::sample> current [[texture(1)]],
+                           texture2d<half,access::write> output [[texture(2)]],
+                           uint2 tid [[thread_position_in_grid]]){
+    if(any(tid>=uint2(output.get_width(),output.get_height())))return;
+    float2 size=float2(current.get_width(),current.get_height());
+    float2 centre=(float2(tid)+0.5f)*size/float2(output.get_width(),output.get_height());
+    float2 displacement=0;float residual=INFINITY;
+    for(uint stage=0;stage<2;stage++){
+        uint lod=min(2-stage,previous.get_num_mip_levels()-1);
+        float radius=stage?4.0f:16.0f,step=stage?1.0f:4.0f,spacing=stage?4.0f:12.0f;
+        float2 origin=displacement;float best=INFINITY;
+        for(float y=-radius;y<=radius;y+=step)for(float x=-radius;x<=radius;x+=step){
+            float2 candidate=origin+float2(x,y);
+            float error=fgPatchError(previous,current,centre,candidate,spacing,lod);
+            float score=error+0.000001f*dot(candidate,candidate);
+            if(score<best){best=score;residual=error;displacement=candidate;}
+        }
+    }
+    output.write(half4(half2(displacement),half(residual),1),tid);
 }
 kernel void huskFlow(texture2d<float,access::sample> previous [[texture(0)]],
                      texture2d<float,access::sample> current [[texture(1)]],
                      texture2d<half,access::write> flow [[texture(2)]],
+                     texture2d<float,access::sample> coarse [[texture(3)]],
                      uint2 tid [[thread_position_in_grid]]) {
     if(any(tid>=uint2(flow.get_width(),flow.get_height())))return;
     float2 size=float2(current.get_width(),current.get_height());
     float2 centre=(float2(tid)+0.5f)*size/float2(flow.get_width(),flow.get_height());
-    float best=INFINITY,residual=INFINITY;float2 displacement=0;
-    // Keep the bounded tile search, then resolve odd/fractional movement.
-    // The regularizer breaks ties; it must not dominate real correspondence
-    // or be reported as the photometric confidence error.
-    for(uint stage=0;stage<3;stage++){
-        float step=stage==0?4.0f:(stage==1?2.0f:0.5f);
-        uint lod=min(2-stage,previous.get_num_mip_levels()-1);
-        float spacing=3.0f*float(1u<<lod);
-        float radius=stage==0?16.0f:(stage==1?4.0f:1.0f);
-        float2 origin=stage?displacement:float2(0);
-        // Each filtered scale has a different residual distribution. Refine
-        // its own optimum instead of comparing a fine residual to a blurrier
-        // coarse residual and accidentally retaining the coarse displacement.
-        best=INFINITY;
-        for(float y=-radius;y<=radius;y+=step)for(float x=-radius;x<=radius;x+=step){
-            float2 candidate=origin+float2(x,y);float error=0;
-            for(int v=-1;v<=1;v++)for(int u=-1;u<=1;u++){
-                float2 p=centre+float2(u,v)*spacing;
-                float3 a=previous.sample(fgSampler,(p+candidate)/size,level(float(lod))).rgb;
-                float3 b=current.sample(fgSampler,p/size,level(float(lod))).rgb;
-                error+=dot(abs(a-b),float3(0.2126f,0.7152f,0.0722f));
-            }
-            error=error/9.0f;
-            float score=error+0.000001f*dot(candidate,candidate);
-            if(score<best){best=score;residual=error;displacement=candidate;}
+    float2 uv=centre/size,seed=coarse.sample(fgSampler,uv).xy;
+    float2 displacement=seed;float best=INFINITY,residual=INFINITY;
+    // Small residual search plus actual coarse corner hypotheses/zero. The
+    // wide search is paid only on the coarse grid, with a spatial prior.
+    for(uint choice=0;choice<14;choice++){
+        float2 candidate;
+        if(choice<9)candidate=seed+float2(int(choice%3)-1,int(choice/3)-1);
+        else if(choice==9)candidate=0;
+        else{
+            float2 grid=uv*float2(coarse.get_width(),coarse.get_height())-0.5f;
+            int2 pos=int2(floor(grid))+int2((choice-10)%2,(choice-10)/2);
+            pos=clamp(pos,int2(0),int2(coarse.get_width(),coarse.get_height())-1);
+            candidate=coarse.read(uint2(pos)).xy;
         }
+        float error=fgPatchError(previous,current,centre,candidate,2.0f,0);
+        float2 delta=candidate-seed;
+        float score=error+0.0005f*min(dot(delta,delta),4.0f);
+        if(score<best){best=score;residual=error;displacement=candidate;}
     }
     // Resolve continuous motion after the half-pixel search. Quantizing every
     // tile independently to0.5px makes a smooth camera pan vary across scenery.
@@ -87,26 +118,61 @@ kernel void huskFlow(texture2d<float,access::sample> previous [[texture(0)]],
         xx+=0.00001f;yy+=0.00001f;float determinant=xx*yy-xy*xy;
         if(determinant<=0.0000000001f)break;
         float2 delta=clamp(float2(xy*by-yy*bx,xy*bx-xx*by)/determinant,float2(-0.5f),float2(0.5f));
-        float2 candidate=displacement+delta;float error=0;
-        for(int v=-1;v<=1;v++)for(int u=-1;u<=1;u++){
-            float2 p=centre+float2(u,v)*3.0f;
-            error+=dot(abs(previous.sample(fgSampler,(p+candidate)/size).rgb-current.sample(fgSampler,p/size).rgb),weight);
-        }
-        error/=9.0f;
+        float2 candidate=displacement+delta;
+        float error=fgPatchError(previous,current,centre,candidate,2.0f,0);
         if(!isfinite(error)||error>=residual)break;
         residual=error;displacement=candidate;
     }
     flow.write(half4(half2(displacement),half(residual),1),tid);
+}
+// Remove isolated tile outliers without carrying stale residuals. A median
+// that materially worsens its own dense RGB evidence is rejected at boundaries.
+kernel void huskRegularizeFlow(texture2d<float,access::sample> previous [[texture(0)]],
+                               texture2d<float,access::sample> current [[texture(1)]],
+                               texture2d<float,access::read> raw [[texture(2)]],
+                               texture2d<half,access::write> output [[texture(3)]],
+                               uint2 tid [[thread_position_in_grid]]){
+    int2 extent=int2(output.get_width(),output.get_height());if(any(tid>=uint2(extent)))return;
+    float2 values[9];uint index=0;
+    for(int y=-1;y<=1;y++)for(int x=-1;x<=1;x++)values[index++]=raw.read(uint2(clamp(int2(tid)+int2(x,y),int2(0),extent-1))).xy;
+    for(uint i=1;i<9;i++)for(uint j=i;j>0;j--){float2 lo=min(values[j-1],values[j]),hi=max(values[j-1],values[j]);values[j-1]=lo;values[j]=hi;}
+    float4 own=raw.read(tid);float2 candidate=values[4];
+    float2 centre=(float2(tid)+0.5f)*float2(current.get_width(),current.get_height())/float2(extent);
+    float error=fgPatchError(previous,current,centre,candidate,2.0f,0);
+    if(!isfinite(error)||error>own.z+0.01f){candidate=own.xy;error=own.z;}
+    output.write(half4(half2(candidate),half(error),1),tid);
+}
+// One bounded256-thread reduction; GPU-only in ordinary use. A poor field
+// must not splice scattered intermediate patches into an otherwise real image.
+kernel void huskFlowQuality(texture2d<float,access::read> forward [[texture(0)]],
+                            texture2d<float,access::sample> backward [[texture(1)]],
+                            texture2d<float,access::write> output [[texture(2)]],
+                            constant uint2 &size [[buffer(0)]],
+                            uint lane [[thread_index_in_threadgroup]]){
+    threadgroup float3 votes[256];float3 count=0;
+    uint width=forward.get_width(),height=forward.get_height();
+    for(uint i=lane;i<width*height;i+=256){
+        uint2 p=uint2(i%width,i/width);float4 f=forward.read(p);
+        float2 uv=(float2(p)+0.5f)/float2(width,height),match=uv+f.xy/float2(size);
+        float4 b=backward.sample(fgSampler,match);float error=length(f.xy+b.xy);
+        bool valid=all(match>=0)&&all(match<=1)&&f.z<0.08f&&b.z<0.08f&&error<2.5f;
+        count+=float3(valid?1.0f:0.0f,isfinite(error)?min(error,64.0f):64.0f,length(f.xy)<0.5f?1.0f:0.0f);
+    }
+    votes[lane]=count;threadgroup_barrier(mem_flags::mem_threadgroup);
+    for(uint stride=128;stride;stride/=2){if(lane<stride)votes[lane]+=votes[lane+stride];threadgroup_barrier(mem_flags::mem_threadgroup);}
+    if(lane==0){float3 result=votes[0]/float(width*height);output.write(float4(result,result.x>=0.80f?1.0f:0.0f),uint2(0));}
 }
 kernel void huskInterpolate(texture2d<float,access::sample> previous [[texture(0)]],
                             texture2d<float,access::sample> current [[texture(1)]],
                             texture2d<float,access::sample> forward [[texture(2)]],
                             texture2d<float,access::sample> backward [[texture(3)]],
                             texture2d<half,access::write> output [[texture(4)]],
+                            texture2d<float,access::read> quality [[texture(5)]],
                             uint2 p [[thread_position_in_grid]]) {
     uint2 size=uint2(output.get_width(),output.get_height());if(any(p>=size))return;
     float2 uv=(float2(p)+0.5f)/float2(size);
     float4 result=current.sample(fgSampler,uv);
+    if(quality.read(uint2(0)).w<0.5f){output.write(half4(result),p);return;}
     float4 f=forward.sample(fgSampler,uv);
     float2 previousUV=uv+0.5f*f.xy/float2(size);
     float2 currentUV=uv-0.5f*f.xy/float2(size);
