@@ -146,7 +146,12 @@ int main(int argc,char**argv){@autoreleasepool{
     NSString*root=[NSString stringWithUTF8String:argv[1]];__block NSDictionary*record=nil;
     assert(eventually(p,^{NSData*d=[NSData dataWithContentsOfFile:[root stringByAppendingPathComponent:@"pair-01.json"]];if(d){[record release];record=[[NSJSONSerialization JSONObjectWithData:d options:0 error:nil]retain];}return [record[@"state"]isEqual:@"complete"];}));
     assert([record[@"files"]count]==11&&[record[@"generated_gpu_stage"]hasPrefix:@"reconstruction"]);
-    fgCaptureFlushTimings(fgCaptureSession);NSData*timingData=[NSData dataWithContentsOfFile:[root stringByAppendingPathComponent:@"consumer-timing.json"]];NSDictionary*timing=[NSJSONSerialization JSONObjectWithData:timingData options:0 error:nil];
+    // Pair metadata is published before the writer flushes timing metadata.
+    // Serialize this explicit flush with that writer: racing two O_EXCL temp
+    // writes can otherwise leave no completed timing file at this instant.
+    dispatch_sync(fgCaptureWriter(),^{fgCaptureFlushTimings(fgCaptureSession);});
+    NSData*timingData=[NSData dataWithContentsOfFile:[root stringByAppendingPathComponent:@"consumer-timing.json"]];assert(timingData);
+    NSDictionary*timing=[NSJSONSerialization JSONObjectWithData:timingData options:0 error:nil];
     bool sawPrep=false,sawGenerated=false,sawReal=false;for(NSDictionary*r in timing[@"records"]){if([r[@"kind"]isEqual:@"reconstruction"])sawPrep=true;if([r[@"kind"]isEqual:@"generated"])sawGenerated=true;if([r[@"kind"]isEqual:@"real"])sawReal=true;}
     assert([timing[@"schema"]intValue]==3&&sawPrep&&sawGenerated&&sawReal);
     capture.enabled=0;assert(vkHuskFramegenCaptureConfigure(&capture));[record release];[firstGate release];[copyGate release];[secondGate release];
