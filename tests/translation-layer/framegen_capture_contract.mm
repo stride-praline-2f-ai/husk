@@ -58,6 +58,11 @@ int main(int argc,char **argv){@autoreleasepool{
     id<MTLCommandBuffer> real=[queue commandBuffer];assert(fgCaptureCopy(real,textures[3],t->_images[3],t->_row));
     [real addCompletedHandler:^(id<MTLCommandBuffer> done){fgCaptureStage(t,false,done);}];[real commit];[real waitUntilCompleted];
     NSDictionary *r=record(root);assert([r[@"state"] isEqual:@"complete"]&&[r[@"files"] count]==11);
+    NSDictionary *measurements=r[@"image_measurements"];
+    assert([measurements[@"real_copy_vs_current"][@"maximum_rgb_difference_codes"] unsignedIntValue]==2);
+    assert(![measurements[@"real_copy_vs_current"][@"exact_rgb_copy"] boolValue]);
+    assert([measurements[@"real_copy_vs_current"][@"changed_rgb_gt1_pixels"] unsignedIntValue]==64);
+    assert([measurements[@"reconstruction_vs_current"][@"maximum_rgb_difference_codes"] unsignedIntValue]==1);
     for(unsigned i=0;i<11;i++){
         NSDictionary *meta=r[@"files"][i];NSData *data=[NSData dataWithContentsOfFile:[root stringByAppendingPathComponent:meta[@"file"]]];
         unsigned row=[meta[@"row_bytes"] unsignedIntValue],w=i>=8?1:(i>=4?2:8),h=i>=8?1:(i>=4?2:8),used=w*(i==10?16:(i>=4?8:4));

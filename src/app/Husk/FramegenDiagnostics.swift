@@ -6,6 +6,7 @@ import Metal
 /// One explicit evidence request, never an automatic screenshot recorder.
 @MainActor enum FramegenDiagnostics {
     private static var activeID: String?
+    private static var lastLaunch: (appID: String, values: [String: Any])?
     static var root: URL { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("Frame Evidence", isDirectory: true) }
     private static var pending: URL { root.appendingPathComponent("pending.json") }
     private static var latest: URL { root.appendingPathComponent("latest.json") }
@@ -48,12 +49,23 @@ import Metal
         guard let data = try? JSONEncoder().encode(TLAppSettings.load(id)), let value = try? JSONSerialization.jsonObject(with: data) else { return "UNAVAILABLE" }
         return value
     }
+    static func recordLaunch(apk: String, values: [String: Any]) {
+        let appID = URL(fileURLWithPath: apk).deletingLastPathComponent().lastPathComponent
+        lastLaunch = (appID, values)
+        guard let dir = activeID.flatMap({ folder($0) }),
+              let data = try? Data(contentsOf: dir.appendingPathComponent("host-session.json")),
+              var record = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              record["app_id"] as? String == appID else { return }
+        record["effective_launch"] = values
+        try? json(record, to: dir.appendingPathComponent("host-session.json"))
+    }
     static func arm(app: TLApp, inUse: Bool) throws -> String {
         let fm = FileManager.default; try fm.createDirectory(at: root, withIntermediateDirectories: true)
         let id = UUID().uuidString, dir = folder(id)!, frames = dir.appendingPathComponent("frames", isDirectory: true)
         try fm.createDirectory(at: frames, withIntermediateDirectories: true)
         var record = context
         record["app_id"] = app.id; record["game"] = app.label; record["capture_id"] = id
+        if let launch = lastLaunch, launch.appID == app.id { record["effective_launch"] = launch.values }
         record["saved_requested_settings"] = savedSettings(app.id); record["requested_engine_values"] = "requests only; actual runtime CVars unavailable"
         record["purpose"] = "Separate already-blurred guest input from framegen reconstruction and display timing; no screen recording needed"
         record["capture_overhead"] = "One pair; up to64MiB temporary staging; GPU readbacks/Utility file work are intrusive. Exclude these frames from performance comparisons."
@@ -112,14 +124,33 @@ import Metal
         }
         return "Capture incomplete: \(result["error"] ?? "reason unavailable"). Logs can still be shared."
     }
-    static func exportContext() throws -> (URL?, [URL], Data, URL) {
+    static func exportContext(appID: String? = nil) throws -> (URL?, [URL], Data, URL) {
         let fm = FileManager.default
         let out = root.appendingPathComponent("Exports", isDirectory: true); try fm.createDirectory(at: out, withIntermediateDirectories: true)
         let document = HuskLog.logFileURL.deletingLastPathComponent()
         let logs = [HuskLog.logFileURL, HuskLog.nativeLogURL, document.appendingPathComponent("husk-prev.log"), HuskLog.previousNativeLogURL]
-        let contextData = try JSONSerialization.data(withJSONObject: context, options: [.prettyPrinted, .sortedKeys])
+        var export = context
+        if let appID {
+            export["app_id"] = appID; export["saved_requested_settings_at_export"] = savedSettings(appID)
+            if let launch = lastLaunch, launch.appID == appID { export["effective_launch"] = launch.values }
+        }
+        var stats = tl_fg_stats()
+        if tl_vk_framegen_snapshot(&stats) {
+            let snapshot: [String: Any] = ["active": stats.active, "failed": stats.failed,
+                "rendered": stats.rendered, "generated_slots": stats.generated, "presented_real": stats.presented_real,
+                "dropped": stats.dropped, "resets": stats.resets, "gpu_errors": stats.gpu_errors]
+            export["framegen_runtime_snapshot"] = snapshot
+            export["counter_scope"] = "Process/driver counters at export, not per-pair counts or proof of unique generated images"
+        }
+        var capture = latestFolder
+        if let appID, let dir = capture {
+            let data = try? Data(contentsOf: dir.appendingPathComponent("host-session.json"))
+            let host = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+            if host?["app_id"] as? String != appID { capture = nil; export["capture_omission"] = "Latest capture belongs to another app" }
+        }
+        let contextData = try JSONSerialization.data(withJSONObject: export, options: [.prettyPrinted, .sortedKeys])
         let name = "Husk-Diagnostics-" + String(HuskLog.sessionID.prefix(8)) + "-" + String(UUID().uuidString.prefix(8)) + ".zip"
-        return (latestFolder, logs, contextData, out.appendingPathComponent(name))
+        return (capture, logs, contextData, out.appendingPathComponent(name))
     }
     static func pruneExports(keeping output: URL) {
         let fm = FileManager.default

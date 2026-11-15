@@ -46,13 +46,17 @@ struct EfficiencyProfilesView: View {
               fps: settings.efficientFrameRate.rawValue, worker: settings.workerScheduling.rawValue, submission: settings.vulkanSubmission.rawValue,
               spatial: settings.spatialUpscaling, spatialPercent: settings.spatialInputPercent, archive: settings.nativePipelineArchiveMode,
               archiveVerification: settings.nativeArchiveVerification, engineOnly: settings.engineOnlyLimiter,
-              clockTimed: settings.clockPresentation, clockFeedback: settings.feedbackClockCorrection, execution: settings.execution)
+              clockTimed: settings.clockPresentation, clockFeedback: settings.feedbackClockCorrection, execution: settings.execution,
+              automaticDuo: settings.automaticDuoProfile, a20Workers: settings.a20EfficiencyWorkers,
+              metal4: settings.metal4Renderer, enhancedMetal4: settings.enhancedMetal4, frameGeneration: settings.frameGeneration,
+              sharedMemory: settings.sharedMemoryReserve, displayResolution: settings.resolution.rawValue)
     }
     private func reload() { profiles = store.load(device: device, game: game) }
     private func save() {
         do {
-            let profile = EfficiencyProfile(name: name, device: device, game: game,
+            var profile = EfficiencyProfile(name: name, device: device, game: game,
                 build: Bundle.main.object(forInfoDictionaryKey: "HuskBuildCommit") as? String ?? "UNAVAILABLE", controls: selection)
+            profile.version = 2
             _ = try store.save(profile, device: device); reload(); message = "Saved for this device/game only. Performance and energy remain unverified."
         } catch { message = "Profile not saved: \(error.localizedDescription). Check settings/name or the 16-profile limit." }
     }
@@ -67,6 +71,17 @@ struct EfficiencyProfilesView: View {
                   let fps = TLAppSettings.EfficientFrameRate(rawValue: c.fps),
                   let worker = TLAppSettings.WorkerScheduling(rawValue: c.worker),
                   let submission = TLAppSettings.VulkanSubmission(rawValue: c.submission) else { throw EfficiencyProfile.Failure.invalid }
+            if p.version == 2 {
+                if c.enhancedMetal4 == true && !Metal4DriverCapabilities.current.nativeArchives { throw EfficiencyProfile.Failure.invalid }
+                if c.metal4 == true {
+                    guard #available(iOS 26.0, *), FileManager.default.fileExists(atPath: (Bundle.main.privateFrameworksPath ?? "") + "/KosmicKrisp.framework/KosmicKrisp") else { throw EfficiencyProfile.Failure.invalid }
+                }
+                if c.metal4 == true && c.frameGeneration == true && !Metal4DriverCapabilities.current.frameGeneration { throw EfficiencyProfile.Failure.invalid }
+                settings.automaticDuoProfile = c.automaticDuo!
+                settings.a20EfficiencyWorkers = c.a20Workers!
+                settings.metal4Renderer = c.metal4!; settings.enhancedMetal4 = c.enhancedMetal4!; settings.frameGeneration = c.frameGeneration!
+                settings.sharedMemoryReserve = c.sharedMemory!; settings.resolution = TLAppSettings.Resolution(rawValue: c.displayResolution!)!
+            }
             settings.unrealGraphics = graphics; settings.orientation = orientation; settings.window = window
             settings.efficientResolution = resolution; settings.customResolutionPercent = c.customPercent; settings.efficientFrameRate = fps
             settings.workerScheduling = worker; settings.vulkanSubmission = submission
@@ -75,7 +90,7 @@ struct EfficiencyProfilesView: View {
             settings.execution = c.execution ?? .init()
             settings.engineOnlyLimiter = c.engineOnly; settings.clockPresentation = c.clockTimed; settings.feedbackClockCorrection = c.clockFeedback
             settings.driverPhaseProfiling = false; settings.pipelineIdentification = false; settings.pipelineFeedback = false; settings.renderTargetInventory = false
-            message = "Applied \(p.name): \(c.fps) FPS, resolution budget \(c.resolution), worker \(c.worker), submission \(c.submission). Fully restart. Launch diagnostics reset OFF; session sampling controls are separate. Benefit unverified."
+            message = (p.version == 1 ? "Legacy partial profile: renderer, FG and automatic tuning retained. " : "Renderer, FG and device tuning restored. ") + "Applied \(p.name): \(c.fps) FPS, resolution budget \(c.resolution), worker \(c.worker), submission \(c.submission). Fully restart. Launch diagnostics reset OFF; session sampling controls are separate. Benefit unverified."
         } catch { message = "Profile rejected: device, game, version or controls do not match." }
     }
     private func restoreReference() {
@@ -84,6 +99,9 @@ struct EfficiencyProfilesView: View {
         settings.efficientResolution = .automatic; settings.efficientFrameRate = .smooth
         settings.workerScheduling = .balanced; settings.vulkanSubmission = .driverDefault
         settings.execution = .init()
+        settings.automaticDuoProfile = false; settings.a20EfficiencyWorkers = true
+        settings.metal4Renderer = false; settings.enhancedMetal4 = false; settings.frameGeneration = false
+        settings.sharedMemoryReserve = true; settings.resolution = .high
         settings.spatialUpscaling = false; settings.nativePipelineArchiveMode = 0; settings.nativeArchiveVerification = false
         settings.engineOnlyLimiter = false; settings.clockPresentation = false; settings.feedbackClockCorrection = false
         settings.driverPhaseProfiling = false; settings.pipelineIdentification = false; settings.pipelineFeedback = false; settings.renderTargetInventory = false
@@ -108,6 +126,7 @@ struct EfficiencyProfilesView: View {
                     ForEach(profiles) { p in
                         VStack(alignment: .leading, spacing: 5) {
                             Text(p.name).font(.headline)
+                            if p.version == 1 { Text("Legacy partial profile · renderer and FG were not saved").font(.caption) }
                             Text("\(p.controls.fps) FPS · budget \(p.controls.resolution) · spatial \(p.controls.spatial ? "ON" : "OFF") · worker \(p.controls.worker) · submit \(p.controls.submission)").font(.caption)
                             Button("Apply controls") { apply(p) }.disabled(blocked)
                             Button("Share profile") { do { exported = [try store.save(p, device: device)]; sharing = true } catch { message = error.localizedDescription } }.disabled(blocked)

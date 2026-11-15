@@ -44,6 +44,20 @@ class SettingsGroupingTests(unittest.TestCase):
         self.assertIn("EfficiencyMetricKitView()", advanced)
         self.assertIn("EfficiencyProfilesView(settings: $settings", simple)
 
+    def test_dungeons_single_routes_and_offline_controller_editor(self):
+        dungeons = GAME.split("    private var dungeonsSettings: some View {", 1)[1].split("    private var allSettings: some View {", 1)[0]
+        self.assertEqual(dungeons.count('Picker("Frame rate"'), 1)
+        self.assertEqual(dungeons.count('Picker("Resolution"'), 1)
+        self.assertNotIn('Picker("Frame Limit"', dungeons)
+        self.assertIn('NavigationLink("Diagnostics") { dungeonsDiagnostics }', dungeons)
+        self.assertIn('dungeons: true', dungeons)
+        self.assertIn('connectToGame: false', GAME)
+        bar = (ROOT / 'src/app/Husk/TLUnityView.swift').read_text().split('private var barControls: some View', 1)[1].split('private var logPanel:', 1)[0]
+        self.assertIn('engine == .ue4 && !settings.isDungeons(app)', bar)
+        self.assertIn('settings.padShown && !settings.isDungeons(app)', bar)
+        self.assertIn('Button { dismiss() }', bar)
+        self.assertIn('Button { toggleInterface() }', bar)
+
     def test_general_diagnostics_grouped_outside_about(self):
         self.assertIn('row(HuskDiagnosticsSettings()', APP)
         general = APP.split("struct HuskDiagnosticsSettings: View", 1)[1].split("struct AboutSettings: View", 1)[0]

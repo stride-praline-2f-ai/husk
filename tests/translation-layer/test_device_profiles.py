@@ -34,6 +34,19 @@ _=try reports.save(Data("{}".utf8));assert(reports.listed().count==8&&FileManage
 do{_=try reports.save(Data(repeating:32,count:1025));fatalError("accepted oversized report")}catch{}
 do{_=try reports.save(Data("not json".utf8));fatalError("accepted invalid JSON")}catch{}
 bad=first;bad.controls.execution=HuskExecutionOptions(prefill:3,commandBufferLimit:8,initializationParking:true);reject(bad)
+
+// v1 remains a partial profile; v2 must contain all modern launch choices.
+var modern=first;modern.version=2
+reject(modern)
+modern.controls.automaticDuo=false;modern.controls.a20Workers=true
+modern.controls.metal4=true;modern.controls.enhancedMetal4=true;modern.controls.frameGeneration=true
+modern.controls.sharedMemory=true;modern.controls.displayResolution="high";modern.controls.execution = .init()
+let validModern=try modern.validated(for:"iPad16,5");assert(validModern.version==2)
+let bytes=try JSONEncoder().encode(modern),roundtrip=try JSONDecoder().decode(EfficiencyProfile.self,from:bytes)
+assert(roundtrip.controls==modern.controls && roundtrip.version==2)
+bad=modern;bad.controls.enhancedMetal4=false;reject(bad)
+bad=modern;bad.controls.displayResolution="invalid";reject(bad)
+assert(first.controls.frameGeneration==nil && first.version==1)
 assert(!EfficiencyHardware.identifier().isEmpty)
 print("Actual device/game/profile constraints, bounded reads/capacity and owned OS-report rotation passed")
 ''')

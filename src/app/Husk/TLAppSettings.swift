@@ -236,7 +236,8 @@ struct TLAppSettings: Codable, Equatable {
         automaticDuoProfile && usesEfficientGraphics(for: app) && isDungeons(app)
     }
     @MainActor func duoAutomaticActive(for app: TLApp) -> Bool {
-        supportsDuoAutomatic(for: app) && DuoDisplayPolicy.metrics(screen: .main).isInner
+        supportsDuoAutomatic(for: app) && window != .window && (window != .auto || !AppWindows.defaultWindowed)
+            && DuoDisplayPolicy.metrics(screen: .main).isInner
     }
 
     @MainActor func renderScale(for app: TLApp) -> CGFloat {
@@ -388,8 +389,9 @@ struct TLAppSettingsView: View {
 
     var body: some View {
         Group {
-            if isDungeons && !advancedOnly { dungeonsSettings }
-            else { allSettings }
+            if isDungeons {
+                if advancedOnly { dungeonsAdvancedSettings } else { dungeonsSettings }
+            } else { allSettings }
         }
         .huskForm()
         .navigationTitle(isDungeons && advancedOnly ? "Advanced Settings" : "Settings")
@@ -418,55 +420,181 @@ struct TLAppSettingsView: View {
     private var dungeonsSettings: some View {
         HuskForm {
             Section {
-                if !settings.usesEfficientGraphics(for: app) {
-                    Button("Use recommended graphics") { settings.unrealGraphics = .automatic }
+                Picker("Graphics", selection: Binding(get: {
+                    settings.usesEfficientGraphics(for: app) ? TLAppSettings.UnrealGraphics.automatic : settings.unrealGraphics
+                }, set: {
+                    settings.unrealGraphics = $0
+                    if !settings.usesEfficientGraphics(for: app) { settings.selectFrameGeneration(false) }
+                })) {
+                    Text("Recommended").tag(TLAppSettings.UnrealGraphics.automatic)
+                    Text("Native high quality").tag(TLAppSettings.UnrealGraphics.sharpHigh)
+                    Text("Game default").tag(TLAppSettings.UnrealGraphics.gameDefault)
                 }
                 Picker("Frame rate", selection: Binding(get: {
                     settings.dungeonsFrameChoice(automaticActive: settings.duoAutomaticActive(for: app))
                 }, set: { settings.selectDungeonsFrameChoice($0, bridgeAvailable: Metal4DriverCapabilities.current.frameGeneration) })) {
                     Text("60 FPS").tag(60)
                     Text("30 FPS").tag(30)
-                    Text("60 FPS · Frame Generation (Beta)").tag(120)
-                }
-                .disabled(!settings.usesEfficientGraphics(for: app))
-                Picker("Resolution", selection: Binding(get: { settings.dungeonsResolutionChoice }, set: { settings.selectDungeonsResolutionChoice($0) })) {
+                    Text("30 → 60 · Frame Generation (Beta)").tag(120)
+                }.disabled(!settings.usesEfficientGraphics(for: app))
+                Picker("Resolution", selection: Binding(get: { settings.duoAutomaticActive(for: app) ? 0 : settings.dungeonsResolutionChoice }, set: { settings.selectDungeonsResolutionChoice($0) })) {
                     Text("Automatic").tag(0)
                     Text("Native").tag(100)
                     Text("Custom").tag(-1)
-                }
-                .disabled(!settings.usesEfficientGraphics(for: app))
-                if settings.dungeonsResolutionChoice == -1 {
-                    HStack(spacing: 12) {
+                }.disabled(!settings.usesEfficientGraphics(for: app))
+                if settings.dungeonsResolutionChoice == -1 && !settings.duoAutomaticActive(for: app) {
+                    HStack {
                         Slider(value: Binding(get: { Double(settings.dungeonsResolutionPercent) }, set: {
                             settings.customResolutionPercent = Int($0.rounded()); settings.efficientResolution = .custom; settings.automaticDuoProfile = false
                         }), in: 65...100, step: 1)
-                        Text("\(settings.dungeonsResolutionPercent)%").monospacedDigit().frame(width: 42, alignment: .trailing)
-                    }
-                    .disabled(!settings.usesEfficientGraphics(for: app))
+                        Text("\(settings.dungeonsResolutionPercent)%").monospacedDigit()
+                    }.disabled(!settings.usesEfficientGraphics(for: app))
                 }
+                LabeledContent("Output estimate", value: settings.fullscreenResolutionEstimate(for: app))
+                LabeledContent("Renderer", value: settings.metal4Renderer ? (settings.enhancedMetal4 ? "Metal 4" : "Metal 4 Compatibility") : "MoltenVK")
             } header: { Text(app.label) } footer: {
                 Text(settings.frameGeneration
-                     ? "Frame Generation renders at 30 FPS and targets 60 output images. Unreliable motion repeats a real frame. Restart Husk after graphics changes."
-                     : "\(settings.metal4Renderer ? "Metal 4" : "MoltenVK") · Restart Husk after graphics changes.")
+                     ? "30 rendered FPS → 60 output target. Generated images can contain artifacts; rejected motion repeats a real image. Graphics changes require a full restart."
+                     : "Graphics changes apply after fully closing and reopening Husk. Output size is an estimate; diagnostics report the actual launch.")
             }
             Section {
+                NavigationLink("Controls & display") { dungeonsControls }
+                NavigationLink("Advanced") { dungeonsAdvancedSettings }
+                NavigationLink("Diagnostics") { dungeonsDiagnostics }
+                NavigationLink("App details & storage") { dungeonsDetails }
+            }
+        }
+    }
+
+    private var dungeonsControls: some View {
+        HuskForm {
+            Section("Controller") {
                 Picker("On-screen controller", selection: $settings.pad) {
                     ForEach(TLAppSettings.PadMode.allCases) { Text($0.title).tag($0) }
                 }
-                Menu {
-                    Button("Capture frame evidence") {
-                        do { frameEvidenceMessage = try FramegenDiagnostics.arm(app: app, inUse: inUse) }
-                        catch { frameEvidenceMessage = error.localizedDescription }
-                    }.disabled(!settings.frameGeneration || frameEvidenceBusy)
-                    Button(frameEvidenceBusy ? "Preparing bundle…" : "Share diagnostic bundle") { exportFrameEvidence() }.disabled(frameEvidenceBusy)
-                    Button("Capture status") { frameEvidenceMessage = FramegenDiagnostics.status }
-                    Button("Cancel capture") { FramegenDiagnostics.cancelPending(); frameEvidenceMessage = "Capture cancelled. Saved evidence is kept." }
-                } label: { HStack { Text("Diagnostics"); Spacer(); Text(FramegenDiagnostics.conciseStatus).foregroundStyle(.secondary).font(.footnote) } }
-                NavigationLink("Advanced settings") { TLAppSettingsView(app: app, advancedOnly: true) }
-            } footer: {
-                if !frameEvidenceMessage.isEmpty { Text(frameEvidenceMessage) }
+                if settings.pad != .never {
+                    Slider(value: $settings.padOpacity, in: 0.3...1) { Text("Controller opacity") }
+                    Toggle("Vibrate on a press", isOn: $settings.haptics)
+                    NavigationLink("Edit controller layout") { DungeonsPadLayoutEditor(appID: app.id) }
+                        .disabled(inUse)
+                }
             }
-        }
+            Section("Display") {
+                Picker("Orientation", selection: $settings.orientation) {
+                    ForEach(TLAppSettings.Orientation.allCases) { Text($0.title).tag($0) }
+                }
+                Picker("Open in", selection: $settings.window) {
+                    ForEach(TLAppSettings.WindowMode.allCases) { Text($0.title).tag($0) }
+                }
+                Toggle("Performance readout", isOn: $settings.showStats)
+                Toggle("Start with interface hidden", isOn: $settings.cleanView)
+                Toggle("Keep the screen on", isOn: $settings.keepAwake)
+            }
+            Section {
+                Text("Three fingers show or hide the Husk bar. The bar keeps Close and controller visibility; settings and diagnostics live here. Edit the layout before loading the game. Display changes require a full restart.")
+            }
+        }.navigationTitle("Controls & Display")
+    }
+
+    private var dungeonsAdvancedSettings: some View {
+        HuskForm {
+            Section {
+                Picker("Renderer", selection: Binding(get: { settings.dungeonsRendererChoice }, set: {
+                    settings.selectDungeonsRendererChoice($0, bridgeAvailable: Metal4DriverCapabilities.current.nativeArchives)
+                })) {
+                    if #available(iOS 26.0, *), Metal4DriverCapabilities.current.nativeArchives { Text("Metal 4").tag(0) }
+                    if #available(iOS 26.0, *), FileManager.default.fileExists(atPath: (Bundle.main.privateFrameworksPath ?? "") + "/KosmicKrisp.framework/KosmicKrisp") { Text("Metal 4 Compatibility").tag(1) }
+                    Text("MoltenVK").tag(2)
+                }
+                if !settings.metal4Renderer {
+                    Toggle("MetalFX upscaling", isOn: Binding(get: { settings.duoAutomaticActive(for: app) || settings.spatialUpscaling }, set: { settings.spatialUpscaling = $0 }))
+                        .disabled(settings.duoAutomaticActive(for: app))
+                    if settings.spatialUpscaling || settings.duoAutomaticActive(for: app) {
+                        Picker("Input scale", selection: Binding(get: { settings.duoAutomaticActive(for: app) ? DuoDisplayPolicy.inputPercent : settings.spatialInputPercent }, set: { settings.spatialInputPercent = $0 })) {
+                            ForEach([80,85,90,95], id: \.self) { Text("\($0)% of output dimensions").tag($0) }
+                        }.disabled(settings.duoAutomaticActive(for: app))
+                    }
+                }
+                if !settings.metal4Renderer || settings.enhancedMetal4 {
+                    Picker("Native pipeline cache", selection: Binding(get: { settings.nativePipelineArchiveMode == 2 }, set: { settings.nativePipelineArchiveMode = $0 ? 2 : 0 })) {
+                        Text("Off").tag(false); Text("On").tag(true)
+                    }.disabled(settings.duoAutomaticActive(for: app) && !settings.metal4Renderer)
+                }
+                Toggle("Shared game memory", isOn: $settings.sharedMemoryReserve)
+            } header: { Text("Graphics & Memory") } footer: {
+                Text("MetalFX uses a smaller input before scaling to the selected output and is available only with MoltenVK. Native caches reuse compatible pipelines; first-use compilation can remain. Shared memory requires supported hardware and installed helper extensions.")
+            }
+            Section {
+                if DuoDisplayPolicy.metrics(screen: .main).isInner {
+                    Toggle("Automatic device tuning", isOn: $settings.automaticDuoProfile)
+                    if DuoDisplayPolicy.supportsA20Workers {
+                        Toggle("A20 efficiency workers", isOn: $settings.a20EfficiencyWorkers)
+                            .disabled(!settings.duoAutomaticActive(for: app))
+                    }
+                }
+                if settings.duoAutomaticActive(for: app) {
+                    Text("Active: automatic worker policy, driver-default queues and MetalFX 80% on MoltenVK. Saved manual experiments are retained but overridden. Diagnostics remain available.")
+                }
+                Button("Saved graphics experiments") { profilesSheet = true }
+                    .sheet(isPresented: $profilesSheet) { EfficiencyProfilesView(settings: $settings, game: app.packageName ?? app.label) }
+                NavigationLink("Developer experiments") {
+                    TLGameAdvancedSettingsView(settings: $settings, appID: app.id, automaticDuoActive: settings.duoAutomaticActive(for: app), dungeons: true)
+                }
+            } header: { Text("Device Tuning") } footer: {
+                Text("Automatic tuning applies only to the supported inner display in full screen. Restart after changing these controls. No measured energy benefit is assumed.")
+            }
+        }.navigationTitle("Advanced")
+    }
+
+    private var dungeonsDiagnostics: some View {
+        HuskForm {
+            Section {
+                Button("Capture frame-generation evidence") {
+                    do { frameEvidenceMessage = try FramegenDiagnostics.arm(app: app, inUse: inUse) }
+                    catch { frameEvidenceMessage = error.localizedDescription }
+                }.disabled(!settings.frameGeneration || frameEvidenceBusy)
+                Button("Capture status") { frameEvidenceMessage = FramegenDiagnostics.status }
+                Button("Cancel capture") { FramegenDiagnostics.cancelPending(); frameEvidenceMessage = "Capture cancelled. Existing files are kept." }
+                Button(frameEvidenceBusy ? "Preparing bundle…" : "Share diagnostic bundle") { exportFrameEvidence() }.disabled(frameEvidenceBusy)
+                Text(frameEvidenceMessage.isEmpty ? FramegenDiagnostics.status : frameEvidenceMessage)
+            } header: { Text("Image Quality") } footer: {
+                Text("Capture is opt-in and local. It saves source images, reconstructed output, flow fields, quality decisions and timing. Export includes measured image differences; missing evidence stays unavailable. No recording or automatic upload.")
+            }
+            Section("Performance & Cache") {
+                NavigationLink("Performance test & cache inspection") { EfficiencyDiagnosticsView() }
+                NavigationLink("Delayed OS reports") { EfficiencyMetricKitView() }
+            }
+            Section {
+                Toggle("Render-target inventory", isOn: $settings.renderTargetInventory)
+                Toggle("Driver phase profiling", isOn: $settings.driverPhaseProfiling)
+                Picker("Pipeline detail", selection: Binding(get: { settings.pipelineIdentification ? (settings.pipelineFeedback ? 2 : 1) : 0 }, set: {
+                    settings.pipelineIdentification = $0 > 0; settings.pipelineFeedback = $0 == 2
+                })) {
+                    Text("Off").tag(0); Text("Identification").tag(1); Text("Identification & feedback").tag(2)
+                }
+                Toggle("Verify native archive reuse", isOn: $settings.nativeArchiveVerification)
+                    .disabled(settings.nativePipelineArchiveMode != 2 || (settings.metal4Renderer && !settings.enhancedMetal4))
+            } header: { Text("Detailed Collection") } footer: {
+                Text(settings.duoAutomaticActive(for: app)
+                     ? "Automatic device tuning overrides detailed launch collection. Turn it off in Advanced to use these saved options. Capture, sharing and performance reports remain accessible."
+                     : "Detailed collection adds overhead and needs a full restart. Leave it off during normal play.")
+            }.disabled(settings.duoAutomaticActive(for: app))
+        }.navigationTitle("Diagnostics")
+    }
+
+    private var dungeonsDetails: some View {
+        HuskForm {
+            Section("App") {
+                TextField("Name", text: $name).focused($nameFocused).onSubmit { rename() }
+                Button("Add to Home Screen") { AppClip.generate(for: app) }
+            }
+            Section {
+                LabeledContent("Saved by the game", value: dataSize)
+                Button("Reset Game Data", role: .destructive) { confirmReset = true }.disabled(inUse || dataDirs.isEmpty)
+            } header: { Text("Storage") } footer: {
+                Text("Reset deletes saves, downloaded data and game caches. Graphics changes and profile changes never reset game data.")
+            }
+        }.navigationTitle("App Details")
     }
 
     private var allSettings: some View {
@@ -539,22 +667,6 @@ struct TLAppSettingsView: View {
                                 .font(.footnote).foregroundStyle(.secondary)
                         }
                         }
-                    }
-                    if settings.usesEfficientGraphics(for: app) && isDungeons && !advancedOnly {
-                        Toggle("Dungeons Frame Generation (Beta)", isOn: Binding(get: { settings.frameGeneration }, set: { settings.selectFrameGeneration($0) }))
-                        Text(Metal4DriverCapabilities.current.frameGeneration ? "30 rendered → 60 output target, including generated images. With Metal 4 on, this enables Metal 4 Enhancements. May add artifacts and latency; unreliable motion repeats a real frame. Turn off to restore your rendered-FPS setting. Restart required." : "30 rendered → 60 output target, including generated images. May add artifacts and input latency; unreliable motion repeats a real frame. Enabling this selects MoltenVK and turns Metal 4 off. Restart required.")
-                            .font(.footnote).foregroundStyle(.secondary)
-                        Button("Capture FG evidence") {
-                            do { frameEvidenceMessage = try FramegenDiagnostics.arm(app: app, inUse: inUse) }
-                            catch { frameEvidenceMessage = error.localizedDescription }
-                        }.disabled(frameEvidenceBusy || !settings.frameGeneration)
-                        Button(frameEvidenceBusy ? "Preparing diagnostic bundle…" : "Share diagnostic bundle") { exportFrameEvidence() }
-                            .disabled(frameEvidenceBusy)
-                        Button("Cancel queued capture") { FramegenDiagnostics.cancelPending(); frameEvidenceMessage = "Capture cancelled. Existing files are kept." }
-                        Text(frameEvidenceMessage.isEmpty ? FramegenDiagnostics.status : frameEvidenceMessage)
-                            .font(.footnote).foregroundStyle(.secondary)
-                        Text("Optional: saves one matched image set locally. Capture adds temporary GPU and file work. Share combines images and logs in one ZIP; nothing uploads automatically. Stop viewing if uncomfortable.")
-                            .font(.footnote).foregroundStyle(.secondary)
                     }
                     Toggle("Shared Game Memory", isOn: $settings.sharedMemoryReserve)
                     Text("Borrows extra game memory on iPhone when supported. Keep app extensions when installing; an additional App ID may be needed. Restart required.")
@@ -698,7 +810,7 @@ struct TLAppSettingsView: View {
 
     private func exportFrameEvidence() {
         do {
-            let (capture, logs, context, output) = try FramegenDiagnostics.exportContext()
+            let (capture, logs, context, output) = try FramegenDiagnostics.exportContext(appID: app.id)
             frameEvidenceBusy = true
             DispatchQueue.global(qos: .utility).async {
                 do {
@@ -762,12 +874,14 @@ private struct TLGameAdvancedSettingsView: View {
     @Binding var settings: TLAppSettings
     let appID: String
     let automaticDuoActive: Bool
+    var dungeons = false
 
     @State private var efficiencySheet = false
     @State private var metricKitSheet = false
 
     var body: some View {
         HuskForm {
+            if !dungeons {
             Section {
                 Toggle("MetalFX Spatial (Experimental)", isOn: $settings.spatialUpscaling)
                 if settings.spatialUpscaling {
@@ -784,13 +898,26 @@ private struct TLGameAdvancedSettingsView: View {
                 Text("MetalFX renders at a smaller input size and upscales the image, including HUD text. Render Target Inventory logs image sizes to help diagnose it. Both require a restart; results and energy savings are unverified.")
             }
 
+            }
             Section {
                 Picker("Worker Scheduling", selection: $settings.workerScheduling) {
                     ForEach(TLAppSettings.WorkerScheduling.allCases) { Text($0.title).tag($0) }
                 }
-                Toggle("Engine-only 60 FPS Limiter (Diagnostic)", isOn: $settings.engineOnlyLimiter)
-                Toggle("Guest-Clock Feedback Only (Experimental)", isOn: $settings.feedbackClockCorrection)
-                Toggle("Clock-Correct Presentation (Experimental)", isOn: $settings.clockPresentation)
+                Toggle(dungeons ? "Engine-only limiter comparison" : "Engine-only 60 FPS Limiter (Diagnostic)", isOn: $settings.engineOnlyLimiter)
+                if dungeons {
+                    if !settings.metal4Renderer && !settings.frameGeneration {
+                        Picker("Clock experiment", selection: Binding(get: { settings.clockPresentation && settings.feedbackClockCorrection ? 3 : (settings.clockPresentation ? 2 : (settings.feedbackClockCorrection ? 1 : 0)) }, set: {
+                            settings.feedbackClockCorrection = $0 == 1 || $0 == 3
+                            settings.clockPresentation = $0 == 2 || $0 == 3
+                        })) {
+                            Text("Off").tag(0); Text("Guest feedback").tag(1); Text("Clock presentation").tag(2)
+                            if settings.clockPresentation && settings.feedbackClockCorrection { Text("Legacy combined values").tag(3) }
+                        }
+                    }
+                } else {
+                    Toggle("Guest-Clock Feedback Only (Experimental)", isOn: $settings.feedbackClockCorrection)
+                    Toggle("Clock-Correct Presentation (Experimental)", isOn: $settings.clockPresentation)
+                }
             } header: {
                 Text("Frame Pacing & CPU")
             } footer: {
@@ -798,6 +925,7 @@ private struct TLGameAdvancedSettingsView: View {
             }
 
             Section {
+                if !dungeons || !settings.metal4Renderer {
                 Picker("Vulkan Submission", selection: $settings.vulkanSubmission) {
                     ForEach(TLAppSettings.VulkanSubmission.allCases) { Text($0.title).tag($0) }
                 }
@@ -811,6 +939,7 @@ private struct TLGameAdvancedSettingsView: View {
                     Text("Driver Default").tag(0)
                     ForEach([8, 16, 32, 64], id: \.self) { Text("\($0) per queue").tag($0) }
                 }
+                }
                 Picker("Swapchain Images (Experimental)", selection: $settings.execution.swapchainImages) {
                     Text("Game Default").tag(0)
                     Text("Two Images").tag(2)
@@ -823,6 +952,13 @@ private struct TLGameAdvancedSettingsView: View {
                 Text("Defaults preserve the normal driver. Swapchain overrides apply only inside the surface's reported limits. Queue and wait settings can affect stability or memory, so compare one at a time after a full restart.")
             }
 
+            if dungeons {
+                if !settings.metal4Renderer {
+                    Section("Cache Comparison") {
+                        Toggle("Driver-only cache comparison", isOn: Binding(get: { settings.nativePipelineArchiveMode == 1 }, set: { settings.nativePipelineArchiveMode = $0 ? 1 : 0 }))
+                    }
+                }
+            } else {
             Section {
                 Picker("Native Pipeline Cache (Experimental)", selection: $settings.nativePipelineArchiveMode) {
                     Text("Off").tag(0)
@@ -851,10 +987,41 @@ private struct TLGameAdvancedSettingsView: View {
             } footer: {
                 Text("Collect general performance evidence here. Driver profiling adds overhead; MetricKit reports can arrive later. Full crash reports and device checks are in Husk Settings > Diagnostics & Logs.")
             }
+            }
         }
         .huskForm()
         .disabled(automaticDuoActive)
-        .navigationTitle("Advanced & Diagnostics")
+        .navigationTitle(dungeons ? "Developer Experiments" : "Advanced & Diagnostics")
         .onChange(of: settings) { $0.save(appID) }
+    }
+}
+
+/// Offline layout editor: does not register a guest controller or load a game.
+private struct DungeonsPadLayoutEditor: View {
+    let appID: String
+    @StateObject private var pad = VirtualPad()
+    @State private var layout = PadLayout()
+    @State private var selected: String?
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            VirtualPadView(pad: pad, haptics: false, layout: layout, editing: true, connectToGame: false, selected: $selected,
+                           onChange: { layout = $0; layout.save(appID) })
+            VStack(spacing: 8) {
+                if let id = selected {
+                    Text(PadLayout.name(id))
+                    Slider(value: Binding(get: { Double(layout[id].scale) }, set: { layout[id].scale = CGFloat($0); layout.save(appID) }), in: 0.6...1.8)
+                        .frame(width: 180)
+                    Button(layout[id].hidden ? "Show control" : "Hide control") { layout[id].hidden.toggle(); layout.save(appID) }
+                    Button("Reset control") { layout[id] = PadLayout.Adjust(); layout.save(appID) }
+                } else {
+                    Text("Drag a control, or tap it to resize or hide it.").multilineTextAlignment(.center).frame(width: 200)
+                }
+                Button("Reset layout", role: .destructive) { layout = PadLayout(); selected = nil; layout.save(appID) }
+            }.padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+        }
+        .navigationTitle("Controller Layout")
+        .onAppear { layout = PadLayout.load(appID); HuskOrientation.set(.landscape) }
+        .onDisappear { HuskOrientation.set(HuskOrientation.standard) }
     }
 }

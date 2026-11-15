@@ -372,6 +372,34 @@ int main(int argc,char**argv){@autoreleasepool{
         printf("PASS: multi-cell repeated scenery with affine camera motion and temporal noise (p50 %.4f p90 %.4f pixels)\n",p50,p90);
         [previous release];[current release];[result release];[debugCoarse release];[debugRaw release];debugCoarse=nil;debugRaw=nil;
     }
+    // An injected affine field isolates reconstruction coordinates from the
+    // estimator. f(q)=0.5*q-24 maps CURRENT pixel centres to previous ones.
+    // Solve q+f(q)/2=p; looking up f(p) smears the moving ramp by >3 codes.
+    for(unsigned image=0;image<2;image++){
+        for(unsigned y=0;y<64;y++)for(unsigned x=0;x<64;x++){
+            float q=image?float(x):((x+.5f+24)/1.5f-.5f);
+            uint8_t value=(uint8_t)std::clamp(lroundf(4*q),0L,255L);
+            unsigned k=(y*64+x)*4;
+            pixels[k]=pixels[k+1]=pixels[k+2]=value;pixels[k+3]=255;
+        }
+        [(image?b:a) replaceRegion:MTLRegionMake2D(0,0,64,64) mipmapLevel:0 withBytes:pixels bytesPerRow:256];
+    }
+    for(unsigned reverse=0;reverse<2;reverse++){
+        for(unsigned y=0;y<4;y++)for(unsigned x=0;x<4;x++){
+            unsigned k=(y*4+x)*4;float centre=(x+.5f)*16;
+            controlled[k]=reverse?16-centre/3:.5f*centre-24;
+            controlled[k+1]=0;controlled[k+2]=.01f;controlled[k+3]=1;
+        }
+        [(reverse?backward:forward) replaceRegion:MTLRegionMake2D(0,0,4,4) mipmapLevel:0 withBytes:controlled bytesPerRow:32];
+    }
+    interpolateOnly();
+    for(unsigned x=24;x<=40;x++){
+        float expected=4*((x+.5f+12)/1.25f-.5f);
+        if(fabs(pixels[(32*64+x)*4]-expected)>1.1f){
+            fprintf(stderr,"QUALITY_REJECT: affine midpoint uses output-anchored flow (x %u output %u expected %.3f)\n",x,pixels[(32*64+x)*4],expected);return 10;
+        }
+    }
+    puts("PASS: affine midpoint samples motion in current-frame coordinates");
     printf("PASS: real GPU shader compilation, bidirectional translation, intermediate image and real-frame copy on %s\n",device.name.UTF8String);
     [queue release];[a release];[b release];[forward release];[backward release];[out release];
     [coarsePSO release];[regularizePSO release];[qualityPSO release];[quality release];

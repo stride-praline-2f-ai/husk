@@ -48,11 +48,36 @@ enum FrameEvidenceFiles {
     private static func safeName(_ name: String) -> Bool {
         !name.isEmpty && name.utf8.count < 100 && !name.contains("/") && !name.contains("\\") && !name.contains("..") && !name.hasPrefix(".")
     }
+    // Metadata-only assessment of MEASURED stages. Never guesses an engine
+    // setting, perceptual blur cause, or missing presentation callback.
+    static func assessment(_ pair: [String: Any]) -> [String: Any] {
+        var findings: [String] = []
+        let measurements = pair["image_measurements"] as? [String: Any]
+        if let real = measurements?["real_copy_vs_current"] as? [String: Any],
+           let exact = real["exact_rgb_copy"] as? Bool {
+            findings.append(exact ? "Following real RGB is an exact source copy" : "DEFECT: following real RGB differs from its matched source")
+        }
+        if let quality = pair["reconstruction_quality"] as? [String: Any],
+           let admitted = quality["interpolation_admitted"] as? Bool {
+            findings.append(admitted ? "GPU admitted interpolation; inspect local motion/occlusion guards" : "GPU rejected the field: whole-frame real fallback")
+        }
+        if let reconstructed = measurements?["reconstruction_vs_current"] as? [String: Any],
+           reconstructed["exact_rgb_copy"] as? Bool == true {
+            findings.append("Generated slot repeats current RGB; not a unique interpolated image")
+        }
+        return ["pair_id": pair["pair_id"] ?? NSNull(), "state": pair["state"] ?? "UNAVAILABLE",
+            "previous_source_sequence": pair["previous_source_sequence"] ?? NSNull(),
+            "current_source_sequence": pair["current_source_sequence"] ?? NSNull(), "epoch": pair["epoch"] ?? NSNull(),
+            "findings": findings, "image_measurements": measurements ?? [:],
+            "quality": pair["reconstruction_quality"] ?? NSNull(),
+            "missing_image_measurements": measurements == nil,
+            "unresolved": "Compare previous/current/generated images and final/raw/coarse fields for moving-detail loss. Edge sums alone cannot identify engine blur, correspondence error or occlusion. Actual runtime engine CVars remain unavailable."]
+    }
     static func bundle(capture: URL?, logs: [URL], context: Data, output: URL) throws {
         let fm = FileManager.default
         let work = output.deletingLastPathComponent().appendingPathComponent("work-" + UUID().uuidString, isDirectory: true)
         try fm.createDirectory(at: work, withIntermediateDirectories: true); defer { try? fm.removeItem(at: work) }
-        var entries: [DiagnosticArchive.Entry] = [], index: [[String: Any]] = [], omissions: [[String: Any]] = [], pairs: [[String: Any]] = []
+        var entries: [DiagnosticArchive.Entry] = [], index: [[String: Any]] = [], omissions: [[String: Any]] = [], pairs: [[String: Any]] = [], assessments: [[String: Any]] = []
         func add(_ source: URL, _ name: String) throws {
             let size = try regular(source, limit: 24 * 1024 * 1024)
             entries.append(.init(name: name, url: source)); index.append(["file": name, "bytes": size, "sha256": try digest(source)])
@@ -60,12 +85,13 @@ enum FrameEvidenceFiles {
         // Native timing metadata is atomically refreshed after late callbacks.
         // Freeze it once so bundle-index hashes and ZIP members describe the
         // SAME bytes even if that refresh overlaps the manual share action.
-        func snapshot(_ source: URL, _ name: String) throws {
+        @discardableResult func snapshot(_ source: URL, _ name: String) throws -> Data {
             _ = try regular(source, limit: 128 * 1024)
             let data = try Data(contentsOf: source)
             guard data.count <= 128 * 1024 else { throw Failure.storageLimit }
             let copy = work.appendingPathComponent(UUID().uuidString + ".json")
             try data.write(to: copy); try add(copy, name)
+            return data
         }
         let contextURL = work.appendingPathComponent("export-context.json"); try context.write(to: contextURL); try add(contextURL, "export-context.json")
         if let capture {
@@ -82,10 +108,11 @@ enum FrameEvidenceFiles {
                 for name in names.sorted() where name.hasSuffix(".json") || name == "engine-requests.txt" {
                     guard safeName(name) else { throw Failure.unsafeFile }
                     let url = native.appendingPathComponent(name); _ = try regular(url, limit: 128 * 1024)
-                    try snapshot(url, "capture/" + name)
+                    let frozen = try snapshot(url, "capture/" + name)
                     guard name.hasPrefix("pair-"), name.hasSuffix(".json") else { continue }
-                    guard let record = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any],
+                    guard let record = try JSONSerialization.jsonObject(with: frozen) as? [String: Any],
                           let files = record["files"] as? [[String: Any]], files.count <= 11 else { throw Failure.invalidMetadata }
+                    assessments.append(assessment(record))
                     pairs.append(["manifest": name, "state": record["state"] ?? "UNAVAILABLE", "stages_saved": files.count, "error": record["error"] ?? NSNull()])
                     for item in files {
                         guard let file = item["file"] as? String, safeName(file), file.hasPrefix("pair-") else { throw Failure.unsafeFile }
@@ -132,6 +159,14 @@ enum FrameEvidenceFiles {
             let copy = work.appendingPathComponent(log.lastPathComponent); try data.write(to: copy)
             try add(copy, "logs/" + log.lastPathComponent)
         }
+        let analysis: [String: Any] = ["schema": 1, "pairs": assessments,
+            "capture_present": capture != nil,
+            "timing_evidence": "capture/consumer-timing.json: separate reconstruction/output copies, requested target, actual presented timestamp and diagnostic-readback flags; omitted and late callback counts remain explicit",
+            "configuration_evidence": "capture/host-session.json and export-context.json: compare app/build/session, saved settings, effective launch overrides and runtime FG counters",
+            "scope": "Stage-local findings from completed capture metadata, not an automatic declaration of the phone blur's exact cause. Missing stages stay unavailable; diagnostic GPU commands are intrusive."]
+        let analysisURL = work.appendingPathComponent("framegen-analysis.json")
+        try JSONSerialization.data(withJSONObject: analysis, options: [.prettyPrinted, .sortedKeys]).write(to: analysisURL)
+        try add(analysisURL, "framegen-analysis.json")
         let manifest: [String: Any] = ["schema": 1, "plan_ids": ["M1", "M3", "M9"], "capture_present": capture != nil,
             "entries": index, "omissions": omissions, "capture_pairs": pairs, "complete_pairs": pairs.filter { $0["state"] as? String == "complete" }.count,
             "native_log_mirrored_in_husk_log": true,

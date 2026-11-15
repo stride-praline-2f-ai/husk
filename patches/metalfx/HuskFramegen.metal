@@ -169,6 +169,16 @@ kernel void huskFlowQuality(texture2d<float,access::read> forward [[texture(0)]]
     for(uint stride=128;stride;stride/=2){if(lane<stride)votes[lane]+=votes[lane+stride];threadgroup_barrier(mem_flags::mem_threadgroup);}
     if(lane==0){float3 result=votes[0]/float(width*height);output.write(float4(result,result.x>=0.80f?1.0f:0.0f),uint2(0));}
 }
+// The field maps CURRENT positions to previous positions. Output pixels live
+// halfway between them: solve q + 0.5*f(q) = output, rather than sampling f
+// at output. Three bounded corrections preserve uniform translation exactly
+// and reduce coordinate error under zoom/shear without another flow texture.
+float4 fgMidpointFlow(texture2d<float,access::sample> forward,float2 uv,float2 size){
+    float4 f=forward.sample(fgSampler,uv);
+    for(uint iteration=0;iteration<3;iteration++)
+        f=forward.sample(fgSampler,uv-0.5f*f.xy/size);
+    return f;
+}
 kernel void huskInterpolate(texture2d<float,access::sample> previous [[texture(0)]],
                             texture2d<float,access::sample> current [[texture(1)]],
                             texture2d<float,access::sample> forward [[texture(2)]],
@@ -180,7 +190,7 @@ kernel void huskInterpolate(texture2d<float,access::sample> previous [[texture(0
     float2 uv=(float2(p)+0.5f)/float2(size);
     float4 result=current.sample(fgSampler,uv);
     if(quality.read(uint2(0)).w<0.5f){output.write(half4(result),p);return;}
-    float4 f=forward.sample(fgSampler,uv);
+    float4 f=fgMidpointFlow(forward,uv,float2(size));
     float2 previousUV=uv+0.5f*f.xy/float2(size);
     float2 currentUV=uv-0.5f*f.xy/float2(size);
     float2 margin=0.5f/float2(size);
@@ -189,7 +199,7 @@ kernel void huskInterpolate(texture2d<float,access::sample> previous [[texture(0
     // Zero/ambiguous motion cannot justify a temporal cross-fade. Clamping an
     // out-of-image warp would stretch the boundary into false correspondence.
     if(inside && length(f.xy)>=0.5f && f.z<0.08f){
-        float4 b=backward.sample(fgSampler,uv+f.xy/float2(size));
+        float4 b=backward.sample(fgSampler,currentUV+f.xy/float2(size));
         if(b.z<0.08f && length(f.xy+b.xy)<2.5f){
             // All admitted scene pixels use the same intermediate motion
             // phase and a SINGLE source. A per-pixel colour-difference gate

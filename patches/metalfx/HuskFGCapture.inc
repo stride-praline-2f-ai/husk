@@ -12,6 +12,37 @@
 #include <cstring>
 #include <errno.h>
 bool huskFramegenRequested();
+// FG_IMAGE_METRICS_BEGIN
+// Utility writer only, AFTER the one-shot GPU readbacks have completed. No
+// additional GPU pass, staging buffer, per-frame log or gameplay scan.
+struct FGImageMetrics {
+    uint64_t pixels=0,changed=0,absoluteDifference=0,referenceEdges=0,outputEdges=0;
+    unsigned maximumDifference=0;
+};
+static FGImageMetrics fgImageMetrics(const uint8_t *reference,const uint8_t *output,unsigned width,unsigned height,unsigned row){
+    FGImageMetrics m;
+    for(unsigned y=0;y<height;y++)for(unsigned x=0;x<width;x++){
+        unsigned largest=0;size_t p=size_t(y)*row+x*4;
+        for(unsigned c=0;c<3;c++){
+            unsigned difference=unsigned(std::abs(int(reference[p+c])-int(output[p+c])));
+            m.absoluteDifference+=difference;largest=std::max(largest,difference);
+            if(x){m.referenceEdges+=unsigned(std::abs(int(reference[p+c])-int(reference[p-4+c])));
+                  m.outputEdges+=unsigned(std::abs(int(output[p+c])-int(output[p-4+c])));}
+            if(y){m.referenceEdges+=unsigned(std::abs(int(reference[p+c])-int(reference[p-row+c])));
+                  m.outputEdges+=unsigned(std::abs(int(output[p+c])-int(output[p-row+c])));}
+        }
+        ++m.pixels;if(largest>1)++m.changed;
+        m.maximumDifference=std::max(m.maximumDifference,largest);
+    }
+    return m;
+}
+// FG_IMAGE_METRICS_END
+static NSDictionary *fgImageMetricsJSON(const FGImageMetrics &m){
+    return @{@"pixels":@(m.pixels),@"changed_rgb_gt1_pixels":@(m.changed),@"maximum_rgb_difference_codes":@(m.maximumDifference),
+        @"mean_absolute_rgb_difference_codes":m.pixels?@((double)m.absoluteDifference/(3*m.pixels)):(id)[NSNull null],
+        @"reference_rgb_edge_l1_sum":@(m.referenceEdges),@"output_rgb_edge_l1_sum":@(m.outputEdges),
+        @"exact_rgb_copy":@(m.maximumDifference==0)};
+}
 static std::atomic<bool> fgCaptureEnabled{false},fgCaptureTimingEnabled{false};
 static std::mutex fgCaptureLock;
 static unsigned fgCaptureBusy;
@@ -82,13 +113,14 @@ static void fgCaptureFlushTimings(HuskFGCaptureSession *s){
     std::sort(rows,rows+count,[](const FGCaptureTiming&a,const FGCaptureTiming&b){return a.recordID<b.recordID;});
     NSMutableArray *items=[NSMutableArray array];
     for(unsigned i=0;i<count;i++){
-        auto &r=rows[i];[items addObject:@{@"source_sequence":@(r.sequence),@"epoch":@(r.epoch),@"kind":r.preparation?@"reconstruction":(r.generated?@"generated":@"real"),
+        auto &r=rows[i];[items addObject:@{@"record_id":@(r.recordID),@"source_sequence":@(r.sequence),@"epoch":@(r.epoch),@"kind":r.preparation?@"reconstruction":(r.generated?@"generated":@"real"),
             @"target_presentation_host_seconds":fgCaptureTime(r.targetHost),@"source_completed_host_seconds":fgCaptureTime(r.sourceCompletedHost),
             @"includes_diagnostic_readback":@(r.diagnostic),@"submit_host_monotonic_seconds":@(r.submitHost),
             @"completion_host_monotonic_seconds":fgCaptureTime(r.completionHost),@"gpu_timestamp_valid":@(r.gpuValid),
             @"gpu_start_seconds":r.gpuValid?@(r.gpuStart):(id)[NSNull null],@"gpu_end_seconds":r.gpuValid?@(r.gpuEnd):(id)[NSNull null],
             @"gpu_duration_ms":r.gpuValid?@((r.gpuEnd-r.gpuStart)*1000):(id)[NSNull null],@"presented_timestamp_valid":@(r.presentValid),
-            @"presented_time_seconds":r.presentValid?@(r.presented):(id)[NSNull null],@"presentation_callback_host_seconds":fgCaptureTime(r.presentObserved)}];
+            @"presented_time_seconds":r.presentValid?@(r.presented):(id)[NSNull null],
+            @"presented_minus_target_ms":(r.presentValid&&r.targetHost>0)?@((r.presented-r.targetHost)*1000):(id)[NSNull null],@"presentation_callback_host_seconds":fgCaptureTime(r.presentObserved)}];
     }
     fgCaptureJSON(s,"consumer-timing.json",@{@"schema":@3,@"plan_ids":@[@"M3",@"M4",@"M9"],@"subsystem":@"framegen_consumer",
         @"records":items,@"capacity":@130,@"omitted_records":@(lost),@"late_callbacks_after_slot_reuse":@(late),@"sampling":@"every output in a rolling128-command ring plus2 pinned capture outputs; ends500ms after file completion",
@@ -130,7 +162,17 @@ static void fgCaptureFinish(HuskFGCaptureTicket *t,NSString *failure){
         double gpuStart[2],gpuEnd[2];{std::lock_guard<std::mutex> lock(t->_stageLock);memcpy(gpuStart,t->_gpuStart,sizeof gpuStart);memcpy(gpuEnd,t->_gpuEnd,sizeof gpuEnd);}
         const float *quality=(const float*)t->_quality.contents;
         id qualityRecord=(!error&&quality)?(id)@{@"coherent_tile_fraction":@(quality[0]),@"mean_forward_backward_error_pixels":@(quality[1]),@"static_tile_fraction":@(quality[2]),@"interpolation_admitted":@(quality[3]>=0.5f),@"minimum_coherent_fraction":@0.80,@"decision":quality[3]>=0.5f?@"interpolation_with_local_boundary_guards":@"whole_frame_real_fallback"}:(id)[NSNull null];
-        NSDictionary *record=@{@"schema":@2,@"reconstruction_quality":qualityRecord,@"plan_ids":@[@"M1",@"M3",@"M9"],@"pair_id":@(t->_id),@"state":error?@"incomplete":@"complete",
+        id imageMeasurements=[NSNull null];
+        if(!error){
+            const uint8_t *previous=(const uint8_t*)t->_images[0].contents,*current=(const uint8_t*)t->_images[1].contents;
+            const uint8_t *generated=(const uint8_t*)t->_images[2].contents,*real=(const uint8_t*)t->_images[3].contents;
+            imageMeasurements=@{@"provenance":@"MEASURED from completed full-resolution BGRA readbacks; RGB only; alpha and row padding excluded",
+                @"source_pair":fgImageMetricsJSON(fgImageMetrics(previous,current,t->_width,t->_height,t->_row)),
+                @"reconstruction_vs_current":fgImageMetricsJSON(fgImageMetrics(current,generated,t->_width,t->_height,t->_row)),
+                @"real_copy_vs_current":fgImageMetricsJSON(fgImageMetrics(current,real,t->_width,t->_height,t->_row)),
+                @"interpretation":@"An exact generated/current match is a repeat, not unique interpolation. A non-exact following-real/current copy is a presentation-copy defect. Edge sums measure detail change, not proof of perceptual blur or its engine cause; use matched source/generated images and fields."};
+        }
+        NSDictionary *record=@{@"schema":@2,@"image_measurements":imageMeasurements,@"reconstruction_quality":qualityRecord,@"plan_ids":@[@"M1",@"M3",@"M9"],@"pair_id":@(t->_id),@"state":error?@"incomplete":@"complete",
             @"error":error?: (id)[NSNull null],@"previous_source_sequence":@(t->_previousSequence),@"current_source_sequence":@(t->_currentSequence),@"epoch":@(t->_epoch),
             @"capture_encode_host_monotonic_seconds":@(t->_created),@"previous_source_gpu_completion_callback_host_seconds":fgCaptureTime(t->_sourcePrevious),
             @"current_source_gpu_completion_callback_host_seconds":fgCaptureTime(t->_sourceCurrent),@"source_gpu_execution_timestamps":@"UNAVAILABLE for source Metal4 feedback; callback time is not GPU duration",

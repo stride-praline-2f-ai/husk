@@ -18,7 +18,9 @@ class FrameEvidenceTests(unittest.TestCase):
    quality=struct.pack('<4f',.9,1.25,.1,1)+bytes(240)
    (frames/'pair-01-quality.f32').write_bytes(quality)
    files.append(dict(stage='quality',file='pair-01-quality.f32',width=1,height=1,row_bytes=256,bytes=256,format='RGBA32Float'))
-   manifest=dict(schema=2,state='complete',files=files)
+   manifest=dict(schema=2,state='complete',files=files,pair_id=1,image_measurements={
+       'real_copy_vs_current':{'exact_rgb_copy':False},'reconstruction_vs_current':{'exact_rgb_copy':True}},
+       reconstruction_quality={'interpolation_admitted':False})
    (frames/'pair-01.json').write_text(json.dumps(manifest))
    log=p/'husk.log';log.write_bytes(b'IDENTITY: build169\n'+b'A'*(2*1024*1024)+b'END OF LOG\n')
    before=hashlib.sha256(log.read_bytes()).hexdigest()
@@ -75,6 +77,10 @@ print("PASS: real Apple BGRA→RGB PNG preserves channels/full pixels; ZIP bound
    try:subprocess.run([str(binary),str(p)],check=True)
    finally:stop.set();writer.join()
    with zipfile.ZipFile(p/'evidence.zip')as z:
+    analysis=json.loads(z.read('framegen-analysis.json'))
+    self.assertIn('DEFECT:', ' '.join(analysis['pairs'][0]['findings']))
+    self.assertIn('whole-frame real fallback', ' '.join(analysis['pairs'][0]['findings']))
+    self.assertIn('not a unique', ' '.join(analysis['pairs'][0]['findings']))
     self.assertIsNone(z.testzip());index=json.loads(z.read('bundle-index.json'));self.assertEqual(index['complete_pairs'],1)
     self.assertEqual(len([n for n in z.namelist()if n.endswith('.png')]),4)
     self.assertEqual(z.read('capture/pair-01-forward.f16'),bytes([4])*512);self.assertEqual(z.read('capture/pair-01-quality.f32'),quality)

@@ -15,6 +15,7 @@ import CoreGraphics
 struct FakeReport { var nativeEngine: FakeEngine }
 enum FakeEngine { case ue4, unity }
 struct TLApp { var label: String; var packageName: String?; var report: FakeReport? }
+enum AppWindows { static var defaultWindowed = false }
 enum TranslationLayer { static let root = URL(fileURLWithPath: "/tmp/unused-duo-settings") }
 enum Idiom { case pad, phone }
 class UIDevice { static let current=UIDevice(); var userInterfaceIdiom=Idiom.phone }
@@ -108,6 +109,8 @@ if mode=="geometry" {
  var settings=TLAppSettings();settings.efficientResolution = .native
  UIDevice.current.userInterfaceIdiom = .pad // inner-screen UI idiom must not accidentally select the iPad budget
  assert(settings.duoAutomaticActive(for:game))
+ settings.window = .window;assert(!settings.duoAutomaticActive(for:game));settings.window = .auto
+ AppWindows.defaultWindowed = true;assert(!settings.duoAutomaticActive(for:game));AppWindows.defaultWindowed = false
  let scale=settings.renderScale(for:game);assert(abs(Double(scale)-portrait.scale()!)<0.00001)
  assert(settings.fullscreenResolutionEstimate(for:game)=="1816 × 1280")
  settings.automaticDuoProfile=false;assert(!settings.duoAutomaticActive(for:game))

@@ -21,6 +21,11 @@ struct EfficiencyProfile: Codable, Identifiable, Equatable {
         var spatial: Bool, spatialPercent: Int, archive: Int
         var archiveVerification: Bool, engineOnly: Bool, clockTimed: Bool, clockFeedback: Bool
         var execution: HuskExecutionOptions? = nil
+        // v1 profiles were partial. Optional fields keep them readable without
+        // inventing the missing renderer/automatic-policy choices.
+        var automaticDuo: Bool? = nil, a20Workers: Bool? = nil
+        var metal4: Bool? = nil, enhancedMetal4: Bool? = nil, frameGeneration: Bool? = nil
+        var sharedMemory: Bool? = nil, displayResolution: String? = nil
     }
     var version = 1
     var id: String = UUID().uuidString
@@ -30,7 +35,7 @@ struct EfficiencyProfile: Codable, Identifiable, Equatable {
     var controls: Controls
     func validated(for currentDevice: String, game currentGame: String? = nil) throws -> EfficiencyProfile {
         let c = controls
-        guard version == 1, UUID(uuidString: id) != nil,
+        guard [1,2].contains(version), UUID(uuidString: id) != nil,
               !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, name.count <= 64,
               name.rangeOfCharacter(from: .controlCharacters) == nil,
               device == currentDevice, !device.isEmpty, device.count <= 64,
@@ -45,6 +50,13 @@ struct EfficiencyProfile: Codable, Identifiable, Equatable {
               (!c.archiveVerification || c.archive == 2),
               (c.execution?.valid ?? true),
               !(c.clockTimed && c.clockFeedback) else { throw Failure.invalid }
+        if version == 2 {
+            guard c.automaticDuo != nil, c.a20Workers != nil, let metal4 = c.metal4,
+                  let enhanced = c.enhancedMetal4, let fg = c.frameGeneration,
+                  c.sharedMemory != nil, let display = c.displayResolution,
+                  ["low","medium","high","native"].contains(display), c.execution != nil,
+                  !(metal4 && fg && !enhanced) else { throw Failure.invalid }
+        }
         return self
     }
     enum Failure: Error { case invalid, tooLarge, capacity }

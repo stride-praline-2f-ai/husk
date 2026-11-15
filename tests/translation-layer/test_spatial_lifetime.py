@@ -2,6 +2,7 @@
 """Actual scaler component with deterministic Metal protocol doubles on Apple."""
 import subprocess,sys,tempfile,unittest
 from pathlib import Path
+from test_framegen_coordinates import MidpointCoordinates
 ROOT=Path(__file__).resolve().parents[2]
 @unittest.skipUnless(sys.platform=='darwin','Apple Objective-C/MetalFX SDK required; IPA CI runs this check')
 class SpatialLifetimeTests(unittest.TestCase):
@@ -202,6 +203,11 @@ int main(){@autoreleasepool{
    self.assertEqual(patchwork.returncode,6,patchwork.stdout)
    self.assertIn('QUALITY_REJECT: incoherent field produced patchwork intermediate',patchwork.stdout)
    print(patchwork.stdout)
+   anchored=subprocess.run([str(exe),str(ROOT/'tests/translation-layer/fixtures/framegen-171.metal')],text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=30)
+   self.assertEqual(anchored.returncode,10,anchored.stdout)
+   self.assertIn('QUALITY_REJECT: affine midpoint uses output-anchored flow',anchored.stdout)
+   print(anchored.stdout)
+
 
 
 

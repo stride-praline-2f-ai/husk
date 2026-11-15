@@ -95,11 +95,12 @@ struct VirtualPadView: UIViewRepresentable {
     var layout = PadLayout()
     /// Editing: touches move controls instead of pressing them, and the one touched last is `selected`.
     var editing = false
+    var connectToGame = true
     var selected: Binding<String?>? = nil
     var onChange: ((PadLayout) -> Void)? = nil
 
     func makeUIView(context: Context) -> PadView {
-        pad.connect()
+        if connectToGame { pad.connect() }
         let view = PadView(pad: pad)
         update(view)
         return view

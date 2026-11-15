@@ -540,6 +540,7 @@ final class TLUnityUIView: UIView, UIKeyInput {
             husk_crash_stage("ue4_fork_launch_options_applied")
             HuskLog.log("tl", "ue4: requested graphics preset: \(efficientGraphics ? "Sharp / Efficient" : (sharpGraphics ? "Sharp / High Quality" : "Game Default")), surface \(width)x\(height)")
             HuskLog.log("tl", "ue4 resolution: device \(UIDevice.current.model), display \(Int(UIScreen.main.bounds.width * UIScreen.main.scale))x\(Int(UIScreen.main.bounds.height * UIScreen.main.scale)), render scale \(contentScaleFactor), launch surface \(width)x\(height); launch-time selection, not runtime calibration")
+            var selectedDriverPath = "UNAVAILABLE"
             if let fw = Bundle.main.privateFrameworksPath {
                 let candidate = fw + "/HuskMoltenVK.framework/HuskMoltenVK"
                 let experimental = (spatialUpscaling || nativePipelineArchiveMode != 0 || frameGeneration) && FileManager.default.fileExists(atPath: candidate)
@@ -564,12 +565,31 @@ final class TLUnityUIView: UIView, UIKeyInput {
                     }
                 }
                 husk_ue4_set_vulkan(selected)
+                selectedDriverPath = selected
                 let usingMetal4 = selected.hasSuffix("KosmicKrisp.framework/KosmicKrisp") || selected.hasSuffix("HuskKosmicKrisp.framework/HuskKosmicKrisp")
                 husk_crash_stage(usingMetal4 ? "ue4_metal4_selected" : (experimental ? "ue4_experimental_moltenvk_selected" : "ue4_original_moltenvk_selected"))
                 HuskLog.log("tl", "[M3/M9 renderer] selected \(usingMetal4 ? "KosmicKrisp Metal 4 beta" : (experimental ? "pinned experimental MoltenVK" : "original MoltenVK")); spatial requested \(spatialUpscaling && !usingMetal4), frame generation requested \(frameGeneration); native preflight decides activation")
             }
             husk_crash_stage("ue4_native_runtime_launch_enter")
             started = husk_ue4_launch(apk, dataDir, layerPtr, Int32(width), Int32(height), angle, ca)
+            let effective: [String: Any] = ["host_session_id": HuskLog.sessionID,
+                "host_monotonic_seconds": ProcessInfo.processInfo.systemUptime,
+                "started": started, "launch_width": width, "launch_height": height,
+                "selected_driver_path": selectedDriverPath, "metal4_active": tl_vk_is_metal4(),
+                "frame_generation_requested": frameGeneration, "requested_rendered_fps": frameGeneration ? 30 : efficientFrameLimit,
+                "requested_output_fps": frameGeneration ? 60 : efficientFrameLimit,
+                "worker_policy": threadPolicy, "automatic_fast_worker_budget": automaticFastWorkerBudget,
+                "submission_mode": submissionMode, "prefill": execution.prefill, "command_buffer_limit": execution.commandBufferLimit,
+                "swapchain_images": execution.swapchainImages, "initialization_parking": execution.initializationParking,
+                "spatial_requested_after_renderer_selection": spatialUpscaling && !tl_vk_is_metal4(), "spatial_input_percent": spatialInputPercent,
+                "clock_presentation_requested_after_overrides": clockPresentation && !frameGeneration && !tl_vk_is_metal4(),
+                "clock_feedback_requested_after_overrides": feedbackClockCorrection && !frameGeneration && !tl_vk_is_metal4(),
+                "archive_mode_requested_after_overrides": tl_vk_is_metal4() && !enhancedMetal4 ? 0 : nativePipelineArchiveMode,
+                "scope": "Host launch after device/renderer overrides. Native FG active/failure counters are separate. Engine runtime CVars and actual worker core placement remain unavailable."]
+            FramegenDiagnostics.recordLaunch(apk: apk, values: effective)
+            if let bytes = try? JSONSerialization.data(withJSONObject: effective, options: [.sortedKeys]), let line = String(data: bytes, encoding: .utf8) {
+                HuskLog.log("framegen-config", line)
+            }
             husk_crash_stage(started ? "ue4_native_runtime_launch_returned_success" : "ue4_native_runtime_launch_returned_refused")
         case .cocos:
             // Geode, when it is on for this game and downloaded: loaded into the game after its own libraries.
@@ -1187,7 +1207,7 @@ struct TLCocosAttemptView: View {
     @State private var uiHidden: Bool
     /// The line saying how to get the interface back, shown for a few seconds after it goes.
     @State private var hint = false
-    private var showLog: Bool { get { showLogSetting && devInfo } nonmutating set { showLogSetting = newValue } }
+    private var showLog: Bool { get { showLogSetting && devInfo && !settings.isDungeons(app) } nonmutating set { showLogSetting = newValue } }
 
     init(app: TLApp) {
         self.app = app
@@ -1371,7 +1391,7 @@ struct TLCocosAttemptView: View {
 
     private var barControls: some View {
         HStack(spacing: 12) {
-            if engine == .ue4 {
+            if engine == .ue4 && !settings.isDungeons(app) {
                 Button { efficiencySheet = true } label: {
                     Image(systemName: "gauge").accessibilityLabel("Efficiency Test")
                 }
@@ -1401,7 +1421,7 @@ struct TLCocosAttemptView: View {
                     Label(settings.padShown ? "Hide pad" : "Pad", systemImage: "gamecontroller").font(.system(size: 12, weight: .semibold))
                 }
                 .tint(.white)
-                if settings.padShown {
+                if settings.padShown && !settings.isDungeons(app) {
                     Button { padSelected = nil; editingPad.toggle() } label: {
                         Label(editingPad ? "Done" : "Edit pad", systemImage: "slider.horizontal.below.square.and.square.filled")
                             .font(.system(size: 12, weight: .semibold))
@@ -1419,7 +1439,7 @@ struct TLCocosAttemptView: View {
             if settings.showStats, model.state == Int32(HUSK_UNITY_RUNNING) {
                 Text(stats).font(.technical(11)).foregroundStyle(.white.opacity(0.7)).lineLimit(1)
             }
-            if devInfo {
+            if devInfo && !settings.isDungeons(app) {
                 Button { withAnimation(.snappy(duration: 0.25)) { showLog.toggle() } } label: {
                     Text(showLog ? "Hide log" : "Log").font(.system(size: 12, weight: .semibold))
                 }
