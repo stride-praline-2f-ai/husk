@@ -1,5 +1,22 @@
 # M9-FG-QUALITY-v1 — build167 real-game quality criterion failed
 
+**Later returned recording / discomfort report, 15 November:** user says the
+switch hurts their eyes. Keep FG OFF; do not request another uncomfortable
+comparison. The uploaded Adobe Express MP4 cannot be visually analysed:
+two independent downloads are byte-identical,14,202,968bytes, SHA256
+`724633afd724764cfab7004857eddafa4c4736448824f9fcb6b4902c6d8d4537`.
+The `mdat` box declares14,233,408bytes at offset40 but only14,202,928bytes
+remain (30,480bytes missing within that box), and there is no `moov` metadata.
+FFprobe reports `moov atom not found`; zero frames were decoded. See the
+[receipt](runs/METAL4-FG-167-video.receipt.json). This establishes an incomplete
+uploaded/exported file, not where truncation occurred. No observed brightness
+flash, alternating blur or medical cause can be claimed. The existing real /
+generated-image alternation and per-pixel fallback are possible contributors,
+not a diagnosis from unseen footage. Request only the existing original Photos
+recording if available, without recreating the effect; further repair remains
+pending actual visual evidence. The prior optional30FPS test below is suspended
+because the user now reports discomfort. No runtime change or replacement IPA.
+
 15 November 2026. This supersedes the *pending* phone-quality status in
 [the 167 handover](builds/3fcf97c285124e3d7a8e9e01d40e17abe00635b6.md).
 It does not invalidate the recorded synthetic GPU or packaging checks.

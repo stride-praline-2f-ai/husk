@@ -1,0 +1,18 @@
+{
+  "scope": "M9-FG-QUALITY-v1 returned167 reported painful switch; video unavailable",
+  "file_name": "Adobe Express - ScreenRecording_11-15-2026 11-41-38_1.mp4",
+  "bytes": 14202968,
+  "sha256": "724633afd724764cfab7004857eddafa4c4736448824f9fcb6b4902c6d8d4537",
+  "downloads_checked": 2,
+  "identical_downloads": true,
+  "mdat_box_offset": 40,
+  "declared_mdat_box_bytes": 14233408,
+  "available_mdat_box_bytes": 14202928,
+  "missing_bytes_within_declared_mdat": 30480,
+  "moov_found": false,
+  "ffprobe_result": "moov atom not found; invalid data",
+  "decoded_frames": 0,
+  "visual_cause": "UNAVAILABLE: incomplete MP4; no verified brightness/contrast/blur transition",
+  "user_report": "It hurts my eyes when it does the switch",
+  "next_step": "Keep FG OFF; resend existing original recording if available; do not repeat an uncomfortable test."
+}
