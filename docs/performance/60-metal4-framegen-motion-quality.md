@@ -1,5 +1,7 @@
 # M9-FG-QUALITY-v1 — returned166 cadence and moving-image fuzziness
 
+**Superseded phone status, 15 November:** [The returned167 pair](61-returned167-framegen-quality.md) independently confirms the delivered source and continued fuzzy movement with FG ON; user says FG OFF fixes it. Real-game visual criterion failed. Synthetic/build passes below remain valid only within their stated scope. All seven ON/nine OFF lifecycle sequences complete in the new evidence. No new shader change/IPA or visual/energy acceptance is claimed. Use the existing sourceMetal4/FG-OFF60 route; the optional remaining discriminator is OFF30 versus ON30 with an actual affected image, not another general log.
+
 15 November 2026. Follows [the launch lease repair](59-metal4-framegen-launch-freeze.md) and verified166/sourceeacafb426fc73fcf02e9b07103dd4c7f342f3ddf. Latest pasted native log lacks a source/build stamp;166is inferred from delivery context, not independently proven by this excerpt. The user reports fuzzy movement that clears when stationary, has not compared FG OFF yet, and confirms changing Low Power Mode near the late transition. Preserve working166launch and all data/output/cache/worker/thermal/renderer controls.
 
 ## Full returned-log analysis
