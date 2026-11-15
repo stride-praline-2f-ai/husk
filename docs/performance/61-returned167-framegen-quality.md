@@ -1,5 +1,13 @@
 # M9-FG-QUALITY-v1 — build167 real-game quality criterion failed
 
+**Valid replacement MOV now inspected:** [Decoded visual evidence](62-framegen-visible-switch.md)
+supersedes the earlier unavailable-footage status below.88decoded frames show
+changing clarity/doubled edges during motion; no large global brightness jump
+is apparent in the short clip. Source review identifies a possible mixed-motion
+phase problem in generated per-pixel fallback, not a proven sole cause or
+repaired algorithm. Enough evidence to document the visual failure; keep FG OFF,
+no further uncomfortable comparison or general logs. No new runtime/IPA.
+
 **Later returned recording / discomfort report, 15 November:** user says the
 switch hurts their eyes. Keep FG OFF; do not request another uncomfortable
 comparison. The uploaded Adobe Express MP4 cannot be visually analysed:
