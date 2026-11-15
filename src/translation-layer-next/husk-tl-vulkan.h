@@ -27,6 +27,8 @@ void *tl_vk_resolve(const char *name);
 
 /* True once tl_vk_configure has named a MoltenVK that loads. Without one the guest is told libvulkan.so does not exist, and games fall back to OpenGL ES. */
 bool tl_vk_available(void);
+/* Ready driver identity, not GPU performance or feature admission. */
+bool tl_vk_is_metal4(void);
 
 unsigned long tl_vk_frames_presented(void);
 

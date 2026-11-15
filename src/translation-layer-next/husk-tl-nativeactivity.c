@@ -378,8 +378,15 @@ bool tl_na_start(const tl_ga_config *cfg)
     }
     if (project && !strcmp(project, "Dungeons") && tl_ue4_sharp_graphics_enabled()) {
         char cache_dir[768];
-        snprintf(cache_dir, sizeof(cache_dir), "%s/%s", N.internal_dir, tl_vk_spatial_active() ? "husk-pipeline-cache-spatial-v1" : "husk-pipeline-cache-v1");
-        tl_pc_configure(cache_dir);
+        const char *name = tl_vk_is_metal4() ? "husk-pipeline-cache-metal4-v1" :
+            tl_vk_spatial_active() ? "husk-pipeline-cache-spatial-v1" : "husk-pipeline-cache-v1";
+        int n = snprintf(cache_dir, sizeof(cache_dir), "%s/%s", N.internal_dir, name);
+        if (n > 0 && n < (int)sizeof(cache_dir)) tl_pc_configure(cache_dir);
+        if (tl_vk_is_metal4()) {
+            n = snprintf(cache_dir, sizeof(cache_dir), "%s/husk-metal4-shader-cache-v1", N.internal_dir);
+            if (n <= 0 || n >= (int)sizeof(cache_dir) || !tl_pc_prepare_mesa_disk_cache(cache_dir))
+                tl_log_line("[M2/M3 METAL4 cache] game disk-cache defaults unavailable; existing driver behaviour retained");
+        }
     }
     char archive_dir[1024];
     int archive_len=snprintf(archive_dir,sizeof(archive_dir),"%s/husk-native-pipeline-archive-v1",N.internal_dir);

@@ -56,6 +56,17 @@ void setup(const char *path, int uuid) {
  tl_pc_set_api((tl_pc_api){create,data,merge,destroy});
  tl_pc_configure(path); tl_pc_device((void *)1,header[2],header[3],(uint8_t *)header+16);
 }
+int setup_deferred(const char *path, int partial) {
+ tl_pc_forget_device((void *)1,NULL,NULL);
+ tl_pc_set_api((tl_pc_api){0});tl_pc_configure(path);
+ bool early=tl_pc_enter();tl_pc_leave(early);
+ if(partial)tl_pc_set_api((tl_pc_api){.create=create,.data=data,.destroy=destroy});
+ bool incomplete=tl_pc_enter();tl_pc_leave(incomplete);
+ tl_pc_set_api((tl_pc_api){create,data,merge,destroy});
+ tl_pc_device((void *)1,header[2],header[3],(uint8_t *)header+16);
+ bool late=tl_pc_enter();tl_pc_leave(late);
+ return !early&&!incomplete&&late;
+}
 uint64_t add(unsigned value) {
  tl_pc_create_info ci={.type=17}; uint64_t cache=0;
  bool locked=tl_pc_enter();create((void *)1,&ci,NULL,&cache);payload[cache]=value;tl_pc_track((void *)1,cache);tl_pc_leave(locked);return cache;
@@ -97,10 +108,17 @@ int parallel_readers(void) {
 }
 ''')
         tl=ROOT/'src/translation-layer-next'
-        (root/'store.c').write_text('#define _DARWIN_C_SOURCE 1\n#define _POSIX_C_SOURCE 200809L\n#include <unistd.h>\nssize_t test_write(int,const void *,size_t);\n#define write test_write\n#include "husk-tl-pipeline-store.c"\n')
+        ref=os.environ.get('HUSK_TEST_SOURCE_REF')
+        production=subprocess.check_output(['git','show',ref+':src/translation-layer-next/husk-tl-pipeline-store.c'],cwd=ROOT,text=True) if ref else (tl/'husk-tl-pipeline-store.c').read_text()
+        (root/'actual-store.c').write_text(production)
+        (root/'store.c').write_text('#define _DARWIN_C_SOURCE 1\n#define _POSIX_C_SOURCE 200809L\n#include <unistd.h>\nssize_t test_write(int,const void *,size_t);\n#define write test_write\n#include "actual-store.c"\n')
         subprocess.run([os.environ.get('CC','cc'),'-std=c11','-Wall','-Wextra','-Werror','-shared','-fPIC','-pthread','-I',str(tl),str(root/'driver.c'),str(root/'store.c'),'-o',str(root/'store.so')],check=True)
         cls.lib=ctypes.CDLL(str(root/'store.so'))
         cls.lib.setup.argtypes=[ctypes.c_char_p,ctypes.c_int]
+        cls.lib.setup_deferred.argtypes=[ctypes.c_char_p,ctypes.c_int]
+        if hasattr(cls.lib,'tl_pc_prepare_mesa_disk_cache'):
+            cls.lib.tl_pc_prepare_mesa_disk_cache.argtypes=[ctypes.c_char_p]
+            cls.lib.tl_pc_prepare_mesa_disk_cache.restype=ctypes.c_bool
         cls.lib.add.argtypes=[ctypes.c_uint];cls.lib.add.restype=ctypes.c_uint64
         cls.lib.cache_value.argtypes=[ctypes.c_uint64];cls.lib.cache_value.restype=ctypes.c_uint
         cls.lib.mutate.argtypes=[ctypes.c_uint64,ctypes.c_uint]
@@ -126,6 +144,33 @@ int parallel_readers(void) {
         blob=self.blob();self.assertEqual(len(blob),36);self.assertEqual(struct.unpack('<I',blob[32:])[0],28)
         self.assertEqual(len(list(self.root.glob('*.bin'))),1)
         self.assertFalse(list(self.root.glob('*.tmp-*')))
+
+    def test_directory_before_icd_functions_activates_after_complete_live_instance_api(self):
+        for partial in (0,1):
+            root=Path(self.tmp.name)/('deferred'+str(partial))
+            self.assertEqual(self.lib.setup_deferred(os.fsencode(root),partial),1)
+            self.lib.add(19);self.lib.tl_pc_checkpoint()
+            self.assertEqual(len(list(root.glob('*.bin'))),1)
+            self.assertEqual(struct.unpack('<I',self.blob()[32:])[0],19)
+
+    def test_mesa_cache_location_budget_and_explicit_overrides(self):
+        libc=ctypes.CDLL(None);libc.getenv.argtypes=[ctypes.c_char_p];libc.getenv.restype=ctypes.c_char_p
+        keys=[b'MESA_SHADER_CACHE_DIR',b'MESA_SHADER_CACHE_MAX_SIZE',b'MESA_SHADER_CACHE_DISABLE']
+        saved={k:libc.getenv(k)for k in keys}
+        try:
+            for k in keys:libc.unsetenv(k)
+            root=Path(self.tmp.name)/'mesa'
+            self.assertTrue(self.lib.tl_pc_prepare_mesa_disk_cache(os.fsencode(root)))
+            self.assertEqual(libc.getenv(keys[0]),os.fsencode(root));self.assertEqual(libc.getenv(keys[1]),b'128M')
+            libc.setenv(keys[0],b'/explicit/mesa',1);libc.setenv(keys[1],b'64M',1);libc.setenv(keys[2],b'true',1)
+            self.assertTrue(self.lib.tl_pc_prepare_mesa_disk_cache(None))
+            self.assertEqual([libc.getenv(k)for k in keys],[b'/explicit/mesa',b'64M',b'true'])
+            libc.unsetenv(keys[0]);libc.unsetenv(keys[1]);self.assertFalse(self.lib.tl_pc_prepare_mesa_disk_cache(b'/missing-parent-husk164/cache'))
+            self.assertIsNone(libc.getenv(keys[0]));self.assertIsNone(libc.getenv(keys[1]))
+        finally:
+            for k,v in saved.items():
+                if v is None:libc.unsetenv(k)
+                else:libc.setenv(k,v,1)
 
     def test_wrong_device_uuid_does_not_reuse_data(self):
         self.lib.add(7);self.lib.tl_pc_checkpoint()

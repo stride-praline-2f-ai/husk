@@ -205,6 +205,7 @@ void tl_vk_archive_configure(const char *project,const char *directory){
     if(tl_npa_requested()&&vk_ready())tl_npa_configure(project,directory,tl_ue4_sharp_graphics_enabled());
 }
 bool tl_vk_available(void) { return V.have_path && vk_ready(); }
+bool tl_vk_is_metal4(void) { return tl_vk_available() && metal4_backend; }
 void tl_vk_spatial_snapshot(tl_spatial_stats *out){
     if(!out)return;
     *out=(tl_spatial_stats){.version=1,.size=sizeof(*out)};

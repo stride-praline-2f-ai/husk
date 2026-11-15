@@ -17,8 +17,13 @@ typedef struct {
     int (*merge)(void *, uint64_t, uint32_t, const uint64_t *);
     void (*destroy)(void *, uint64_t, const void *);
 } tl_pc_api;
+/* API and directory may arrive in either order during instance initialization;
+ * no devices/cache calls may run until both have been provided. */
 void tl_pc_set_api(tl_pc_api api);
 void tl_pc_configure(const char *directory);
+/* Before Mesa creates its physical devices: app-owned bounded shader disk
+ * cache defaults. Explicit Mesa environment overrides are preserved. */
+bool tl_pc_prepare_mesa_disk_cache(const char *directory);
 void tl_pc_device(void *device, uint32_t vendor, uint32_t id, const uint8_t uuid[16]);
 /* Locks share access between normal pipeline/cache calls. Checkpoints alone
  * take exclusive access, preserving parallel pipeline creation in gameplay. */

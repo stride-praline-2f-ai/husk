@@ -1,0 +1,35 @@
+{
+  "download_url": "https://filebin.net/98dc288794b8fcd3f2f6fa88/Husk-3.4-build163-Anki-Metal4.ipa",
+  "file": {
+    "filename": "Husk-3.4-build163-Anki-Metal4.ipa",
+    "content-type": "application/zip",
+    "bytes": 149265731,
+    "bytes_readable": "149 MB",
+    "md5": "lnVFvGqhuBOihxkPTg5zkw==",
+    "sha1": "084755effa58345005504425a0bb2b9289878fbd",
+    "sha256": "4010aeda700ff5d6cf4458d6948c4a8913df80350e243e34580419688f944e81",
+    "updated_at": "2026-11-15T01:28:33.645282Z",
+    "updated_at_relative": "now",
+    "created_at": "2026-11-15T01:28:33.645282Z",
+    "created_at_relative": "now"
+  },
+  "bin": {
+    "id": "98dc288794b8fcd3f2f6fa88",
+    "readonly": false,
+    "bytes": 0,
+    "bytes_readable": "0 B",
+    "files": 0,
+    "updated_at": "2026-11-15T01:28:33.691144Z",
+    "updated_at_relative": "now",
+    "created_at": "2026-11-15T01:28:26.987075Z",
+    "created_at_relative": "now",
+    "expired_at": "2026-11-22T01:28:33.691143Z",
+    "expired_at_relative": "6 days from now"
+  },
+  "anonymous_full_download_verified": true,
+  "downloaded_bytes": 149265731,
+  "downloaded_sha256": "4010aeda700ff5d6cf4458d6948c4a8913df80350e243e34580419688f944e81",
+  "magic": "504b0304",
+  "source": "503f5cbef4d48e64828043fe057fd976928e0dc0",
+  "candidate_build": "163"
+}

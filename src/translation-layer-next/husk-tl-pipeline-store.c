@@ -30,26 +30,61 @@ static struct device {
 } devices[MAX_DEVICES];
 static uint64_t next_serial;
 static char directory[768];
+static char requested_directory[768];
 static tl_pc_api api;
 static pthread_rwlock_t access_lock = PTHREAD_RWLOCK_INITIALIZER;
 static pthread_mutex_t metadata_lock = PTHREAD_MUTEX_INITIALIZER;
-static atomic_bool saving;
+static atomic_bool saving, configured;
 void tl_log_line(const char *fmt, ...);
 
-void tl_pc_set_api(tl_pc_api value) { api = value; } /* before engine threads */
+/* Direct ICDs resolve device commands only after a live instance exists.
+ * Remember the launch-time directory instead of losing it when those commands
+ * are not available yet. Binding occurs before that instance creates devices. */
+static void activate_directory(void)
+{
+    if (!requested_directory[0] || !api.create || !api.data || !api.merge || !api.destroy) { atomic_store(&configured, false); return; }
+    bool changed = strcmp(directory, requested_directory) != 0;
+    if (changed) snprintf(directory, sizeof(directory), "%s", requested_directory);
+    bool was_ready = atomic_exchange(&configured, true);
+    if (changed || !was_ready) tl_log_line("ue4 cache store: enabled; compatible data restored on launch, checkpoints on pause; no first-use warm-up guarantee");
+}
+void tl_pc_set_api(tl_pc_api value) {
+    pthread_rwlock_wrlock(&access_lock);
+    api = value; activate_directory();
+    pthread_rwlock_unlock(&access_lock);
+}
 void tl_pc_configure(const char *path)
 {
-    if (!path || strlen(path) >= sizeof(directory) || !api.create || !api.data || !api.merge || !api.destroy) return;
+    if (!path || strlen(path) >= sizeof(requested_directory)) return;
     if (mkdir(path, 0700) && access(path, W_OK)) return;
     struct stat root;
     if (stat(path, &root) || !S_ISDIR(root.st_mode)) return;
-    snprintf(directory, sizeof(directory), "%s", path);
-    tl_log_line("ue4 cache store: enabled; compatible data restored on launch, checkpoints on pause; no first-use warm-up guarantee");
+    pthread_rwlock_wrlock(&access_lock);
+    snprintf(requested_directory, sizeof(requested_directory), "%s", path);
+    activate_directory();
+    if (!atomic_load(&configured)) tl_log_line("ue4 cache store: directory prepared; awaiting Vulkan cache API from a live instance");
+    pthread_rwlock_unlock(&access_lock);
+}
+bool tl_pc_prepare_mesa_disk_cache(const char *path)
+{
+    bool existing = getenv("MESA_SHADER_CACHE_DIR") != NULL;
+    if (!existing) {
+        if (!path || !path[0] || strlen(path) >= 768) return false;
+        if (mkdir(path, 0700) && access(path, W_OK)) return false;
+        struct stat st;
+        if (lstat(path, &st) || !S_ISDIR(st.st_mode) || access(path, W_OK)) return false;
+        if (setenv("MESA_SHADER_CACHE_DIR", path, 0)) return false;
+    }
+    if (setenv("MESA_SHADER_CACHE_MAX_SIZE", "128M", 0)) return false;
+    tl_log_line("[M2/M3 METAL4 cache] Mesa shader cache %s; default requested budget 128 MiB, explicit overrides retained; NIR/MSL reuse is not a native Metal pipeline hit",
+        existing ? "existing location retained" : "game location prepared");
+    return true;
 }
 bool tl_pc_enter(void)
 {
-    if (!directory[0]) return false;
+    if (!atomic_load(&configured)) return false;
     pthread_rwlock_rdlock(&access_lock);
+    if (!atomic_load(&configured)) { pthread_rwlock_unlock(&access_lock); return false; }
     return true;
 }
 void tl_pc_leave(bool locked) { if (locked) pthread_rwlock_unlock(&access_lock); }
@@ -60,7 +95,7 @@ static struct device *find(void *handle)
 }
 void tl_pc_device(void *handle, uint32_t vendor, uint32_t id, const uint8_t uuid[16])
 {
-    if (!directory[0] || !handle) return;
+    if (!atomic_load(&configured) || !handle) return;
     pthread_mutex_lock(&metadata_lock);
     struct device *d = find(handle);
     if (!d) for (unsigned i = 0; i < MAX_DEVICES; ++i) if (!devices[i].handle) { d = &devices[i]; break; }
@@ -78,7 +113,7 @@ static bool path_for(void *handle, char path[1024], uint8_t header[32])
     struct device *d = find(handle);
     if (d) { memcpy(header, d->header, 32); found = true; }
     pthread_mutex_unlock(&metadata_lock);
-    if (!found || !directory[0]) return false;
+    if (!found || !atomic_load(&configured)) return false;
     char key[65];
     for (unsigned i = 0; i < 32; ++i) snprintf(key + i * 2, 3, "%02x", header[i]);
     snprintf(path, 1024, "%s/%s.bin", directory, key);
@@ -123,7 +158,7 @@ void tl_pc_discard(void *handle)
 /* These metadata operations run inside a caller's shared access scope. */
 void tl_pc_track(void *handle, uint64_t cache)
 {
-    if (!directory[0]) return;
+    if (!atomic_load(&configured)) return;
     pthread_mutex_lock(&metadata_lock);
     struct device *d = find(handle);
     if (d && d->count < MAX_CACHES) { d->caches[d->count++] = cache; ++d->generation; }
@@ -131,7 +166,7 @@ void tl_pc_track(void *handle, uint64_t cache)
 }
 void tl_pc_changed(void *handle, uint64_t cache)
 {
-    if (!directory[0] || !cache) return;
+    if (!atomic_load(&configured) || !cache) return;
     pthread_mutex_lock(&metadata_lock);
     struct device *d = find(handle);
     if (d) for (unsigned i = 0; i < d->count; ++i) if (d->caches[i] == cache) {
@@ -177,7 +212,7 @@ static bool write_blob(const char *path, const void *data, size_t size)
 }
 void tl_pc_checkpoint(void)
 {
-    if (!directory[0]) return;
+    if (!atomic_load(&configured)) return;
     for (unsigned i = 0; i < MAX_DEVICES; ++i) {
         void *data = NULL; size_t size = 0; char path[1024]; uint8_t header[32];
         pthread_rwlock_wrlock(&access_lock);
@@ -227,7 +262,7 @@ static void *save_worker(void *unused)
 }
 void tl_pc_checkpoint_async(void)
 {
-    if (!directory[0]) return;
+    if (!atomic_load(&configured)) return;
     bool dirty = false;
     pthread_mutex_lock(&metadata_lock);
     for (unsigned i = 0; i < MAX_DEVICES; ++i)
