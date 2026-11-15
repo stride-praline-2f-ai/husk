@@ -64,7 +64,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 tests/translation-layer/test_spatial_lifetime.py SpatialLifetimeTests.test_real_optical_flow_shader_compiles_and_interpolates_on_available_host_gpu -v
+          python3 tests/translation-layer/test_spatial_lifetime.py SpatialLifetimeTests.test_real_optical_flow_shader_compiles_and_interpolates_on_available_host_gpu SpatialLifetimeTests.test_bounded_framegen_capture_real_gpu_blits_and_cancellation -v
+          python3 tests/translation-layer/test_frame_evidence.py
       - name: Fingerprint reusable build components
         id: cache_keys
         run: |
@@ -150,6 +151,7 @@ jobs:
           # python3 tests/translation-layer/test_external_efficiency.py -v
           # python3 tests/translation-layer/test_spatial.py -v
           # python3 tests/translation-layer/test_spatial_lifetime.py -v
+          # python3 tests/translation-layer/test_frame_evidence.py -v
           # python3 tests/translation-layer/test_native_archive.py -v
           # python3 tests/translation-layer/test_native_archive_status.py -v
           # python3 tests/translation-layer/test_lifecycle_resilience.py -v
