@@ -5,6 +5,24 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 @unittest.skipUnless(sys.platform=='darwin','Apple Objective-C/MetalFX SDK required; IPA CI runs this check')
 class SpatialLifetimeTests(unittest.TestCase):
+ def test_real_gpu_preparation_does_not_block_or_reconstruct_on_display_ticks(self):
+  for frozen in [True,False]:
+   with self.subTest(frozen170=frozen),tempfile.TemporaryDirectory() as d:
+    p=Path(d);(p/'frames').mkdir()
+    (p/'HuskFramegenABI.h').write_bytes((ROOT/'src/translation-layer-next/husk-tl-framegen.h').read_bytes())
+    (p/'HuskFGCapture.inc').write_bytes((ROOT/'patches/metalfx/HuskFGCapture.inc').read_bytes())
+    shader=(ROOT/'patches/metalfx/HuskFramegen.metal').read_text()
+    (p/'HuskFramegenShader.inc').write_text('static const char*huskFramegenShader=R"HUSKFG('+shader+')HUSKFG";')
+    name='tests/translation-layer/fixtures/framegen-presenter-170.inc' if frozen else 'patches/metalfx/HuskFramegen.inc'
+    code=(ROOT/name).read_text().replace('#if TARGET_OS_IOS','#if 1').replace('#include <os/proc.h>','static uint64_t os_proc_available_memory(){return 1ULL<<30;}').replace('[CADisplayLink displayLinkWithTarget:self selector:@selector(tick:)]','((CADisplayLink*)nil)')
+    (p/'HuskFramegen.inc').write_text(code)
+    command=['clang++','-std=c++17','-fno-objc-arc','-fblocks','-Wno-deprecated-declarations','-I',str(p),str(ROOT/'tests/translation-layer/framegen_presenter_contract.mm'),'-framework','Foundation','-framework','Metal','-framework','QuartzCore','-o',str(p/'check')]
+    if not frozen:command.insert(1,'-DHUSK_PREPARED_PRESENTATION=1')
+    subprocess.run(command,check=True)
+    result=subprocess.run([str(p/'check'),str(p/'frames')],text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=30)
+    print(('Frozen170 presenter: ' if frozen else '')+result.stdout,flush=True)
+    self.assertEqual(result.returncode,9 if frozen else 0,result.stdout)
+
  def test_bounded_framegen_capture_real_gpu_blits_and_cancellation(self):
   with tempfile.TemporaryDirectory() as d:
    p=Path(d);(p/'HuskFramegenABI.h').write_bytes((ROOT/'src/translation-layer-next/husk-tl-framegen.h').read_bytes())

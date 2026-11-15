@@ -15,7 +15,7 @@ class ContractFiles(unittest.TestCase):
  def test_absent_optional_drivers_create_no_false_runtime_admission(self):
   with tempfile.TemporaryDirectory()as d:
    p=Path(d);record=module.stage(p,p/'contract.json','a'*40)
-   self.assertEqual(record['model'],2);self.assertEqual(record['libraries'],{})
+   self.assertEqual(record['model'],3);self.assertEqual(record['libraries'],{})
 @unittest.skipUnless(sys.platform=='darwin','Apple Foundation/CommonCrypto and Swift required; IPA CI runs this check')
 class AppleContract(unittest.TestCase):
  def test_actual_loaded_dylib_code_identity_source_and_tampered_contract(self):
@@ -23,10 +23,10 @@ class AppleContract(unittest.TestCase):
    p=Path(d);(p/'fixed.c').write_text('int fixed_entry(void){return 2;}')
    dylib=p/'FixedDriver';subprocess.run(['clang','-dynamiclib',str(p/'fixed.c'),'-o',str(dylib)],check=True)
    expected=module.code_digest(dylib.read_bytes())
-   (p/'contract.json').write_text(json.dumps(dict(schema=1,model=2,app_source='a'*40,libraries={'FixedDriver':{'code_sha256':expected}})))
-   (p/'wrong.json').write_text(json.dumps(dict(schema=1,model=2,app_source='a'*40,libraries={'FixedDriver':{'code_sha256':'0'*64}})))
+   (p/'contract.json').write_text(json.dumps(dict(schema=1,model=3,app_source='a'*40,libraries={'FixedDriver':{'code_sha256':expected}})))
+   (p/'wrong.json').write_text(json.dumps(dict(schema=1,model=3,app_source='a'*40,libraries={'FixedDriver':{'code_sha256':'0'*64}})))
    (p/'malformed.json').write_text('{"schema":null,"model":null}')
-   (p/'old.json').write_text(json.dumps(dict(schema=1,model=1,app_source='a'*40,libraries={'FixedDriver':{'code_sha256':expected}})))
+   (p/'old.json').write_text(json.dumps(dict(schema=1,model=2,app_source='a'*40,libraries={'FixedDriver':{'code_sha256':expected}})))
    (p/'main.m').write_text(r'''
 #import <Foundation/Foundation.h>
 #include <dlfcn.h>

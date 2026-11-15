@@ -1,0 +1,62 @@
+{
+  "history": [
+    {
+      "run_id": 43726197969,
+      "job_id": 132848546914,
+      "status": "cancelled",
+      "description": "3.5px constant-gradient failure; setup continued despite early failure; workflow corrected",
+      "log_sha256": "21d61c860fb5cbb5c29997715c3a4244c5267e1565fbbb6e9c030b8e597e2d03",
+      "log_bytes": 157832,
+      "test_executions": 452,
+      "test_invocations": 58,
+      "test_skips": 0
+    },
+    {
+      "run_id": 43726479997,
+      "job_id": 132849504626,
+      "status": "failure",
+      "description": "Same constant-gradient failure; heavy setup correctly skipped",
+      "log_sha256": "eb00ea106192c5de8e5e91d43bb10909711cc43ff02f1dfd20c52d325ebcbbf8",
+      "log_bytes": 27345,
+      "test_executions": 2,
+      "test_invocations": 1,
+      "test_skips": 0
+    },
+    {
+      "run_id": 43726951467,
+      "job_id": 132850856320,
+      "status": "failure",
+      "description": "Repeated-scene p90 8.074px rejected; criterion retained",
+      "log_sha256": "7a36b01ed15bde9664c79056b4138c3fe33a1739796481bb9487b6dad0363287",
+      "log_bytes": 28064,
+      "test_executions": 2,
+      "test_invocations": 1,
+      "test_skips": 0
+    },
+    {
+      "run_id": 43727676559,
+      "job_id": 132853061363,
+      "status": "success",
+      "description": "Both fresh drivers; explicit mip witness rejects frozen169; repeated-scene p90 0.1721px",
+      "log_sha256": "b311db25b92612b4cbfc611c7fcd71b0d77f4f5862296cdfc3d2ba9c374eefa1",
+      "log_bytes": 759452,
+      "test_executions": 466,
+      "test_invocations": 63,
+      "test_skips": 0
+    },
+    {
+      "run_id": 43731239823,
+      "job_id": 132863909991,
+      "status": "cancelled",
+      "description": "All51 suites and10setup passed; app compile cancelled to include disabled-state consistency for custom scale; no IPA delivered",
+      "log_sha256": "9e0d192d50fb107108e8ac136bd9107268e75b589eb9555d01704b1ef7fc2159",
+      "log_bytes": 256687,
+      "test_executions": 472,
+      "test_invocations": 64,
+      "test_skips": 0
+    }
+  ],
+  "earlier_170_packages_delivered": false,
+  "fresh_driver_source": "02d767c28dd4f8d5c559a9d6f41f9847719a6eb9",
+  "scope": "Earlier failed controls retained; final source includes later mandatory-contract and simpler-settings steering."
+}

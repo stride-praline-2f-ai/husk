@@ -1,0 +1,35 @@
+{
+  "download_url": "https://filebin.net/b725f181992c427189a05188/Husk-3.4-build170-Framegen-Field.ipa",
+  "file": {
+    "filename": "Husk-3.4-build170-Framegen-Field.ipa",
+    "content-type": "application/zip",
+    "bytes": 154389344,
+    "bytes_readable": "154 MB",
+    "md5": "nZC629XJAiXhiqHDsstQWw==",
+    "sha1": "ce0fa1e7c458264f36060b9d7ef0a2ae23ea8866",
+    "sha256": "e914b115ac9d0ecae1903e97eaf0780bd191d5480e80f3fe4f4aa6c8dee05878",
+    "updated_at": "2026-11-15T15:59:21.935697Z",
+    "updated_at_relative": "now",
+    "created_at": "2026-11-15T15:59:21.935697Z",
+    "created_at_relative": "now"
+  },
+  "bin": {
+    "id": "b725f181992c427189a05188",
+    "readonly": false,
+    "bytes": 0,
+    "bytes_readable": "0 B",
+    "files": 0,
+    "updated_at": "2026-11-15T15:59:22.260822Z",
+    "updated_at_relative": "now",
+    "created_at": "2026-11-15T15:58:56.928593Z",
+    "created_at_relative": "now",
+    "expired_at": "2026-11-22T15:59:22.260822Z",
+    "expired_at_relative": "6 days from now"
+  },
+  "anonymous_full_download_verified": true,
+  "downloaded_bytes": 154389344,
+  "downloaded_sha256": "e914b115ac9d0ecae1903e97eaf0780bd191d5480e80f3fe4f4aa6c8dee05878",
+  "magic": "504b0304",
+  "source": "d17c1309521f56c7d9437d932edb8a1d63f7b459",
+  "candidate_build": "170"
+}
