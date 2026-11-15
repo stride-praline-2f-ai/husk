@@ -92,15 +92,20 @@ struct TLAppSettings: Codable, Equatable {
 
     var unrealGraphics: UnrealGraphics = .automatic
 
+    func isDungeons(_ app: TLApp) -> Bool {
+        guard app.report?.nativeEngine == .ue4 else { return false }
+        let package = app.packageName?.lowercased() ?? "", label = app.label.lowercased()
+        return package == "com.nintendosss.spice" || package.contains("dungeons")
+            || (label.contains("minecraft") && label.contains("dungeons"))
+    }
+
     func usesSharpGraphics(for app: TLApp) -> Bool {
         guard app.report?.nativeEngine == .ue4 else { return false }
         switch unrealGraphics {
         case .gameDefault: return false
         case .sharpHigh, .efficientHigh: return true
         case .automatic:
-            let name = app.label.lowercased()
-            return (name.contains("minecraft") && name.contains("dungeons"))
-                || (app.packageName?.lowercased().contains("dungeons") ?? false)
+            return isDungeons(app)
         }
     }
 
@@ -152,6 +157,42 @@ struct TLAppSettings: Codable, Equatable {
         enhancedMetal4 = enabled && bridgeAvailable
         if !enhancedMetal4 && metal4Renderer { frameGeneration = false }
     }
+    // DUNGEONS_SIMPLE_POLICY_BEGIN
+    func dungeonsFrameChoice(automaticActive: Bool) -> Int {
+        frameGeneration ? 120 : (automaticActive ? 60 : efficientFrameRate.rawValue)
+    }
+    mutating func selectDungeonsFrameChoice(_ value: Int, bridgeAvailable: Bool) {
+        selectFrameGeneration(value == 120, bridgeAvailable: bridgeAvailable)
+        if value == 30 { efficientFrameRate = .cool; automaticDuoProfile = false }
+        if value == 60 { efficientFrameRate = .smooth }
+    }
+    var dungeonsResolutionChoice: Int {
+        efficientResolution == .automatic ? 0 : (efficientResolution == .native ? 100 : -1)
+    }
+    var dungeonsResolutionPercent: Int {
+        efficientResolution == .custom ? customResolutionPercent : (efficientResolution.rawValue > 0 ? efficientResolution.rawValue : customResolutionPercent)
+    }
+    mutating func selectDungeonsResolutionChoice(_ value: Int) {
+        if value == 0 {
+            efficientResolution = .automatic
+            // Automatic resolution must not silently replace a chosen30FPS cap.
+            automaticDuoProfile = frameGeneration || efficientFrameRate == .smooth
+        } else {
+            let percent = dungeonsResolutionPercent
+            efficientResolution = value == 100 ? .native : .custom
+            if value != 100 { customResolutionPercent = percent }
+            automaticDuoProfile = false
+        }
+    }
+    var dungeonsRendererChoice: Int { metal4Renderer ? (enhancedMetal4 ? 0 : 1) : 2 }
+    mutating func selectDungeonsRendererChoice(_ value: Int, bridgeAvailable: Bool) {
+        if value == 2 { selectMetal4(false, bridgeAvailable: bridgeAvailable) }
+        else {
+            selectMetal4(true, bridgeAvailable: bridgeAvailable)
+            selectEnhancedMetal4(value == 0, bridgeAvailable: bridgeAvailable)
+        }
+    }
+    // DUNGEONS_SIMPLE_POLICY_END
     var sharedMemoryReserve = true
     var spatialUpscaling = false
     var spatialInputPercent = 80
@@ -192,10 +233,7 @@ struct TLAppSettings: Codable, Equatable {
     }
 
     func supportsDuoAutomatic(for app: TLApp) -> Bool {
-        let name = app.label.lowercased()
-        return automaticDuoProfile && usesEfficientGraphics(for: app)
-            && ((name.contains("minecraft") && name.contains("dungeons"))
-                || (app.packageName?.lowercased().contains("dungeons") ?? false))
+        automaticDuoProfile && usesEfficientGraphics(for: app) && isDungeons(app)
     }
     @MainActor func duoAutomaticActive(for app: TLApp) -> Bool {
         supportsDuoAutomatic(for: app) && DuoDisplayPolicy.metrics(screen: .main).isInner
@@ -311,6 +349,7 @@ struct TLAppSettings: Codable, Equatable {
 /// One game's settings, opened from its page or from its tile's menu.
 struct TLAppSettingsView: View {
     let app: TLApp
+    private let advancedOnly: Bool
 
     @State private var profilesSheet = false
     @ObservedObject private var store = TranslationLayerStore.shared
@@ -325,8 +364,9 @@ struct TLAppSettingsView: View {
     @State private var showFrameEvidenceShare = false
     @FocusState private var nameFocused: Bool
 
-    init(app: TLApp) {
+    init(app: TLApp, advancedOnly: Bool = false) {
         self.app = app
+        self.advancedOnly = advancedOnly
         _settings = State(initialValue: TLAppSettings.load(app.id))
         _name = State(initialValue: app.label)
     }
@@ -344,7 +384,91 @@ struct TLAppSettingsView: View {
             .filter { FileManager.default.fileExists(atPath: $0.path) }
     }
 
+    private var isDungeons: Bool { settings.isDungeons(app) }
+
     var body: some View {
+        Group {
+            if isDungeons && !advancedOnly { dungeonsSettings }
+            else { allSettings }
+        }
+        .huskForm()
+        .navigationTitle(isDungeons && advancedOnly ? "Advanced Settings" : "Settings")
+        .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: settings) { $0.save(app.id) }
+        .onChange(of: settings.geode) { on in
+            if on { Task { await geode.prepare(app) } } else { geode.remove(app) }
+        }
+        .onChange(of: nameFocused) { focused in if !focused { rename() } }
+        .onDisappear { rename() }
+        .onAppear { if isDungeons && !advancedOnly { settings = TLAppSettings.load(app.id) } }
+        .task { dataSize = await Self.measure(dataDirs) }
+        .sheet(isPresented: $showFrameEvidenceShare) { ShareSheet(items: frameEvidenceFiles.map { $0 as Any }) }
+        .confirmationDialog("Reset the data of \(app.label)?", isPresented: $confirmReset, titleVisibility: .visible) {
+            Button("Reset Game Data", role: .destructive) {
+                for dir in dataDirs { try? FileManager.default.removeItem(at: dir) }
+                HuskLog.log("tl", "reset the data of \(app.label)")
+                Task { dataSize = await Self.measure(dataDirs) }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Saves, settings and caches the game made here are deleted.")
+        }
+    }
+
+    private var dungeonsSettings: some View {
+        HuskForm {
+            Section {
+                if !settings.usesEfficientGraphics(for: app) {
+                    Button("Use recommended graphics") { settings.unrealGraphics = .automatic }
+                }
+                Picker("Frame rate", selection: Binding(get: {
+                    settings.dungeonsFrameChoice(automaticActive: settings.duoAutomaticActive(for: app))
+                }, set: { settings.selectDungeonsFrameChoice($0, bridgeAvailable: Metal4DriverCapabilities.current.frameGeneration) })) {
+                    Text("60 FPS").tag(60)
+                    Text("30 FPS").tag(30)
+                    Text("60 FPS · Frame Generation (Beta)").tag(120)
+                }
+                .disabled(!settings.usesEfficientGraphics(for: app))
+                Picker("Resolution", selection: Binding(get: { settings.dungeonsResolutionChoice }, set: { settings.selectDungeonsResolutionChoice($0) })) {
+                    Text("Automatic").tag(0)
+                    Text("Native").tag(100)
+                    Text("Custom").tag(-1)
+                }
+                .disabled(!settings.usesEfficientGraphics(for: app))
+                if settings.dungeonsResolutionChoice == -1 {
+                    HStack(spacing: 12) {
+                        Slider(value: Binding(get: { Double(settings.dungeonsResolutionPercent) }, set: {
+                            settings.customResolutionPercent = Int($0.rounded()); settings.efficientResolution = .custom; settings.automaticDuoProfile = false
+                        }), in: 65...100, step: 1)
+                        Text("\(settings.dungeonsResolutionPercent)%").monospacedDigit().frame(width: 42, alignment: .trailing)
+                    }
+                }
+            } header: { Text(app.label) } footer: {
+                Text(settings.frameGeneration
+                     ? "Frame Generation renders at 30 FPS and targets 60 output images. Unreliable motion repeats a real frame. Restart Husk after graphics changes."
+                     : "\(settings.metal4Renderer ? "Metal 4" : "MoltenVK") · Restart Husk after graphics changes.")
+            }
+            Section {
+                Picker("On-screen controller", selection: $settings.pad) {
+                    ForEach(TLAppSettings.PadMode.allCases) { Text($0.title).tag($0) }
+                }
+                Menu {
+                    Button("Capture frame evidence") {
+                        do { frameEvidenceMessage = try FramegenDiagnostics.arm(app: app, inUse: inUse) }
+                        catch { frameEvidenceMessage = error.localizedDescription }
+                    }.disabled(!settings.frameGeneration || frameEvidenceBusy)
+                    Button(frameEvidenceBusy ? "Preparing bundle…" : "Share diagnostic bundle") { exportFrameEvidence() }.disabled(frameEvidenceBusy)
+                    Button("Capture status") { frameEvidenceMessage = FramegenDiagnostics.status }
+                    Button("Cancel capture") { FramegenDiagnostics.cancelPending(); frameEvidenceMessage = "Capture cancelled. Saved evidence is kept." }
+                } label: { HStack { Text("Diagnostics"); Spacer(); Text(FramegenDiagnostics.conciseStatus).foregroundStyle(.secondary).font(.footnote) } }
+                NavigationLink("Advanced settings") { TLAppSettingsView(app: app, advancedOnly: true) }
+            } footer: {
+                if !frameEvidenceMessage.isEmpty { Text(frameEvidenceMessage) }
+            }
+        }
+    }
+
+    private var allSettings: some View {
         HuskForm {
             Section {
                 HStack(spacing: 14) {
@@ -382,11 +506,29 @@ struct TLAppSettingsView: View {
 
             if app.report?.nativeEngine == .ue4 {
                 Section {
+                    if isDungeons {
+                        Picker("Graphics preset", selection: Binding(get: { settings.unrealGraphics }, set: {
+                            settings.unrealGraphics = $0
+                            if !settings.usesEfficientGraphics(for: app) { settings.selectFrameGeneration(false) }
+                        })) {
+                            ForEach(TLAppSettings.UnrealGraphics.allCases) { Text($0.title).tag($0) }
+                        }
+                    } else {
                     Picker("Graphics Preset", selection: $settings.unrealGraphics) {
                         ForEach(TLAppSettings.UnrealGraphics.allCases) { Text($0.title).tag($0) }
                     }
+                    }
                     LabeledContent("Active Preset", value: settings.usesEfficientGraphics(for: app) ? "Sharp / Efficient" : (settings.usesSharpGraphics(for: app) ? "Sharp / High Quality" : "Game Default"))
                     if #available(iOS 26.0, *), FileManager.default.fileExists(atPath: (Bundle.main.privateFrameworksPath ?? "") + "/KosmicKrisp.framework/KosmicKrisp") {
+                        if isDungeons {
+                            Picker("Renderer", selection: Binding(get: { settings.dungeonsRendererChoice }, set: {
+                                settings.selectDungeonsRendererChoice($0, bridgeAvailable: Metal4DriverCapabilities.current.nativeArchives)
+                            })) {
+                                if Metal4DriverCapabilities.current.nativeArchives { Text("Metal 4").tag(0) }
+                                Text("Metal 4 · Compatibility").tag(1)
+                                Text("MoltenVK").tag(2)
+                            }
+                        } else {
                         Toggle("Metal 4 Vulkan (Beta)", isOn: Binding(get: { settings.metal4Renderer }, set: { settings.selectMetal4($0) }))
                         Text("Separate KosmicKrisp renderer at the selected output resolution. Turn off to restore MoltenVK and MetalFX. Restart required.")
                             .font(.footnote).foregroundStyle(.secondary)
@@ -395,8 +537,9 @@ struct TLAppSettingsView: View {
                             Text("Source-built renderer with bounded shader-library reuse, optional native pipeline archives and frame generation. Archive Enabled is in Optional Experiments. Turn this off to restore the published Metal 4 driver. Restart required.")
                                 .font(.footnote).foregroundStyle(.secondary)
                         }
+                        }
                     }
-                    if settings.usesEfficientGraphics(for: app) && app.label.lowercased().contains("dungeons") {
+                    if settings.usesEfficientGraphics(for: app) && isDungeons && !advancedOnly {
                         Toggle("Dungeons Frame Generation (Beta)", isOn: Binding(get: { settings.frameGeneration }, set: { settings.selectFrameGeneration($0) }))
                         Text(Metal4DriverCapabilities.current.frameGeneration ? "30 rendered → 60 output target, including generated images. With Metal 4 on, this enables Metal 4 Enhancements. May add artifacts and latency; unreliable motion repeats a real frame. Turn off to restore your rendered-FPS setting. Restart required." : "30 rendered → 60 output target, including generated images. May add artifacts and input latency; unreliable motion repeats a real frame. Enabling this selects MoltenVK and turns Metal 4 off. Restart required.")
                             .font(.footnote).foregroundStyle(.secondary)
@@ -549,27 +692,6 @@ struct TLAppSettingsView: View {
                 Text(inUse ? "The game is loaded in this session. Close Husk completely and open it again to reset its data."
                            : "Deletes what the game saved and downloaded here: saves, settings and caches. The game itself stays.")
             }
-        }
-        .huskForm()
-        .navigationTitle("Settings")
-        .navigationBarTitleDisplayMode(.inline)
-        .onChange(of: settings) { $0.save(app.id) }
-        .onChange(of: settings.geode) { on in
-            if on { Task { await geode.prepare(app) } } else { geode.remove(app) }
-        }
-        .onChange(of: nameFocused) { focused in if !focused { rename() } }
-        .onDisappear { rename() }
-        .task { dataSize = await Self.measure(dataDirs) }
-        .sheet(isPresented: $showFrameEvidenceShare) { ShareSheet(items: frameEvidenceFiles.map { $0 as Any }) }
-        .confirmationDialog("Reset the data of \(app.label)?", isPresented: $confirmReset, titleVisibility: .visible) {
-            Button("Reset Game Data", role: .destructive) {
-                for dir in dataDirs { try? FileManager.default.removeItem(at: dir) }
-                HuskLog.log("tl", "reset the data of \(app.label)")
-                Task { dataSize = await Self.measure(dataDirs) }
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("Saves, settings and caches the game made here are deleted.")
         }
     }
 

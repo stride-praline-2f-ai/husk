@@ -9,6 +9,12 @@ import Metal
     static var root: URL { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("Frame Evidence", isDirectory: true) }
     private static var pending: URL { root.appendingPathComponent("pending.json") }
     private static var latest: URL { root.appendingPathComponent("latest.json") }
+    private static var requiredContract: Any {
+        guard let url = Bundle.main.url(forResource: "framegen-contract", withExtension: "json"),
+              let data = try? Data(contentsOf: url), data.count < 128 * 1024,
+              let value = try? JSONSerialization.jsonObject(with: data) else { return "UNAVAILABLE; FG must refuse" }
+        return value
+    }
     static var context: [String: Any] {
         let info = Bundle.main.infoDictionary ?? [:]
         var drivers: [String: Any] = [:]
@@ -23,7 +29,7 @@ import Metal
             "device": HuskLog.deviceModel, "os": UIDevice.current.systemVersion, "gpu": MTLCreateSystemDefaultDevice()?.name ?? "UNAVAILABLE",
             "physical_ram_bytes": ProcessInfo.processInfo.physicalMemory, "cpu_count": ProcessInfo.processInfo.processorCount,
             "low_power_mode": ProcessInfo.processInfo.isLowPowerModeEnabled, "thermal_state": ProcessInfo.processInfo.thermalState.rawValue,
-            "application_state": UIApplication.shared.applicationState.rawValue, "drivers": drivers,
+            "application_state": UIApplication.shared.applicationState.rawValue, "drivers": drivers, "required_framegen_contract": requiredContract,
             "scope": "Host context at this observation time; capture frames have their own IDs/times. No electrical power or runtime engine CVar readback."]
     }
     private static func json(_ value: [String: Any], to url: URL) throws {
@@ -60,7 +66,7 @@ import Metal
         }
         HuskLog.log("frame-evidence", "[M3/M9] \(record["state"]!); capture \(id), app \(app.id); local only, no automatic upload")
         prune(keeping: id)
-        if result == 1 { return "Capture armed. Return to the scene only if comfortable; one matched pair saves after about3 seconds of rendered frames. No recording needed." }
+        if result == 1 { return "Capture armed. Return to the scene only if comfortable; one matched pair saves after about 3 seconds of rendered frames. No recording needed." }
         if inUse { return "Capture is unavailable in the running renderer or another capture is busy. Keep existing files; use source Metal4 Enhancements with FG on if you later choose to capture." }
         return "One capture is queued for the next full game launch with FG enabled. No continuous recording. You do not need to keep watching if it is uncomfortable."
     }
@@ -78,6 +84,20 @@ import Metal
     static func cancelPending() {
         try? FileManager.default.removeItem(at: pending)
         _ = tl_vk_framegen_capture_arm(nil, 0, 0, 0)
+        if let dir = latestFolder, let data = try? Data(contentsOf: dir.appendingPathComponent("host-session.json")),
+           var record = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            record["state"] = "cancelled"; try? json(record, to: dir.appendingPathComponent("host-session.json"))
+        }
+    }
+    static var conciseStatus: String {
+        guard let dir = latestFolder else { return "Off" }
+        guard let data = try? Data(contentsOf: dir.appendingPathComponent("frames/pair-01.json")),
+              let record = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            if let data = try? Data(contentsOf: dir.appendingPathComponent("host-session.json")),
+               let host = try? JSONSerialization.jsonObject(with: data) as? [String: Any], host["state"] as? String == "cancelled" { return "Cancelled" }
+            return "Waiting"
+        }
+        return record["state"] as? String == "complete" ? "Saved" : "Incomplete"
     }
     static var status: String {
         guard let dir = latestFolder else { return "No frame evidence saved. Capture stays off unless explicitly armed." }

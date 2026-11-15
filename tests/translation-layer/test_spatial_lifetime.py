@@ -152,6 +152,8 @@ int main(){@autoreleasepool{
    self.assertEqual(current_mip.returncode,0,current_mip.stdout)
    print(current_mip.stdout)
    old_mip=subprocess.run([str(exe),str(ROOT/'tests/translation-layer/fixtures/framegen-169.metal'),'mip-only'],text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=30)
+   self.assertEqual(old_mip.returncode,8,old_mip.stdout)
+   self.assertIn('QUALITY_REJECT: motion sampler ignored requested mip level',old_mip.stdout)
    print('Frozen169 mip witness:',old_mip.returncode,old_mip.stdout)
    result=subprocess.run([str(exe),str(ROOT/'patches/metalfx/HuskFramegen.metal')],text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=30)
    print(result.stdout)

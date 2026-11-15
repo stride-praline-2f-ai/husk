@@ -6,7 +6,7 @@ ROOT=Path(__file__).resolve().parents[1]
 workflow=(ROOT/'.github/workflows/build-husk-ipa.yml').read_text()
 # The explicit suite list is the workflow contract, including the new Duo case.
 names=re.findall(r'python3 (tests/translation-layer/[^ ]+\.py) -v',workflow)
-if len(names)!=50 or len(set(names))!=50:raise SystemExit('Expected exactly 50 distinct required suites')
+if len(names)!=51 or len(set(names))!=51:raise SystemExit('Expected exactly 51 distinct required suites')
 results=[];logs=ROOT/'build/logs';logs.mkdir(parents=True,exist_ok=True)
 for name in names:
     result=subprocess.run([sys.executable,name,'-v'],cwd=ROOT,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)

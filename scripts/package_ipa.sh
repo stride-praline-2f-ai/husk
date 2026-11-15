@@ -47,6 +47,9 @@ if [ -f "$BUILT" ] && [ "$BUILT" -nt "$STAGED" ]; then
     cp "$BUILT" "$STAGED"
 fi
 
+# Bind FG to the exact reviewed driver code before resources/project generation.
+python3 "$HUSK_ROOT/scripts/stage_framegen_contract.py" "$HUSK_ROOT/build/ios-arm64/lib" "$HUSK_ROOT/src/app/Husk/Resources/framegen-contract.json"
+
 # Regenerate the project first.
 #
 # project.yml globs src/app/Husk, so adding a source file there is meant to be
