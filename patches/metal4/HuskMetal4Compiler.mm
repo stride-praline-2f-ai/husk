@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <sys/stat.h>
 #include <string.h>
+#include <stdio.h>
 #include "HuskNativeArchiveABI.h"
 
 static std::mutex ownersLock;
@@ -44,7 +45,7 @@ static NSString *huskDigest(NSData *data){
         capture=[device newPipelineDataSetSerializerWithDescriptor:c];[c release];desc.pipelineDataSetSerializer=capture;
     }
     NSError *error=nil;compiler=[device newCompilerWithDescriptor:desc error:&error];[desc release];
-    if(!compiler){[self release];return nil;}return self;
+    if(!compiler){fprintf(stderr,"[M3 METAL4] compiler creation failed: %s\n",error.localizedDescription.UTF8String?:"unavailable");[self release];return nil;}return self;
 }
 - (void)dealloc {[compiler release];[capture release];[super dealloc];}
 @end
@@ -164,7 +165,7 @@ static NSString *huskDigest(NSData *data){
         state=compute?(id)[archive newComputePipelineStateWithDescriptor:desc error:nil]:(id)[archive newRenderPipelineStateWithDescriptor:desc error:nil];
         if(state){++hits;break;}
     }[archives release];
-    if(state){if(error)*error=nil;return state;}++misses;
+    if(state){if(error)*error=nil;return state;}if(_enabled)++misses;
     HuskMetal4CompileEpoch *e=[self epoch];
     {std::shared_lock<std::shared_mutex> gate(e->gate,std::adopt_lock);
         state=compute?(id)[e->compiler newComputePipelineStateWithDescriptor:desc compilerTaskOptions:options error:error]:(id)[e->compiler newRenderPipelineStateWithDescriptor:desc compilerTaskOptions:options error:error];
@@ -231,7 +232,9 @@ extern "C" __attribute__((visibility("default"))) int vkHuskArchiveSnapshot(tl_n
     *s={};s->version=TL_NATIVE_ARCHIVE_ABI;s->size=sizeof(*s);s->requested=archiveEnabled;s->supported=!compilerOwners.empty();s->pending=pending;
     s->descriptors_captured=captures;s->archive_attachments=hits;s->archive_fallbacks=misses;s->saved_bytes=writeBytes;s->restored_bytes=readBytes;
     s->read_failures=readErrors;s->write_failures=writeErrors;s->evicted_files=evictions;s->evicted_bytes=evictedBytes;s->prepare_calls=prepareCalls;
-    s->verification_requested=archiveVerify;s->verification_attempts=hits+misses;s->archive_requirement_satisfied=hits;return 1;
+    s->verification_requested=archiveVerify;
+    if(archiveVerify){s->verification_attempts=hits+misses;s->archive_requirement_satisfied=hits;s->verification_failures=misses;}
+    return 1;
 }
 extern "C" __attribute__((visibility("default"))) void vkHuskMetal4Checkpoint(void){
     std::lock_guard<std::mutex> guard(ownersLock);for(HuskMetal4Compiler *c:compilerOwners)[c checkpoint];

@@ -2,7 +2,16 @@ name: Validate source-built Metal4 driver toolchain
 on:
   push:
     branches: [main]
-    paths: ['.github/workflows/metal4-toolchain.yml', '.github/ci/build_metal4_probe.sh']
+    paths:
+      - '.github/workflows/metal4-toolchain.yml'
+      - '.github/ci/build_metal4_probe.sh'
+      - 'patches/metal4/**'
+      - 'patches/metalfx/HuskFramegen*'
+      - 'scripts/prepare_metal4_source.py'
+      - 'tests/translation-layer/metal4*'
+      - 'tests/translation-layer/test_metal4_components.py'
+      - 'src/translation-layer-next/husk-tl-framegen.h'
+      - 'src/translation-layer-next/husk-tl-native-archive.h'
   workflow_dispatch:
 permissions:
   contents: read
