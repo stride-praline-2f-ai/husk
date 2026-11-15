@@ -1,0 +1,271 @@
+{
+  "source": "1d431a2d6ed7069f02e107e5e5fa696075211a7c",
+  "tree": "b6285137e5c456addd19abb27483bbde4a041038",
+  "packaged_source": "1d431a2d6ed7069f02e107e5e5fa696075211a7c-dirty",
+  "candidate_build": "164",
+  "workflow": "58c92a9d3385dc3eb02b49252637f50fcd1aa14a",
+  "run_id": 43666649342,
+  "job_id": 132667399846,
+  "runner_name": "GitHub Actions 1000000649",
+  "runner_id": 1000000649,
+  "attempt": 1,
+  "started": "2026-11-15T02:12:12Z",
+  "updated": "2026-11-15T02:18:33Z",
+  "conclusion": "success",
+  "steps": [
+    {
+      "name": "Set up job",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 1,
+      "started_at": "2026-11-15T02:12:15Z",
+      "completed_at": "2026-11-15T02:12:16Z"
+    },
+    {
+      "name": "Check out private build repository",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 2,
+      "started_at": "2026-11-15T02:12:16Z",
+      "completed_at": "2026-11-15T02:12:19Z"
+    },
+    {
+      "name": "Restore exact reviewed source",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 3,
+      "started_at": "2026-11-15T02:12:19Z",
+      "completed_at": "2026-11-15T02:12:22Z"
+    },
+    {
+      "name": "Fingerprint reusable build components",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 4,
+      "started_at": "2026-11-15T02:12:22Z",
+      "completed_at": "2026-11-15T02:12:25Z"
+    },
+    {
+      "name": "Restore pinned tools downloads and Rust dependencies",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 5,
+      "started_at": "2026-11-15T02:12:25Z",
+      "completed_at": "2026-11-15T02:12:50Z"
+    },
+    {
+      "name": "Restore source-matched native driver component",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 6,
+      "started_at": "2026-11-15T02:12:50Z",
+      "completed_at": "2026-11-15T02:12:51Z"
+    },
+    {
+      "name": "Restore source-matched Java component",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 7,
+      "started_at": "2026-11-15T02:12:51Z",
+      "completed_at": "2026-11-15T02:12:52Z"
+    },
+    {
+      "name": "Check every platform signing and packaging prerequisite",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 8,
+      "started_at": "2026-11-15T02:12:52Z",
+      "completed_at": "2026-11-15T02:12:55Z"
+    },
+    {
+      "name": "Run full regression suite including actual Duo policy",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 9,
+      "started_at": "2026-11-15T02:12:55Z",
+      "completed_at": "2026-11-15T02:14:28Z"
+    },
+    {
+      "name": "Prepare clean cloud Mac build tools and check Vulkan SDK ABI",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 10,
+      "started_at": "2026-11-15T02:14:28Z",
+      "completed_at": "2026-11-15T02:14:29Z"
+    },
+    {
+      "name": "Stage matching release resources",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 11,
+      "started_at": "2026-11-15T02:14:29Z",
+      "completed_at": "2026-11-15T02:14:31Z"
+    },
+    {
+      "name": "Verify exact unchanged release Metal shaders",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 12,
+      "started_at": "2026-11-15T02:14:31Z",
+      "completed_at": "2026-11-15T02:14:31Z"
+    },
+    {
+      "name": "Set up Java compiler for Android framework repair",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 13,
+      "started_at": "2026-11-15T02:14:31Z",
+      "completed_at": "2026-11-15T02:14:32Z"
+    },
+    {
+      "name": "Rebuild and exercise the repaired Java framework",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 14,
+      "started_at": "2026-11-15T02:14:32Z",
+      "completed_at": "2026-11-15T02:14:33Z"
+    },
+    {
+      "name": "Save verified Java component for future app-only builds",
+      "status": "completed",
+      "conclusion": "skipped",
+      "number": 15,
+      "started_at": "2026-11-15T02:14:33Z",
+      "completed_at": "2026-11-15T02:14:33Z"
+    },
+    {
+      "name": "Verify unchanged driver independently",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 16,
+      "started_at": "2026-11-15T02:14:33Z",
+      "completed_at": "2026-11-15T02:14:36Z"
+    },
+    {
+      "name": "Save verified native driver for future app-only builds",
+      "status": "completed",
+      "conclusion": "skipped",
+      "number": 17,
+      "started_at": "2026-11-15T02:14:36Z",
+      "completed_at": "2026-11-15T02:14:36Z"
+    },
+    {
+      "name": "Build pairing library with cached dependencies",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 18,
+      "started_at": "2026-11-15T02:14:36Z",
+      "completed_at": "2026-11-15T02:14:51Z"
+    },
+    {
+      "name": "Check staged project and every required library",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 19,
+      "started_at": "2026-11-15T02:14:51Z",
+      "completed_at": "2026-11-15T02:15:03Z"
+    },
+    {
+      "name": "Report all setup failures together before app compilation",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 20,
+      "started_at": "2026-11-15T02:15:03Z",
+      "completed_at": "2026-11-15T02:15:04Z"
+    },
+    {
+      "name": "Build and package fresh Duo IPA",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 21,
+      "started_at": "2026-11-15T02:15:04Z",
+      "completed_at": "2026-11-15T02:18:22Z"
+    },
+    {
+      "name": "Upload installable IPA",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 22,
+      "started_at": "2026-11-15T02:18:22Z",
+      "completed_at": "2026-11-15T02:18:25Z"
+    },
+    {
+      "name": "Save private build result",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 23,
+      "started_at": "2026-11-15T02:18:25Z",
+      "completed_at": "2026-11-15T02:18:27Z"
+    },
+    {
+      "name": "Upload build logs on failure",
+      "status": "completed",
+      "conclusion": "skipped",
+      "number": 24,
+      "started_at": "2026-11-15T02:18:27Z",
+      "completed_at": "2026-11-15T02:18:27Z"
+    },
+    {
+      "name": "Post Set up Java compiler for Android framework repair",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 46,
+      "started_at": "2026-11-15T02:18:27Z",
+      "completed_at": "2026-11-15T02:18:27Z"
+    },
+    {
+      "name": "Post Restore pinned tools downloads and Rust dependencies",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 47,
+      "started_at": "2026-11-15T02:18:27Z",
+      "completed_at": "2026-11-15T02:18:27Z"
+    },
+    {
+      "name": "Post Check out private build repository",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 48,
+      "started_at": "2026-11-15T02:18:27Z",
+      "completed_at": "2026-11-15T02:18:27Z"
+    },
+    {
+      "name": "Complete job",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 49,
+      "started_at": "2026-11-15T02:18:27Z",
+      "completed_at": "2026-11-15T02:18:29Z"
+    }
+  ],
+  "automated_tests": 452,
+  "suite_invocations": 58,
+  "skipped": 0,
+  "font_paths": "pass",
+  "java": "Verified unchanged exact component cache hit; actual unique-activity regression passes; packaged full/core identity checked independently",
+  "driver": "Verified unchanged exact component cache hit; native driver/compiler/shader unchanged",
+  "cache_regression": "Production deferred/partial ICD callback activation and roundtrip, Mesa bounded defaults/explicit overrides plus existing concurrency/corruption/generation checks:11 pass",
+  "physical_cache": "pending164 activation/save/restart/restore",
+  "native_metal4": "Confirmed selected in user's previous supplied run; build not stamped in excerpt",
+  "combined_metal4_framegen": "not implemented; exact pinned interface review documented",
+  "energy": "unavailable",
+  "artifact": {
+    "id": 14142841110,
+    "name": "Husk-Duo-IPA",
+    "size_in_bytes": 149264050,
+    "url": "https://api.github.com/repos/stride-praline-2f-ai/husk/actions/artifacts/14142841110",
+    "archive_download_url": "https://api.github.com/repos/stride-praline-2f-ai/husk/actions/artifacts/14142841110/zip",
+    "expired": false,
+    "created_at": "2026-11-15T02:18:25Z",
+    "expires_at": "2026-11-22T02:18:22Z",
+    "updated_at": "2026-11-15T02:18:25Z",
+    "digest": "sha256:2abe46700097a3b37cbabc867f71e282e954f5bd705fee0d906557052ae79baf",
+    "workflow_run": {
+      "id": 43666649342,
+      "repository_id": 1451482305,
+      "head_repository_id": 1451482305,
+      "head_branch": "main",
+      "head_sha": "58c92a9d3385dc3eb02b49252637f50fcd1aa14a"
+    }
+  }
+}

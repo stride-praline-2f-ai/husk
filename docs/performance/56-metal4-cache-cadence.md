@@ -1,0 +1,33 @@
+# METAL4-CACHE-v1 — native driver confirmed, compilation and persistence
+
+15November2026; M2/M3/M4/M6/M8/M10 follow-through on the user's nativeMetal4 run after verified163. [Selected supplied observations /23numeric windows](runs/METAL4-CACHE-v1.returned-run.json). No full raw log is reconstructed. Source stamp absent;163 is inferred from new pacing-wait output and delivery context. Visual/input/audio and scene context were requested, not assumed.
+
+## What changed in the evidence
+
+KosmicKrisp library is explicitly selected/active, both guest swapchain and output are1816×1280, framegen is off, requested engine/host cap60, LPM0. More than13,900host frame events are reported and an earlier pause/resume recreates the swapchain successfully. This closes the previous **renderer selection** uncertainty; it does not alone prove visible image correctness, physical display cadence, latency or energy. ANGLE's separate offscreen GL renderer is not evidence of fallback.
+
+23reported windows span45.7–60.0hostFPS. Pipeline creation repeatedly runs for85–418.155ms per call; one window totals4948.407ms of potentially overlapping host pipeline calls. Zero-pipeline windows report60.0/58.8FPS, while a near-zero window reports59.9. P95 remains17.56–19.35ms, and host maxima reach885.88ms during heavier work. Large drops coincide with compilation, but overlapping pipeline/acquire/wait timings must not be added into frame time or called GPU duration. Unmarked scene transitions/loading prevent a controlled sustained-gameplay average.
+
+Timer data now separates requested from actual wait: average excess varies roughly0.32–1.59ms per sleep, with maximum11.026ms in one window. These are real host overshoots, but a60.0mean window also has that largest maximum; arbitrary sleep reduction or busy spinning would not establish a net fix. Preserve the pacer/thermal controls while fixing the demonstrated cache ordering bug. Existing engine-only-limiter experiment can later be evaluated separately in an already compiled scene; no mixed-variable performance claim.
+
+Thermal is nominal0 initially and fair1 later, never serious/critical in this excerpt. No thermal cap change is logged. The A20extra trial waits on pipeline cost/thermal pressure rather than being admitted; no efficiency-core placement or benefit is established. Shared mapped memory rises3136MiB with1531MiB in use, reported headroom remains~4.3GiB or more; no terminal allocation failure is shown. Final pause3 starts without a completion in the excerpt while frames continue, so its foreground/background/controller context remains unknown and is excluded rather than labelled a crash. Queue-options/MoltenVK configuration rc-1 is inapplicable to this separate driver, not evidence of failed rendering.
+
+## Confirmed persistence defect and repairs
+
+Before any instance, `vk_load` calls `configure_pipeline_store_api`. A directly loaded ICD initially exposes global entrypoints but cannot resolve its device cache commands through a live instance yet. `tl_pc_configure` previously returned immediately when those callbacks were absent, discarding the requested directory. After `vkCreateInstance`, the API is rebound, but the directory request was never replayed. This matches **no cache-store-enabled line, zero restored bytes, no saved checkpoint**, not merely a cold normal cache.
+
+The production regression fails against163source503f5cbe and passes repaired code. The store now remembers the validated directory, publishes readiness only once the complete API exists, and supports either arrival order. API/directory activation uses exclusive access plus atomic readiness, retaining shared normal cache/pipeline access, header/checksum/size checks, snapshot generations, atomic writes and device-lifetime protection. There is no driver/cache ABI or compiler-contract change.
+
+NativeMetal4 uses a separate `husk-pipeline-cache-metal4-v1` directory, preserving original MoltenVK and spatial cache paths as well as their Vulkan UUID/device validation. Before Mesa physical devices are created, its shader disk-cache defaults receive a game-owned `husk-metal4-shader-cache-v1` path and requested128MiB budget. Existing MESA_SHADER_CACHE_DIR/MAX_SIZE/DISABLE overrides are retained. Invalid/unwritable defaults leave existing behaviour intact. Tests cover deferred/partial callbacks, persistence roundtrip, corruption/UUID/size rejection, concurrency/generations and cache overrides/failure.
+
+This can restore compatible Vulkan cache persistence and explicit bounded Mesa NIR/MSL disk reuse. It **does not** implement native Metal compiled pipeline archives or remove first-use compilation. Pinned Playport patch0015 explicitly states deserialization still builds Metal libraries/pipelines; cache hits are not native PSO hits. No opaque handles, fake pipelines, arbitrary prewarming, resolution cuts, disabled safeguards or cache deletions are added.
+
+## Source and next gates
+
+Candidate164 preserves163's Anki fixes/Java DEX, renderer exclusivity, output-rate/wait diagnostics, helpers/extensions, shader/driver pins and rollback controls. NativeMetal4 itself is unchanged. Portable cache regression and relevant suites must pass, then full Apple/fresh app/package and independent verification. Warm-restart persistence and actual scene/FPS benefit remain phone gates. Build163 and its active returned test remain available; no larger generic gameplay capture is requested.
+
+After a verified164: keep resolution/FPS/worker/backend settings fixed, reach the same scene briefly, leave via normal pause/Close so a checkpoint can finish, then fully restart and revisit it once. Look for cache-store activation, a compatible saved checkpoint and subsequent restored/accepted seed; hit/benefit remain distinct. No cache clearing. This checks cache plumbing before independently testing any timing policy or new framegen port.
+
+## Final164 build disposition
+
+[Verified164 handover and receipts](builds/1d431a2d6ed7069f02e107e5e5fa696075211a7c.md):452Apple tests/58invocations/zero test skips plus font paths, fresh app/helper/sign/package and independent compiled-code/retainedJava+driver+extension verification pass. Full anonymous rawIPA download matches SHA256. Physical activation/save/restart/restore and actual benefit remain pending; combinedMetal4/framegen remains unimplemented. Use only the short cache-focused check in that handover.

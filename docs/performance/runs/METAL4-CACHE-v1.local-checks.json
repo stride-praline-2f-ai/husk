@@ -1,0 +1,19 @@
+{
+  "scope": "METAL4-CACHE-v1 candidate164",
+  "environment": "Linux portable production-code tests",
+  "tests": {
+    "store": 11,
+    "graphics": 18,
+    "input": 11,
+    "thread": 39,
+    "timing": 11,
+    "buildcache": 9
+  },
+  "regression_before": "Build163 source503f5cbe deferred-ICD test fails 0 !=1; repaired module passes",
+  "limits": [
+    "Apple compilation and actual driver serialization/warm restart pending",
+    "NIR/MSL cache is not native Metal pipeline reuse",
+    "No framegen bridge implemented for Metal4"
+  ],
+  "passed": 99
+}
