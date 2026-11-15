@@ -1,0 +1,72 @@
+{
+  "schema": 1,
+  "source": "3fcf97c285124e3d7a8e9e01d40e17abe00635b6",
+  "tree": "2c53d9a3b9e586ae806b157acee53ae378b8868e",
+  "workflow": "44bf81a72898a90ad68602c8c9a820c0932bfcac",
+  "run": 43705655385,
+  "job": 132786151457,
+  "conclusion": "success",
+  "run_metadata": {
+    "created_at": "2026-11-15T10:46:01Z",
+    "updated_at": "2026-11-15T11:02:55Z",
+    "run_attempt": 1,
+    "head_sha": "44bf81a72898a90ad68602c8c9a820c0932bfcac"
+  },
+  "checks": {
+    "tests": 461,
+    "invocations": 60,
+    "unittest_skips": 0,
+    "original_suite_inventory": 49,
+    "font_path": "pass",
+    "vulkan_sdk_structures": 31,
+    "vulkan_sdk_offsets": 96,
+    "strict_setup_groups": 10,
+    "actual_gpu_quality": "Current shader passes moving thin object/static HUD/colour/edge and original4/16pxmotion/copy cases; same fixture rejects exact166shader for HUDghosting",
+    "source_metal4_driver": "fresh ARM64/imports/eight exports/metadata pass",
+    "custom_moltenvk_driver": "fresh exact shader/14exports/SDK build pass",
+    "java_component": "unchanged source-matched verified component",
+    "fresh_application_extensions_signing_packaging": "pass"
+  },
+  "superseded_attempt": {
+    "source": "2cf2b37b8cc45e3d44dcbf21e3743a6632793bef",
+    "workflow": "62e603efa751dfbbe08db545beda78a70e98fcba",
+    "run": 43705169646,
+    "conclusion": "cancelled",
+    "reason": "Pre-delivery source review found unconditional stable-pixel suppression of a true thin moving object. Final source refines guard and adds the exact GPUcounterexample.",
+    "delivered": false
+  },
+  "artifact": {
+    "id": 14158638935,
+    "name": "Husk-Duo-IPA",
+    "size_in_bytes": 154256905,
+    "url": "https://api.github.com/repos/stride-praline-2f-ai/husk/actions/artifacts/14158638935",
+    "archive_download_url": "https://api.github.com/repos/stride-praline-2f-ai/husk/actions/artifacts/14158638935/zip",
+    "expired": false,
+    "created_at": "2026-11-15T11:02:48Z",
+    "expires_at": "2026-11-22T11:02:44Z",
+    "updated_at": "2026-11-15T11:02:48Z",
+    "digest": "sha256:40edf10abb1ed163c90a490d56b986deed75892952a26643dd0ed8a3a0e729af",
+    "workflow_run": {
+      "id": 43705655385,
+      "repository_id": 1451482305,
+      "head_repository_id": 1451482305,
+      "head_branch": "main",
+      "head_sha": "44bf81a72898a90ad68602c8c9a820c0932bfcac"
+    }
+  },
+  "evidence": [
+    "2026-11-15T10:48:31.5619770Z PASS: production Metal4 compiler control contracts; mock GPU/archive objects, no physical hit/energy claim",
+    "2026-11-15T10:48:33.6554350Z PASS: production Metal4 feedback/lease/error/epoch contracts; controlled feedback, physical GPU output unverified",
+    "2026-11-15T10:49:12.1710320Z PASS: stationary HUD and locally inconsistent/equal-luminance colours preserve the real pixel without ghost blending",
+    "2026-11-15T10:49:12.1711920Z PASS: frozen166 shader rejected for stationary HUD ghosting; repaired shader passes the same GPU cases",
+    "2026-11-15T10:49:28.1309740Z M2 actual Vulkan SDK observer ABI: 31 structures / 96 field offsets passed",
+    "2026-11-15T10:54:08.3209100Z M2 actual Vulkan SDK observer ABI: 31 structures / 96 field offsets passed",
+    "2026-11-15T10:57:07.4892150Z test_production_compiler_cache_epoch_and_persistence_contract (__main__.Metal4Components.test_production_compiler_cache_epoch_and_persistence_contract) ... PASS: production Metal4 compiler control contracts; mock GPU/archive objects, no physical hit/energy claim",
+    "2026-11-15T10:57:09.7318560Z PASS: production Metal4 feedback/lease/error/epoch contracts; controlled feedback, physical GPU output unverified",
+    "2026-11-15T11:00:00.8357760Z Source bridge contract, ARM64 code, eight exports and metadata verified",
+    "2026-11-15T11:00:16.7346990Z regressions: success",
+    "2026-11-15T11:00:16.7348350Z metal4_source: success",
+    "2026-11-15T11:02:24.6056720Z ** BUILD SUCCEEDED **"
+  ],
+  "scope": "Synthetic AppleGPU/driver/app/package mechanism checks; physical game quality/latency/netGPU/energy pending."
+}

@@ -28,3 +28,8 @@ FG OFF remains the immediate165 workaround. After a verified166IPA, only a30–6
 ## Final166 gates
 
 [Verified build/handover](builds/eacafb426fc73fcf02e9b07103dd4c7f342f3ddf.md): Apple43702777875/job132777309996 passed461test executions/60invocations/zero test skips; old-boundary reproduction and repaired32-cycle actual bridge test passed twice, full49-suite/font/SDK/10setupgroups passed, new sourceMetal4/app/three extensions/sign/package pass. Independent package confirms current source/code/patch hashes and unchanged compiler contract, original driver/Anki/fonts/helper retention and full773regular notice set. Raw154255997byteIPA SHA256`19fa2fbcb3779929ec5db13341e4d7251b5c98f1d0dfb6bb629f39546183dbe1`; full anonymous download matches. ScopeI3/3=100%, repairedD0/2, E0/1UNKNOWN. Fixed global31.11/I79.795918/M4scope34.5667/Duo0 unchanged. Positive165FGoffcontrol is preserved; actual166FGonverification remains required.
+
+
+## Subsequent returnedcontext166progress and167quality work
+
+[Latest ten-window analysis](60-metal4-framegen-motion-quality.md): native excerpt lacks explicitbuildstamp but follows166delivery. FGonadvances to2962GPU-completedframes withzeroGPUerrors/failed0; four-slot starvation no longerreproduces. Usernowreportsmotionfuzziness and LPMchange; finalunfinishedpause/inactiveFGstilldoesnotcloseD2or fullimage/audioacceptance. [Verified167quality correction](builds/3fcf97c285124e3d7a8e9e01d40e17abe00635b6.md) preserves this lease repair, with actualGPUold/newquality tests. No new longcapture/wholeplancredit.

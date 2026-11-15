@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "source": "3fcf97c285124e3d7a8e9e01d40e17abe00635b6",
+  "tree": "2c53d9a3b9e586ae806b157acee53ae378b8868e",
+  "observation_time_utc": "2026-11-15T10:47:03.114103+00:00",
+  "plan_ids": [
+    "M3",
+    "M9"
+  ],
+  "subsystem": "colour_flow_interpolation_quality",
+  "scope": [
+    "Per-pixel RGB agreement separate from tile-luminance confidence",
+    "Stable thin-feature guard distinguishes true disjoint-position moving object",
+    "Zero-motion and out-of-image fallback",
+    "No resolution/scaler/worker/lease/lifecycle change",
+    "Extra reads conditional on accepted significantly different warp",
+    "Real GPU current/frozen166 quality expectations and retained4/16pxtranslation/copy cases",
+    "Both driver source digests rebuilt; native game-compiler compatibility unchanged"
+  ],
+  "outcome": "Source quality weakness addressed. Exact-source full Apple/GPU/dual-driver/app gates pending; actual game cause/benefit still needs matched FGoff/on comparison.",
+  "pre_delivery_review": "First draft unconditional stable-pixel shortcut rejected because it suppressed a thin moving object. Superseded2cf2b37 candidate is not a delivered artifact.",
+  "inputs": {
+    "patches/metalfx/HuskFramegen.metal": "9a8e058325ca96ebcd68dd07df9ba09b60bc627d78d585c960e72c802121c226",
+    "tests/translation-layer/framegen_gpu.mm": "1bad8ab798c8fe5a27d2039a8660dd3e65d68ed884b7c2cf6cb6af7ddf8918d8",
+    "tests/translation-layer/fixtures/framegen-166.metal": "8c28fc5265bb5e2e75a505dededde113eca5336e82d26103ddd1551bbf103d74"
+  },
+  "limitations": [
+    "No real-game pixel capture or FGoffcomparison yet",
+    "No unique-pixel counter, actual display timing, GPU-duration or input-latency measurement",
+    "LPMtransition confounds late intervals; finalpause/owner context incomplete",
+    "Current-frame fallback may reduce local smoothness; no energy claim"
+  ],
+  "subsequent_validation": {
+    "ci_receipt": "3fcf97c285124e3d7a8e9e01d40e17abe00635b6.ci.json",
+    "run": 43705655385,
+    "result": "Full actualGPU/driver/app/package gates pass; physical game comparison/energy remains pending"
+  }
+}

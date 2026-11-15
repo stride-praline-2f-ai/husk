@@ -37,3 +37,8 @@ https://filebin.net/86352422456da1e6e6f76533/Husk-3.4-build166-Metal4-FG-Fix.ipa
 ```
 
 Direct rawIPA, full anonymous re-download verified. Temporary hosting expires22November2026 10:22UTC.165FG-OFF remains a working rollback; its historical source/artifacts and returned results are retained.
+
+
+## Subsequent returned evidence
+
+The next native excerpt progressesto2962GPU-completedframes withFGon/failed0/GPUerrors0, supporting repair of the former4-frame starvation in that run. Fullsourceheader is absent;166attribution followsdeliverycontext. Motionfuzziness and an unfinishedLPM/pause segment leave visual/lifecycle/energy acceptance pending. [Fullanalysis](../60-metal4-framegen-motion-quality.md), [verified167quality update](3fcf97c285124e3d7a8e9e01d40e17abe00635b6.md); leaseownershipfix remains. No repeated cache/generalbenchmark requested.
