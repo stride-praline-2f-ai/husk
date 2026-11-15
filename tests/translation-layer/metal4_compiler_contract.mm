@@ -3,6 +3,7 @@
 // ownership/cache/epoch/error contracts, NOT GPU correctness or native hits.
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
+#import <objc/runtime.h>
 #include <atomic>
 #include <thread>
 #include <vector>
@@ -102,7 +103,7 @@ int main(int argc,char **argv){@autoreleasepool{
     MTLCompileOptions *opts=[MTLCompileOptions new];opts.mathMode=MTLMathModeFast;ld.options=opts;
     id a=[c newLibraryWithDescriptor:ld error:nil],b=[c newLibraryWithDescriptor:ld error:nil];assert(a==b&&compiledLibraries==1);[a release];[b release];
     ld.source=@"source-b";[[c newLibraryWithDescriptor:ld error:nil]release];assert(compiledLibraries==2);
-    opts.mathMode=MTLMathModeSafe;[[c newLibraryWithDescriptor:ld error:nil]release];assert(compiledLibraries==3);
+    opts.mathMode=MTLMathModeSafe;ld.options=opts;[[c newLibraryWithDescriptor:ld error:nil]release];assert(compiledLibraries==3);
     // Exact source concurrent requests share one immutable owned library.
     unsigned before=compiledLibraries.load();std::vector<std::thread> readers;
     for(unsigned i=0;i<8;i++)readers.emplace_back([&]{@autoreleasepool{
@@ -126,8 +127,12 @@ int main(int argc,char **argv){@autoreleasepool{
     [pipeline(c,@"before-rotation")release];
     std::thread producer([&]{@autoreleasepool{[pipeline(c,@"blocked")release];}});
     assert(!dispatch_semaphore_wait(entered,dispatch_time(DISPATCH_TIME_NOW,2*NSEC_PER_SEC)));
-    unsigned compilers=createdCompilers.load();std::thread saver([&]{@autoreleasepool{[c save];}});
-    for(unsigned i=0;i<2000&&createdCompilers==compilers;i++)usleep(1000);assert(createdCompilers>compilers);
+    Ivar epochIvar=class_getInstanceVariable([HuskMetal4Compiler class],"_epoch");
+    NSLock *ownerLock=object_getIvar(c,class_getInstanceVariable([HuskMetal4Compiler class],"_lock"));
+    [ownerLock lock];id prior=[object_getIvar(c,epochIvar)retain];[ownerLock unlock];
+    std::thread saver([&]{@autoreleasepool{[c save];}});bool rotated=false;
+    for(unsigned i=0;i<2000&&!rotated;i++){[ownerLock lock];rotated=object_getIvar(c,epochIvar)!=prior;[ownerLock unlock];if(!rotated)usleep(1000);}
+    assert(rotated);[prior release];
     [pipeline(c,@"new-epoch")release];dispatch_semaphore_signal(releaseCompile);producer.join();saver.join();
     [c save];assert(vkHuskArchiveSnapshot(&stats)&&stats.pending==0);
     // File write failure stays advisory; native creation remains usable.

@@ -63,6 +63,7 @@ static NSString *huskDigest(NSData *data){
     dispatch_queue_t _saveQueue;
     BOOL _savingScheduled,_enabled;
     std::atomic<unsigned> _pending;
+    std::atomic<bool> _urgentSaveScheduled;
 }
 - (instancetype)initWithDevice:(id<MTLDevice>)device;
 - (id<MTLLibrary>)newLibraryWithDescriptor:(MTL4LibraryDescriptor *)desc error:(NSError **)error;
@@ -82,7 +83,7 @@ static NSString *huskDigest(NSData *data){
 - (instancetype)initWithDevice:(id<MTLDevice>)device {
     if(!(self=[super init]))return nil;
     _device=[device retain];_lock=[NSLock new];_libraryLock=[NSCondition new];
-    _libraries=[NSMutableDictionary new];_loading=[NSMutableSet new];_libraryOrder=[NSMutableArray new];_archives=[NSArray new];_pending=0;
+    _libraries=[NSMutableDictionary new];_loading=[NSMutableSet new];_libraryOrder=[NSMutableArray new];_archives=[NSArray new];_pending=0;_urgentSaveScheduled=false;
     NSString *path=nil;{std::lock_guard<std::mutex> guard(ownersLock);_enabled=archiveEnabled;path=[archiveRoot copy];}
     if(_enabled&&path.length){
         NSOperatingSystemVersion os=NSProcessInfo.processInfo.operatingSystemVersion;
@@ -175,11 +176,17 @@ static NSString *huskDigest(NSData *data){
 - (id<MTLComputePipelineState>)newComputePipelineStateWithDescriptor:(MTL4ComputePipelineDescriptor *)d compilerTaskOptions:(MTL4CompilerTaskOptions *)o error:(NSError **)e {return [self pipeline:d compute:YES options:o error:e];}
 - (unsigned)pending {return _pending.load();}
 - (void)scheduleSave {
+    if(_pending.load()>=64)[self checkpoint];
     [_lock lock];if(_savingScheduled){[_lock unlock];return;}_savingScheduled=YES;[_lock unlock];
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW,8*NSEC_PER_SEC),_saveQueue,^{[self save];});
 }
-- (void)checkpoint {if(_enabled&&_pending.load())dispatch_async(_saveQueue,^{[self save];});}
+- (void)checkpoint {
+    bool expected=false;
+    if(_enabled&&_pending.load()&&_urgentSaveScheduled.compare_exchange_strong(expected,true))
+        dispatch_async(_saveQueue,^{[self save];});
+}
 - (void)save {
+    _urgentSaveScheduled=false;
     [_lock lock];_savingScheduled=NO;
     if(!_enabled||!_pending.load()||!_epoch->capture){[_lock unlock];return;}
     [_lock unlock];
