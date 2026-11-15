@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "provenance": "User pasted Anki log; selected observations/excerpts, not complete log",
+  "source": "Expected162 from context; no explicit stamp in excerpt",
+  "full_framework_classes": 5995,
+  "old_signal_error_present": false,
+  "old_storage_exception_present": false,
+  "editor_old_freeze_boundary_passed": true,
+  "save_action_observed": true,
+  "note_contents_or_persistence_verified": false,
+  "editor_back_and_browser_navigation_observed": true,
+  "exit": "Normal Back/finish, javaapp: the app finished",
+  "preview_error": "Uncaught ReferenceError: Can't find variable: _showQuestion",
+  "preview_ports": [
+    54533,
+    54534
+  ],
+  "crash_report_dialog_launches": 2,
+  "crash_report_filename": "2026-11-14T23:37:05.680+00:00.stacktrace",
+  "old_report_missing_during_approval": true,
+  "new_terminal_uncaught_exception": false,
+  "diagnostic_classification": "See55-returned-anki-dungeons-reliability.md; native unwind/multiprocess/private-window APIs remain broader compatibility limits",
+  "verbatim_excerpts": [
+    "I/AnkiDroid: NoteEditorActivity::TemplatePreviewerFragment::onViewDestroyed",
+    "I/AnkiDroid: NoteEditorActivity::TemplatePreviewerFragment::onDestroy",
+    "I/AnkiDroid: NoteEditorActivity::TemplatePreviewerFragment::onDetach",
+    "I/AnkiDroid: NoteEditorActivity::TemplatePreviewerFragment::onResume",
+    "I/AnkiDroid: NoteEditor:: Save note button pressed",
+    "I/AnkiDroid: Closing note editor",
+    "javaapp: the app finished"
+  ]
+}

@@ -71,7 +71,23 @@ if mode=="geometry" {
  assert(!settings.supportsDuoAutomatic(for:TLApp(label:"Other game",packageName:nil,report:FakeReport(nativeEngine:.ue4))))
  var manual=settings;manual.metal4Renderer=true;manual.frameGeneration=true;manual.automaticDuoProfile=false;manual.a20EfficiencyWorkers=false;manual.sharedMemoryReserve=false
  let roundtrip=try JSONDecoder().decode(TLAppSettings.self,from:JSONEncoder().encode(manual))
- assert(roundtrip.metal4Renderer && roundtrip.frameGeneration && !roundtrip.automaticDuoProfile && !roundtrip.a20EfficiencyWorkers && !roundtrip.sharedMemoryReserve && roundtrip.customResolutionPercent==71 && !roundtrip.spatialUpscaling)
+ assert(roundtrip.metal4Renderer && !roundtrip.frameGeneration && !roundtrip.automaticDuoProfile && !roundtrip.a20EfficiencyWorkers && !roundtrip.sharedMemoryReserve && roundtrip.customResolutionPercent==71 && !roundtrip.spatialUpscaling)
+ var chosen=TLAppSettings();chosen.selectFrameGeneration(true);assert(chosen.frameGeneration && !chosen.metal4Renderer)
+ chosen.selectMetal4(true);assert(chosen.metal4Renderer && !chosen.frameGeneration)
+ chosen.selectFrameGeneration(true);assert(chosen.frameGeneration && !chosen.metal4Renderer)
+ chosen.selectFrameGeneration(false);assert(!chosen.frameGeneration && !chosen.metal4Renderer)
+ for m4 in [false,true] {for fg in [false,true] {assert(DuoDisplayPolicy.usesFrameGeneration(metal4:m4,requested:fg)==(fg && !m4))}}
+} else if mode=="rate" {
+ var rate=FrameGenerationRate();assert(rate.sample(time:1,real:10,generated:9,resets:0)==nil)
+ assert(rate.sample(time:2,real:38,generated:36,resets:0)==55)
+ assert(rate.sample(time:3,real:66,generated:64,resets:0)==56)
+ assert(rate.sample(time:4,real:94,generated:92,resets:1)==nil)
+ assert(rate.sample(time:10,real:94,generated:92,resets:1)==nil)
+ assert(rate.sample(time:11,real:94,generated:92,resets:1)==0)
+ assert(rate.sample(time:12,real:1,generated:0,resets:1)==nil)
+ assert(rate.sample(time:Double.nan,real:1,generated:0,resets:1)==nil)
+ assert(rate.sample(time:13,real:1,generated:0,resets:1)==nil)
+ rate.reset();assert(rate.sample(time:14,real:1,generated:0,resets:1)==nil)
 } else if mode=="duo-settings" {
  var settings=TLAppSettings();settings.efficientResolution = .native
  UIDevice.current.userInterfaceIdiom = .pad // inner-screen UI idiom must not accidentally select the iPad budget
@@ -91,7 +107,7 @@ print("PASS",mode)
 }}
 ''')
   subprocess.run(['cc','-c',str(ROOT/'src/translation-layer-next/husk-tl-ue4-graphics.c'),'-o',str(p/'graphics.o')],check=True)
-  cls.exe=p/'test';subprocess.run(['swiftc','-swift-version','5','-parse-as-library',str(ROOT/'src/app/Husk/HuskExecutionOptions.swift'),str(ROOT/'src/app/Husk/DuoDisplayPolicy.swift'),str(p/'Facades.swift'),str(p/'Settings.swift'),str(p/'main.swift'),str(p/'graphics.o'),'-o',str(cls.exe)],check=True)
+  cls.exe=p/'test';subprocess.run(['swiftc','-swift-version','5','-parse-as-library',str(ROOT/'src/app/Husk/HuskExecutionOptions.swift'),str(ROOT/'src/app/Husk/DuoDisplayPolicy.swift'),str(ROOT/'src/app/Husk/FrameGenerationRate.swift'),str(p/'Facades.swift'),str(p/'Settings.swift'),str(p/'main.swift'),str(p/'graphics.o'),'-o',str(cls.exe)],check=True)
  def case(self,name):subprocess.run([str(self.exe),name],check=True)
  def test_two_stage_geometry_uses_physical_panel_and_is_orientation_independent(self):self.case('geometry')
  def test_a20_runtime_match_fallback_and_independent_worker_opt_out(self):self.case('a20')
@@ -100,4 +116,5 @@ print("PASS",mode)
  def test_old_settings_migrate_without_overwriting_manual_values_and_opt_out_roundtrips(self):self.case('decode')
  def test_duo_phone_budget_survives_tablet_ui_idiom_and_manual_native_uses_panel_pixels(self):self.case('duo-settings')
  def test_m4_baseline_and_default_scaler_are_unchanged(self):self.case('m4')
+ def test_output_rate_uses_actual_callbacks_and_rejects_resets_and_gaps(self):self.case('rate')
 if __name__=='__main__':unittest.main()

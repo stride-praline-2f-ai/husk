@@ -1,0 +1,57 @@
+{
+  "candidate": "163",
+  "environment": "Linux; Apple SDK/Swift/WebKit execution deferred",
+  "tests": {
+    "graphics": {
+      "passed": 18,
+      "skipped": 0
+    },
+    "input": {
+      "passed": 11,
+      "skipped": 0
+    },
+    "thread": {
+      "passed": 39,
+      "skipped": 0
+    },
+    "web": {
+      "passed": 2,
+      "skipped": 1
+    },
+    "close": {
+      "passed": 1,
+      "skipped": 0
+    },
+    "timing": {
+      "passed": 11,
+      "skipped": 0
+    },
+    "settings": {
+      "passed": 3,
+      "skipped": 0
+    },
+    "cache": {
+      "passed": 9,
+      "skipped": 0
+    },
+    "duo": {
+      "passed": 0,
+      "skipped": 8
+    },
+    "webkit": {
+      "passed": 0,
+      "skipped": 1
+    },
+    "unique_activity": {
+      "passed": 1,
+      "skipped": 0
+    }
+  },
+  "notes": [
+    "Production unique-activity Java helper compiled/executed with JDK21 (1 test).",
+    "Unchanged deadline pacer and related native/source suites pass.",
+    "Actual WK asset regression and Swift renderer/rate tests must pass on Apple; Linux skips are not Apple passes."
+  ],
+  "passed": 95,
+  "skipped": 10
+}

@@ -131,7 +131,7 @@ final class TLUnityUIView: UIView, UIKeyInput {
         self.driverProfiling = driverProfiling
         self.pipelineIdentification = pipelineIdentification
         self.pipelineFeedback = pipelineFeedback
-        self.frameGeneration = frameGeneration
+        self.frameGeneration = DuoDisplayPolicy.usesFrameGeneration(metal4: metal4Renderer, requested: frameGeneration)
         self.metal4Renderer = metal4Renderer
         self.spatialUpscaling = spatialUpscaling
         self.spatialInputPercent = spatialInputPercent
@@ -305,12 +305,22 @@ final class TLUnityUIView: UIView, UIKeyInput {
         statsTimer?.tolerance = 0.1
     }
 
+    private var frameGenerationRate = FrameGenerationRate()
     private func updateStats() {
         var p = husk_unity_perf()
         husk_unity_perf_snapshot(&p)
-        let text = p.fps > 0
+        var text = p.fps > 0
             ? String(format: "%.0f fps · %.1f ms · max %.0f", p.fps, p.mean_ms, p.max_ms)
             : "starting"
+        if engine == .ue4 && frameGeneration {
+            var generated = tl_fg_stats()
+            if tl_vk_framegen_snapshot(&generated), generated.active != 0 {
+                let output = frameGenerationRate.sample(time: ProcessInfo.processInfo.systemUptime,
+                    real: generated.presented_real, generated: generated.generated, resets: generated.resets)
+                text = output.map { String(format: "%.0f render fps · %.0f output/s", p.fps, $0) }
+                    ?? String(format: "%.0f render fps · output waiting", p.fps)
+            } else { frameGenerationRate.reset() }
+        }
         stats.text = text
         onStats?(text)
     }

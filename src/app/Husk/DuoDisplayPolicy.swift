@@ -40,6 +40,9 @@ enum DuoDisplayPolicy {
     static let fps = 60
     static let worker = 2 // Balanced: preserves critical roles, no core affinity.
     static let submission = 0 // Driver Default.
+    /// These are distinct backends. Resolve legacy conflicting flags in favour
+    /// of the explicitly requested native Metal 4 renderer, never silent FG fallback.
+    static func usesFrameGeneration(metal4: Bool, requested: Bool) -> Bool { requested && !metal4 }
 
     /// Runtime-matched A20 family. Prefer a validated kernel topology over a model fallback.
     /// A worker allowance is not P-core affinity.

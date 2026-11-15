@@ -407,6 +407,25 @@ static NSString *bridge_js(void)
 
 static NSString *nstr(jobj *s) { const char *u = s ? tl_jni_string(s) : NULL; return u ? [NSString stringWithUTF8String:u] : nil; }
 static NSData *nbytes(jobj *b) { return b && b->kind == TL_K_PRIM_ARRAY ? [NSData dataWithBytes:b->arr.data length:b->arr.len] : nil; }
+/* Android asset URLs embedded in HTML/CSS/scripts are virtual app resources.
+ * Preserve the real document origin while routing those prefixes through the
+ * Java asset handler; WK cannot load host file URLs from an HTTP document. */
+static NSData *android_resource_urls(NSData *body, NSString *mime, NSString *encoding)
+{
+    NSString *type = mime.lowercaseString ?: @"";
+    BOOL text = [type containsString:@"html"] || [type containsString:@"css"] ||
+                [type containsString:@"javascript"] || [type containsString:@"ecmascript"];
+    NSString *enc = encoding.lowercaseString;
+    if (!body.length || !text || (enc.length && ![enc isEqualToString:@"utf-8"] && ![enc isEqualToString:@"utf8"])) return body;
+    NSString *source = [[NSString alloc] initWithData:body encoding:NSUTF8StringEncoding];
+    if (!source || [source rangeOfString:@"file:/"].location == NSNotFound) return body;
+    NSString *mapped = source;
+    for (NSString *prefix in @[@"file:///android_asset/", @"file:/android_asset/", @"file:///android_res/", @"file:/android_res/"]) {
+        NSString *host = [prefix containsString:@"android_asset"] ? @"huskapp://android_asset/" : @"huskapp://android_res/";
+        mapped = [mapped stringByReplacingOccurrencesOfString:prefix withString:host];
+    }
+    return [mapped isEqualToString:source] ? body : [mapped dataUsingEncoding:NSUTF8StringEncoding];
+}
 static NSArray<NSString *> *nstrs(jobj *arr)
 {
     NSMutableArray *out = [NSMutableArray array];
@@ -526,7 +545,7 @@ NAT(W_loadData)
            the app's data folder as its base */
         NSURL *b = base.length && ![base isEqualToString:@"about:blank"] ? [NSURL URLWithString:base] : nil;
         if (!b) { extern const char *tl_data_dir(void); b = [NSURL fileURLWithPath:[NSString stringWithUTF8String:tl_data_dir()] isDirectory:YES]; }
-        [h.web loadData:data ?: [NSData data] MIMEType:mime characterEncodingName:enc baseURL:b];
+        [h.web loadData:android_resource_urls(data, mime, enc) ?: [NSData data] MIMEType:mime characterEncodingName:enc baseURL:b];
     });
     return true;
 }
@@ -684,9 +703,14 @@ NAT(W_respond)
         if (enc.length && ![type containsString:@"charset"]) type = [NSString stringWithFormat:@"%@; charset=%@", type, enc];
         if (!h[@"Content-Type"] && !h[@"content-type"]) h[@"Content-Type"] = type;
         if (!h[@"Access-Control-Allow-Origin"]) h[@"Access-Control-Allow-Origin"] = @"*";
+        NSData *resource = android_resource_urls(body, mime, enc);
+        if (resource != body) {
+            for (NSString *key in h.allKeys) if ([key caseInsensitiveCompare:@"Content-Length"] == NSOrderedSame) [h removeObjectForKey:key];
+            h[@"Content-Length"] = [NSString stringWithFormat:@"%lu", (unsigned long)resource.length];
+        }
         NSHTTPURLResponse *resp = [[NSHTTPURLResponse alloc] initWithURL:task.request.URL statusCode:status HTTPVersion:@"HTTP/1.1" headerFields:h];
         [task didReceiveResponse:resp];
-        if (body.length) [task didReceiveData:body];
+        if (resource.length) [task didReceiveData:resource];
         [task didFinish];
     });
     return true;
