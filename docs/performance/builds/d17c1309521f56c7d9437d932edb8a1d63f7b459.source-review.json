@@ -1,0 +1,24 @@
+{
+  "source": "d17c1309521f56c7d9437d932edb8a1d63f7b459",
+  "tree": "178a83475966c731a3814f604ae6a40d6a3d1adf",
+  "paths": [
+    ".github/workflows/build-husk-ipa.yml",
+    "AGENTS.md",
+    "PROJECT_PLAN.md",
+    "docs/performance/65-framegen-coherent-field.md",
+    "docs/performance/EVIDENCE.md",
+    "scripts/package_ipa.sh",
+    "scripts/run_mac_regressions.py",
+    "scripts/stage_framegen_contract.py",
+    "src/app/Husk/FramegenDiagnostics.swift",
+    "src/app/Husk/TLAppSettings.swift",
+    "src/translation-layer-next/husk-tl-framegen-contract.m",
+    "src/translation-layer-next/husk-tl-vulkan.m",
+    "tests/translation-layer/test_framegen_enforcement.py",
+    "tests/translation-layer/test_runtime_input_vulkan.py",
+    "tests/translation-layer/test_spatial_lifetime.py"
+  ],
+  "byte_exact": true,
+  "driver_compile_source": "02d767c28dd4f8d5c559a9d6f41f9847719a6eb9",
+  "scope": "Final exact host/UI source readback; both driver input sets unchanged."
+}

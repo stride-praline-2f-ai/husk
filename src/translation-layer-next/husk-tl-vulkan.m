@@ -102,6 +102,14 @@ void tl_vk_configure(const char *path, const char *frame_dir, int frame_every)
     if (frame_dir) { snprintf(V.frame_dir, sizeof(V.frame_dir), "%s", frame_dir); V.frame_every = frame_every > 0 ? frame_every : 60; }
 }
 
+extern bool tl_fg_contract_verify(void *,const char *,const char *);
+static bool tl_vk_require_framegen_contract(void *entrypoint){
+    NSString *path=[NSBundle.mainBundle pathForResource:@"framegen-contract" ofType:@"json"];
+    NSString *source=NSBundle.mainBundle.infoDictionary[@"HuskBuildCommit"];
+    bool verified=path&&[source isKindOfClass:NSString.class]&&tl_fg_contract_verify(entrypoint,path.UTF8String,source.UTF8String);
+    if(!verified)tl_log_line("[M9-FG-CONTRACT] required fixed generator unavailable or stale; refusing FG before changing rendered FPS; no legacy-generator fallback");
+    return verified;
+}
 static bool framegen_requested;
 static char diagnostic_session[64]="UNAVAILABLE";
 static char framegen_capture_directory[768];
@@ -146,7 +154,7 @@ bool tl_vk_framegen_prepare(const char* project,int width,int height){
     if(!framegen_requested||!project||strcmp(project,"Dungeons")||!tl_ue4_efficiency_enabled()||!vk_ready())return false;
     typedef int(*fn)(const tl_fg_config*);fn configure=V.lib?(fn)vk_symbol("vkHuskFramegenConfigure"):NULL;
     tl_fg_config c={1,sizeof(c),1,(uint32_t)width,(uint32_t)height,0};
-    if(!configure||!configure(&c)){tl_log_line("[M9-FRAMEGEN] unavailable; original rendered FPS retained");return false;}
+    if(!configure||!tl_vk_require_framegen_contract((void*)configure)||!configure(&c)){tl_log_line("[M9-FRAMEGEN] unavailable; original rendered FPS retained");return false;}
     tl_vk_framegen_pause(atomic_load(&framegen_paused));
     husk_ue4_set_efficiency(true,30);
     if(framegen_capture_directory[0]){tl_vk_framegen_capture_arm(framegen_capture_directory,180,90,1);framegen_capture_directory[0]=0;}
@@ -1014,7 +1022,7 @@ static void pace_efficient_frame(void)
         wait_requested_ns = wait_actual_ns = wait_excess_max_ns = wait_samples = 0;
     if(framegen_requested){
         tl_fg_stats fg;
-        if(tl_vk_framegen_snapshot(&fg))tl_log_line("[M9-FRAMEGEN] active %u failed %u; since-launch GPU-completed rendered %llu, presented real %llu/generated %llu, dropped %llu, resets %llu, GPU errors %llu; generated includes low-confidence real-image fallback; not energy or unique-pixel measurement",fg.active,fg.failed,(unsigned long long)fg.rendered,(unsigned long long)fg.presented_real,(unsigned long long)fg.generated,(unsigned long long)fg.dropped,(unsigned long long)fg.resets,(unsigned long long)fg.gpu_errors);
+        if(tl_vk_framegen_snapshot(&fg))tl_log_line("[M9-FRAMEGEN] active %u failed %u; since-launch GPU-completed rendered %llu, presented real %llu/generated %llu, dropped %llu, resets %llu, GPU errors %llu; generated slots include local or whole-frame real-image fallback; not energy or unique-pixel measurement",fg.active,fg.failed,(unsigned long long)fg.rendered,(unsigned long long)fg.presented_real,(unsigned long long)fg.generated,(unsigned long long)fg.dropped,(unsigned long long)fg.resets,(unsigned long long)fg.gpu_errors);
     }
         tl_dp_report();
         count = late = 0; report_at = now;

@@ -1,0 +1,234 @@
+{
+  "schema": 1,
+  "plan_ids": [
+    "M1",
+    "M3",
+    "M9"
+  ],
+  "observed_at": "2026-11-15T14:44:39.208399+00:00",
+  "archive": {
+    "name": "Husk-Diagnostics-D95744E0-C5F7188B.zip",
+    "bytes": 15857676,
+    "sha256": "97b638b9eca9e04bfd340e5cf674ded6f2a1191c2b1ae56a08c7eb31fc90b7f3",
+    "crc": "pass",
+    "indexed_hashes": "all verified",
+    "omitted_logs": []
+  },
+  "entries": {
+    "export-context.json": {
+      "bytes": 3507,
+      "sha256": "c411005efc839281b86c28f8aec7a847d11c13dd2cab9b60168dfd1e167565c6"
+    },
+    "capture/host-session.json": {
+      "bytes": 5287,
+      "sha256": "c5c31fc054d654373f70b8a4a4f6ce4660feefc579badd18853a225078a4bfbe"
+    },
+    "capture/consumer-timing.json": {
+      "bytes": 16624,
+      "sha256": "25f359485e4bf6b9c2a81434b065aa24e7a21e3e79905a73035f5e8d4e9b59aa"
+    },
+    "capture/engine-requests.txt": {
+      "bytes": 644,
+      "sha256": "9ddb92a906b5c812792f53df4e719647c4714ae480c24f563a8ded151ee3fa41"
+    },
+    "capture/pair-01.json": {
+      "bytes": 2727,
+      "sha256": "4b271cac9c77d36f1c29eda725b8f82ca8b7df9b62394770df88bf52b4e9c9d5"
+    },
+    "capture/pair-01-previous.png": {
+      "bytes": 3850357,
+      "sha256": "4487d18a4a820d06d77924d3b77351e292a57f42a29a06aa94b9250249cb827d"
+    },
+    "capture/pair-01-current.png": {
+      "bytes": 3862894,
+      "sha256": "2866b4231d4d3d8a7c265870c8eea4dd3d1256fd5a2bacf450c9df475d1147f8"
+    },
+    "capture/pair-01-generated.png": {
+      "bytes": 3916488,
+      "sha256": "d14fae86b2075c696af8fd9b938cda877bdd346b9dc0c162b7d2d9a88e4377ae"
+    },
+    "capture/pair-01-following-real.png": {
+      "bytes": 3862894,
+      "sha256": "2866b4231d4d3d8a7c265870c8eea4dd3d1256fd5a2bacf450c9df475d1147f8"
+    },
+    "capture/pair-01-forward.f16": {
+      "bytes": 81920,
+      "sha256": "45e2e464f47ca7a4d1640ef5167f166bb2ecc7ac40acca6fea325346a6c9e8a6"
+    },
+    "capture/pair-01-backward.f16": {
+      "bytes": 81920,
+      "sha256": "c696f23a48551aab38ccc19f27a46c1fd87180f0fd926406bd208e72cc9da6d1"
+    },
+    "logs/husk.log": {
+      "bytes": 48634,
+      "sha256": "f84719c460afea8254a9e936a344b6a1ff50463d070a72de83042b0517c6e8c3"
+    },
+    "logs/husk-native.log": {
+      "bytes": 33948,
+      "sha256": "26bef614d62f20a704128304b75ce77af34f390195b18f196def378920fe3b8b"
+    },
+    "logs/husk-prev.log": {
+      "bytes": 48235,
+      "sha256": "5088ecc59fc34e791dd633cb29dea77b86b982899af0c4d405e03aa4a05a69e7"
+    },
+    "logs/husk-native-prev.log": {
+      "bytes": 34894,
+      "sha256": "cb10d7d240f36e0a13dd901160138e0b12b725f2ddeede2712273abefef9fee7"
+    },
+    "bundle-index.json": {
+      "bytes": 4695,
+      "sha256": "941300d47f5b08457c3c6d6d152f067551625ca3fcd927201f1ee8020d075127"
+    }
+  },
+  "identity": {
+    "version": "3.4",
+    "build": "169",
+    "source": "db8d07008cbce6f22819522d403b41806eb2f861-dirty",
+    "built": "2026-11-15 14:05 UTC",
+    "host_session_id": "D95744E0-2367-4400-94E4-0F087604DC59",
+    "capture_id": "759DAC62-EF73-4308-94DA-8DA7F1470555",
+    "device": "iPhone19,4",
+    "os": "27.3",
+    "gpu": "Apple A20 Pro GPU",
+    "low_power_mode": false,
+    "thermal_state": 0
+  },
+  "pair": {
+    "backward_field": "previous to current, same units; interpolated flow is not engine motion vectors",
+    "capture_encode_host_monotonic_seconds": 45827.29415825001,
+    "current_source_gpu_completion_callback_host_seconds": 45827.257657541675,
+    "current_source_sequence": 449,
+    "diagnostic_overhead": "intrusive opt-in GPU copies/readback plus Utility disk work; not an energy or baseline pacing benchmark",
+    "engine_runtime_cvars": "UNAVAILABLE; engine-requests.txt contains requests only",
+    "epoch": 1,
+    "error": null,
+    "files": [
+      {
+        "bytes": 9502720,
+        "file": "pair-01-previous.bgra",
+        "format": "BGRA8Unorm",
+        "height": 1280,
+        "origin": "top-left",
+        "row_bytes": 7424,
+        "stage": "previous",
+        "width": 1856
+      },
+      {
+        "bytes": 9502720,
+        "file": "pair-01-current.bgra",
+        "format": "BGRA8Unorm",
+        "height": 1280,
+        "origin": "top-left",
+        "row_bytes": 7424,
+        "stage": "current",
+        "width": 1856
+      },
+      {
+        "bytes": 9502720,
+        "file": "pair-01-generated.bgra",
+        "format": "BGRA8Unorm",
+        "height": 1280,
+        "origin": "top-left",
+        "row_bytes": 7424,
+        "stage": "generated",
+        "width": 1856
+      },
+      {
+        "bytes": 9502720,
+        "file": "pair-01-following-real.bgra",
+        "format": "BGRA8Unorm",
+        "height": 1280,
+        "origin": "top-left",
+        "row_bytes": 7424,
+        "stage": "following-real",
+        "width": 1856
+      },
+      {
+        "bytes": 81920,
+        "file": "pair-01-forward.f16",
+        "format": "RGBA16Float",
+        "height": 80,
+        "origin": "top-left",
+        "row_bytes": 1024,
+        "stage": "forward",
+        "width": 116
+      },
+      {
+        "bytes": 81920,
+        "file": "pair-01-backward.f16",
+        "format": "RGBA16Float",
+        "height": 80,
+        "origin": "top-left",
+        "row_bytes": 1024,
+        "stage": "backward",
+        "width": 116
+      }
+    ],
+    "forward_field": "current to previous, xy in swapchain pixels, z photometric residual; RGBA16Float little-endian",
+    "generated_gpu_end_seconds": 45827.325824875006,
+    "generated_gpu_start_seconds": 45827.300427125,
+    "input_stage": "final guest swapchain colour, after engine postprocessing and BEFORE framegen",
+    "pair_id": 1,
+    "plan_ids": [
+      "M1",
+      "M3",
+      "M9"
+    ],
+    "previous_source_gpu_completion_callback_host_seconds": 45827.224923583344,
+    "previous_source_sequence": 448,
+    "real_gpu_end_seconds": 45827.324263125,
+    "real_gpu_start_seconds": 45827.310572,
+    "schema": 1,
+    "source_gpu_execution_timestamps": "UNAVAILABLE for source Metal4 feedback; callback time is not GPU duration",
+    "state": "complete"
+  },
+  "consumer_gpu_ms": {
+    "scope": "Valid actual consumer MTLCommandBuffer end-start; non-readback samples. Not source/game GPU time, exclusive frame time, displayed FPS or energy. Commands can overlap.",
+    "generated": {
+      "samples": 12,
+      "min": 23.70195832918398,
+      "median": 24.97943749767728,
+      "max": 25.488624996796716
+    },
+    "real": {
+      "samples": 13,
+      "min": 0.2119999990100041,
+      "median": 0.2735833331826143,
+      "max": 0.5127083350089379
+    }
+  },
+  "measured_image_findings": {
+    "current_and_following_real_png_identical": true,
+    "scenery_region_xywh": [
+      80,
+      160,
+      1600,
+      900
+    ],
+    "source_pair_changed_rgb_gt1_fraction": 0.9116902777777778,
+    "generated_vs_current_changed_rgb_gt1_fraction": 0.18603958333333334,
+    "scope": "Decoded RGB channel maximum absolute code-value delta>1/255; no brightness or power inference."
+  },
+  "field_findings": {
+    "method": "CPU reconstruction of169 admission using exported GPU final f16 fields and OpenCV4 bilinear remap; estimated per-pixel admission, not a captured GPU branch counter. Native170 adds exact GPU quality data.",
+    "estimated_scenery_warp_admitted_fraction": 0.22606597222222222,
+    "forward_backward_error_scenery_p50_pixels": 5.304262161254883,
+    "forward_backward_error_scenery_p95_pixels": 17.426095962524414,
+    "tile_neighbour_motion_jump_p50_pixels": 6.32984805,
+    "tile_neighbour_motion_jump_p95_pixels": 24.9143384
+  },
+  "prototype_findings": {
+    "scope": "Offline CPU engineering prototype on the returned pair, NOT built170 GPU/phone proof. No images or raw capture published.",
+    "coarse_seed_plus_local_refinement_and_unconditional_median3_estimated_motion_coverage": 0.7067896349676724,
+    "including_static_consistency_fraction": 0.8877437196928879,
+    "forward_backward_error_p50_pixels": 0.67384326,
+    "implementation_differences": "Production retains subpixel refinement and rejects median if dense RGB residual worsens>0.01; exact GPU checks still required."
+  },
+  "decision": "169 capture gate succeeded. Source/current real copy exact, but scattered warp/fallback and inconsistent local vectors are demonstrated; quality not accepted. Replace independent wide tile search, regularize with residual guard, whole-frame quality fail-closed, reduce exact cubic sample work, capture intermediate fields and pinned consecutive timestamps. PreserveFG-OFF60; no new uncomfortable recording required.",
+  "unavailable": [
+    "actual engine runtime CVars",
+    "panel scanout/input latency",
+    "170 physical visual quality/GPU cost/energy",
+    "whole-phone control/audio acceptance"
+  ]
+}

@@ -7,15 +7,16 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <cmath>
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <errno.h>
 bool huskFramegenRequested();
-static std::atomic<bool> fgCaptureEnabled{false};
+static std::atomic<bool> fgCaptureEnabled{false},fgCaptureTimingEnabled{false};
 static std::mutex fgCaptureLock;
 static unsigned fgCaptureBusy;
 struct FGCaptureTiming {
-    uint64_t sequence,epoch;
+    uint64_t sequence,epoch,recordID;
     bool generated,diagnostic,gpuValid,presentValid;
     double submitHost,gpuStart,gpuEnd,completionHost,presented,presentObserved;
 };
@@ -26,8 +27,8 @@ struct FGCaptureTiming {
     uint64_t _base;
     std::atomic<bool> _cancelled;
     std::mutex _timingLock;
-    FGCaptureTiming _timings[64];
-    unsigned _timingCount,_timingLost,_commands;
+    FGCaptureTiming _timings[128],_pinned[2];
+    unsigned _timingCount,_timingLost,_commands,_lateCallbacks;
 }
 @end
 @implementation HuskFGCaptureSession
@@ -37,8 +38,8 @@ struct FGCaptureTiming {
 @interface HuskFGCaptureTicket:NSObject {
 @public
     HuskFGCaptureSession *_session;
-    id<MTLBuffer> _images[4],_fields[2];
-    unsigned _id,_width,_height,_row,_flowWidth,_flowHeight,_flowRow;
+    id<MTLBuffer> _images[4],_fields[6],_quality;
+    unsigned _id,_width,_height,_row,_flowWidth,_flowHeight,_flowRow,_coarseWidth,_coarseHeight,_coarseRow;
     uint64_t _previousSequence,_currentSequence,_epoch;
     double _created,_sourcePrevious,_sourceCurrent;
     std::mutex _stageLock;
@@ -49,7 +50,7 @@ struct FGCaptureTiming {
 @end
 @implementation HuskFGCaptureTicket
 - (instancetype)init{if((self=[super init]))_finalized=false;return self;}
-- (void)dealloc{for(auto b:_images)[b release];for(auto b:_fields)[b release];
+- (void)dealloc{for(auto b:_images)[b release];for(auto b:_fields)[b release];[_quality release];
     {std::lock_guard<std::mutex> lock(fgCaptureLock);if(_session&&_session->_busy)--_session->_busy;if(fgCaptureBusy)--fgCaptureBusy;}
     [_session release];[super dealloc];}
 @end
@@ -74,8 +75,11 @@ static bool fgCaptureJSON(HuskFGCaptureSession *s,const char *name,id object){
 }
 static id fgCaptureTime(double value){return std::isfinite(value)&&value>0?(id)@(value):(id)[NSNull null];}
 static void fgCaptureFlushTimings(HuskFGCaptureSession *s){
-    FGCaptureTiming rows[64];unsigned count,lost;
-    {std::lock_guard<std::mutex> lock(s->_timingLock);count=s->_timingCount;lost=s->_timingLost;memcpy(rows,s->_timings,count*sizeof(*rows));}
+    FGCaptureTiming rows[130];unsigned count,lost,late;
+    {std::lock_guard<std::mutex> lock(s->_timingLock);count=std::min(s->_timingCount,128u);lost=s->_timingLost;late=s->_lateCallbacks;
+     unsigned first=s->_timingCount>128?s->_timingCount%128:0;for(unsigned i=0;i<count;i++)rows[i]=s->_timings[(first+i)%128];
+     for(unsigned i=0;i<2;i++)if(s->_pinned[i].recordID)rows[count++]=s->_pinned[i];}
+    std::sort(rows,rows+count,[](const FGCaptureTiming&a,const FGCaptureTiming&b){return a.recordID<b.recordID;});
     NSMutableArray *items=[NSMutableArray array];
     for(unsigned i=0;i<count;i++){
         auto &r=rows[i];[items addObject:@{@"source_sequence":@(r.sequence),@"epoch":@(r.epoch),@"kind":r.generated?@"generated":@"real",
@@ -85,15 +89,15 @@ static void fgCaptureFlushTimings(HuskFGCaptureSession *s){
             @"gpu_duration_ms":r.gpuValid?@((r.gpuEnd-r.gpuStart)*1000):(id)[NSNull null],@"presented_timestamp_valid":@(r.presentValid),
             @"presented_time_seconds":r.presentValid?@(r.presented):(id)[NSNull null],@"presentation_callback_host_seconds":fgCaptureTime(r.presentObserved)}];
     }
-    fgCaptureJSON(s,"consumer-timing.json",@{@"schema":@1,@"plan_ids":@[@"M3",@"M4",@"M9"],@"subsystem":@"framegen_consumer",
-        @"records":items,@"capacity":@64,@"omitted_records":@(lost),@"sampling":@"one in seven output commands plus captured pairs; bounded opt-in window",
+    fgCaptureJSON(s,"consumer-timing.json",@{@"schema":@2,@"plan_ids":@[@"M3",@"M4",@"M9"],@"subsystem":@"framegen_consumer",
+        @"records":items,@"capacity":@130,@"omitted_records":@(lost),@"late_callbacks_after_slot_reuse":@(late),@"sampling":@"every output in a rolling128-command ring plus2 pinned capture outputs; ends500ms after file completion",
         @"host_clock":@"CACurrentMediaTime seconds",@"gpu_clock":@"MTLCommandBuffer GPUStartTime/GPUEndTime seconds; no inferred cross-clock latency",
         @"presentation_clock":@"CAMetalDrawable presentedTime; absent callbacks stay unavailable",
         @"limitations":@"Not unique pixels, input latency, panel scanout or power. Exclude diagnostic-copy commands from normal GPU comparisons."});
 }
 extern "C" __attribute__((visibility("default"))) int vkHuskFramegenCaptureConfigure(const tl_fg_capture_config *c){
     if(!c||c->version!=1||c->size!=sizeof(*c)||c->enabled>1)return 0;
-    if(!c->enabled){std::lock_guard<std::mutex> lock(fgCaptureLock);fgCaptureEnabled=false;if(fgCaptureSession)fgCaptureSession->_cancelled=true;[fgCaptureSession release];fgCaptureSession=nil;return 1;}
+    if(!c->enabled){std::lock_guard<std::mutex> lock(fgCaptureLock);fgCaptureEnabled=false;fgCaptureTimingEnabled=false;if(fgCaptureSession)fgCaptureSession->_cancelled=true;[fgCaptureSession release];fgCaptureSession=nil;return 1;}
     if(!huskFramegenRequested()||c->pair_limit<1||c->pair_limit>2||c->first_frame<1||c->first_frame>900||c->frame_stride<1||c->frame_stride>900||
        c->directory[0]!='/'||strnlen(c->directory,sizeof c->directory)==sizeof c->directory)return 0;
     int fd=open(c->directory,O_RDONLY|O_DIRECTORY|O_NOFOLLOW);if(fd<0)return 0;
@@ -103,7 +107,7 @@ extern "C" __attribute__((visibility("default"))) int vkHuskFramegenCaptureConfi
     std::lock_guard<std::mutex> lock(fgCaptureLock);
     if(fgCaptureBusy){close(fd);return 0;}
     auto *s=[HuskFGCaptureSession new];s->_fd=fd;s->_limit=c->pair_limit;s->_first=c->first_frame;s->_stride=c->frame_stride;s->_base=fgRendered.load();
-    if(fgCaptureSession)fgCaptureSession->_cancelled=true;[fgCaptureSession release];fgCaptureSession=s;fgCaptureEnabled=true;
+    if(fgCaptureSession)fgCaptureSession->_cancelled=true;[fgCaptureSession release];fgCaptureSession=s;fgCaptureEnabled=true;fgCaptureTimingEnabled=true;
     fprintf(stderr,"[M3/M9-FG-CAPTURE] armed %u pair(s), first after %u completed source frames, stride %u; diagnostic copies are excluded from performance acceptance\n",c->pair_limit,c->first_frame,c->frame_stride);return 1;
 }
 static void fgCaptureFinish(HuskFGCaptureTicket *t,NSString *failure){
@@ -112,23 +116,27 @@ static void fgCaptureFinish(HuskFGCaptureTicket *t,NSString *failure){
     {std::lock_guard<std::mutex> lock(fgCaptureLock);if(t->_session==fgCaptureSession&&t->_session->_next>=t->_session->_limit)fgCaptureEnabled=false;}
     dispatch_async(fgCaptureWriter(),^{@autoreleasepool{
         NSString *error=failure;NSMutableArray *files=[NSMutableArray array];
-        const char *stages[]={"previous","current","generated","following-real","forward","backward"};
-        if(!error)for(unsigned i=0;i<6;i++){
-            bool field=i>=4;id<MTLBuffer> b=field?t->_fields[i-4]:t->_images[i];
-            char file[96];snprintf(file,sizeof file,"pair-%02u-%s.%s",t->_id,stages[i],field?"f16":"bgra");
+        const char *stages[]={"previous","current","generated","following-real","forward","backward","raw-forward","raw-backward","coarse-forward","coarse-backward","quality"};
+        if(!error)for(unsigned i=0;i<11;i++){
+            bool field=i>=4,coarse=i==8||i==9,quality=i==10;
+            id<MTLBuffer> b=quality?t->_quality:(field?t->_fields[i-4]:t->_images[i]);
+            char file[96];snprintf(file,sizeof file,"pair-%02u-%s.%s",t->_id,stages[i],quality?"f32":(field?"f16":"bgra"));
             if(!fgCaptureWrite(t->_session,file,b.contents,b.length)){error=[NSString stringWithFormat:@"file write failed at %s (errno %d)",stages[i],errno];break;}
             [files addObject:@{@"stage":[NSString stringWithUTF8String:stages[i]],@"file":[NSString stringWithUTF8String:file],
-                @"width":@(field?t->_flowWidth:t->_width),@"height":@(field?t->_flowHeight:t->_height),@"row_bytes":@(field?t->_flowRow:t->_row),
-                @"bytes":@(b.length),@"format":field?@"RGBA16Float":@"BGRA8Unorm",@"origin":@"top-left"}];
+                @"width":@(quality?1:(coarse?t->_coarseWidth:(field?t->_flowWidth:t->_width))),@"height":@(quality?1:(coarse?t->_coarseHeight:(field?t->_flowHeight:t->_height))),@"row_bytes":@(quality?256:(coarse?t->_coarseRow:(field?t->_flowRow:t->_row))),
+                @"bytes":@(b.length),@"format":quality?@"RGBA32Float":(field?@"RGBA16Float":@"BGRA8Unorm"),@"origin":@"top-left"}];
         }
         double gpuStart[2],gpuEnd[2];{std::lock_guard<std::mutex> lock(t->_stageLock);memcpy(gpuStart,t->_gpuStart,sizeof gpuStart);memcpy(gpuEnd,t->_gpuEnd,sizeof gpuEnd);}
-        NSDictionary *record=@{@"schema":@1,@"plan_ids":@[@"M1",@"M3",@"M9"],@"pair_id":@(t->_id),@"state":error?@"incomplete":@"complete",
+        const float *quality=(const float*)t->_quality.contents;
+        id qualityRecord=(!error&&quality)?(id)@{@"coherent_tile_fraction":@(quality[0]),@"mean_forward_backward_error_pixels":@(quality[1]),@"static_tile_fraction":@(quality[2]),@"interpolation_admitted":@(quality[3]>=0.5f),@"minimum_coherent_fraction":@0.80,@"decision":quality[3]>=0.5f?@"interpolation_with_local_boundary_guards":@"whole_frame_real_fallback"}:(id)[NSNull null];
+        NSDictionary *record=@{@"schema":@2,@"reconstruction_quality":qualityRecord,@"plan_ids":@[@"M1",@"M3",@"M9"],@"pair_id":@(t->_id),@"state":error?@"incomplete":@"complete",
             @"error":error?: (id)[NSNull null],@"previous_source_sequence":@(t->_previousSequence),@"current_source_sequence":@(t->_currentSequence),@"epoch":@(t->_epoch),
             @"capture_encode_host_monotonic_seconds":@(t->_created),@"previous_source_gpu_completion_callback_host_seconds":fgCaptureTime(t->_sourcePrevious),
             @"current_source_gpu_completion_callback_host_seconds":fgCaptureTime(t->_sourceCurrent),@"source_gpu_execution_timestamps":@"UNAVAILABLE for source Metal4 feedback; callback time is not GPU duration",
             @"generated_gpu_start_seconds":fgCaptureTime(gpuStart[0]),@"generated_gpu_end_seconds":fgCaptureTime(gpuEnd[0]),
             @"real_gpu_start_seconds":fgCaptureTime(gpuStart[1]),@"real_gpu_end_seconds":fgCaptureTime(gpuEnd[1]),@"files":files,
-            @"input_stage":@"final guest swapchain colour, after engine postprocessing and BEFORE framegen",
+            @"input_stage":@"colour handed to framegen after engine postprocessing and any upstream spatial pass; source Metal4 has no spatial pass",
+            @"field_stages":@"coarse64px -> raw16px residual refinement -> median3x3 with dense residual recheck; forward/backward are final fields",
             @"forward_field":@"current to previous, xy in swapchain pixels, z photometric residual; RGBA16Float little-endian",
             @"backward_field":@"previous to current, same units; interpolated flow is not engine motion vectors",
             @"diagnostic_overhead":@"intrusive opt-in GPU copies/readback plus Utility disk work; not an energy or baseline pacing benchmark",
@@ -140,7 +148,10 @@ static void fgCaptureFinish(HuskFGCaptureTicket *t,NSString *failure){
         // One bounded final flush allows pending presentation callbacks to be
         // included. Hold only the small session/ring, never image buffers.
         HuskFGCaptureSession *session=t->_session;
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW,500*NSEC_PER_MSEC),fgCaptureWriter(),^{@autoreleasepool{fgCaptureFlushTimings(session);}});
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW,500*NSEC_PER_MSEC),fgCaptureWriter(),^{@autoreleasepool{
+            {std::lock_guard<std::mutex> lock(fgCaptureLock);if(fgCaptureSession==session)fgCaptureTimingEnabled=false;}
+            fgCaptureFlushTimings(session);
+        }});
     }});
 }
 static HuskFGCaptureTicket *fgCaptureReserve(id<MTLDevice> device,unsigned w,unsigned h,unsigned fw,unsigned fh,
@@ -151,16 +162,18 @@ static HuskFGCaptureTicket *fgCaptureReserve(id<MTLDevice> device,unsigned w,uns
      if(!s||s->_cancelled.load()||fgCaptureBusy||s->_busy||s->_next>=s->_limit||current<s->_base+s->_first+uint64_t(s->_next)*s->_stride)return nil;
      [s retain];pair=++s->_next;++s->_busy;++fgCaptureBusy;}
     auto *t=[HuskFGCaptureTicket new];t->_session=s;t->_id=pair;t->_width=w;t->_height=h;t->_row=(w*4+255)&~255u;
-    t->_flowWidth=fw;t->_flowHeight=fh;t->_flowRow=(fw*8+255)&~255u;t->_previousSequence=previous;t->_currentSequence=current;t->_epoch=epoch;
+    t->_flowWidth=fw;t->_flowHeight=fh;t->_flowRow=(fw*8+255)&~255u;
+    t->_coarseWidth=(fw+3)/4;t->_coarseHeight=(fh+3)/4;t->_coarseRow=(t->_coarseWidth*8+255)&~255u;t->_previousSequence=previous;t->_currentSequence=current;t->_epoch=epoch;
     t->_created=CACurrentMediaTime();t->_sourcePrevious=previousTime;t->_sourceCurrent=currentTime;
-    uint64_t size=uint64_t(t->_row)*h,flowSize=uint64_t(t->_flowRow)*fh,total=4*size+2*flowSize;
+    uint64_t size=uint64_t(t->_row)*h,flowSize=uint64_t(t->_flowRow)*fh,coarseSize=uint64_t(t->_coarseRow)*t->_coarseHeight,total=4*size+4*flowSize+2*coarseSize+256;
     bool admitted=w>=1&&h>=1&&w<=4096&&h<=4096&&fw>=1&&fh>=1&&fw<=256&&fh<=256&&total<=(64ULL<<20);
 #if TARGET_OS_IOS
     admitted=admitted&&os_proc_available_memory()>total+(128ULL<<20);
 #endif
     if(admitted){for(auto &b:t->_images){b=[device newBufferWithLength:size options:MTLResourceStorageModeShared];if(b)memset(b.contents,0,b.length);}
-        for(auto &b:t->_fields){b=[device newBufferWithLength:flowSize options:MTLResourceStorageModeShared];if(b)memset(b.contents,0,b.length);}}
-    bool allocated=admitted;for(auto b:t->_images)allocated=allocated&&b!=nil;for(auto b:t->_fields)allocated=allocated&&b!=nil;
+        for(unsigned i=0;i<6;i++){auto &b=t->_fields[i];b=[device newBufferWithLength:(i>=4?coarseSize:flowSize) options:MTLResourceStorageModeShared];if(b)memset(b.contents,0,b.length);}
+        t->_quality=[device newBufferWithLength:256 options:MTLResourceStorageModeShared];if(t->_quality)memset(t->_quality.contents,0,256);}
+    bool allocated=admitted&&t->_quality!=nil;for(auto b:t->_images)allocated=allocated&&b!=nil;for(auto b:t->_fields)allocated=allocated&&b!=nil;
     if(!allocated){fgCaptureFinish(t,@"diagnostic staging memory unavailable or exceeds64MiB budget");[t release];return nil;}
     fprintf(stderr,"[M3/M9-FG-CAPTURE] pair %u begins at source %llu; exclude diagnostic-copy frames from performance comparisons\n",pair,(unsigned long long)current);return t;
 }
@@ -177,17 +190,17 @@ static void fgCaptureStage(HuskFGCaptureTicket *t,bool generated,id<MTLCommandBu
     if(ready)fgCaptureFinish(t,nil);
 }
 static void fgCaptureObserve(id<MTLCommandBuffer> command,id<CAMetalDrawable> drawable,bool generated,bool diagnostic,uint64_t sequence,uint64_t epoch){
-    if(!fgCaptureEnabled.load(std::memory_order_relaxed))return;
-    HuskFGCaptureSession *s;unsigned index;
-    {std::lock_guard<std::mutex> lock(fgCaptureLock);s=fgCaptureSession;if(!s||s->_cancelled.load())return;
-     if(!diagnostic&&s->_commands++%7)return;[s retain];}
-    bool full;
-    {std::lock_guard<std::mutex> lock(s->_timingLock);full=s->_timingCount>=64;if(full)++s->_timingLost;
-     else{index=s->_timingCount++;auto &r=s->_timings[index];r.sequence=sequence;r.epoch=epoch;r.generated=generated;r.diagnostic=diagnostic;r.submitHost=CACurrentMediaTime();}}
-    if(full){[s release];return;}
-    [command addCompletedHandler:^(id<MTLCommandBuffer> done){std::lock_guard<std::mutex> lock(s->_timingLock);auto &r=s->_timings[index];
+    if(!fgCaptureTimingEnabled.load(std::memory_order_relaxed))return;
+    HuskFGCaptureSession *s;unsigned index;uint64_t recordID;
+    {std::lock_guard<std::mutex> lock(fgCaptureLock);s=fgCaptureSession;if(!s||s->_cancelled.load())return;[s retain];}
+    {std::lock_guard<std::mutex> lock(s->_timingLock);index=diagnostic?(generated?128:129):s->_timingCount++%128;recordID=++s->_commands;
+     if(!diagnostic&&s->_timingCount>128)++s->_timingLost;
+     auto &r=index>=128?s->_pinned[index-128]:s->_timings[index];r={};r.recordID=recordID;r.sequence=sequence;r.epoch=epoch;r.generated=generated;r.diagnostic=diagnostic;r.submitHost=CACurrentMediaTime();}
+    [command addCompletedHandler:^(id<MTLCommandBuffer> done){std::lock_guard<std::mutex> lock(s->_timingLock);auto &r=index>=128?s->_pinned[index-128]:s->_timings[index];
+        if(r.recordID!=recordID){++s->_lateCallbacks;return;}
         r.completionHost=CACurrentMediaTime();r.gpuStart=done.GPUStartTime;r.gpuEnd=done.GPUEndTime;
         r.gpuValid=done.status==MTLCommandBufferStatusCompleted&&std::isfinite(r.gpuStart)&&std::isfinite(r.gpuEnd)&&r.gpuStart>0&&r.gpuEnd>=r.gpuStart;}];
-    [drawable addPresentedHandler:^(id<MTLDrawable> shown){std::lock_guard<std::mutex> lock(s->_timingLock);auto &r=s->_timings[index];r.presented=shown.presentedTime;
-        r.presentObserved=CACurrentMediaTime();r.presentValid=std::isfinite(r.presented)&&r.presented>0;}];[s release];
+    [drawable addPresentedHandler:^(id<MTLDrawable> shown){std::lock_guard<std::mutex> lock(s->_timingLock);auto &r=index>=128?s->_pinned[index-128]:s->_timings[index];
+        if(r.recordID!=recordID){++s->_lateCallbacks;return;}
+        r.presented=shown.presentedTime;r.presentObserved=CACurrentMediaTime();r.presentValid=std::isfinite(r.presented)&&r.presented>0;}];[s release];
 }

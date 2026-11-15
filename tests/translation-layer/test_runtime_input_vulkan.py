@@ -166,13 +166,14 @@ class FramegenAdmissionTests(unittest.TestCase):
 #include <string.h>
 #include "husk-tl-framegen.h"
 static struct{void*lib;}V={(void*)1};
-static bool efficient=true,available=true,accept=true;static int fps=60,paused=-1,calls,captures;
+static bool efficient=true,available=true,accept=true,model_ok=true;static int fps=60,paused=-1,calls,captures;
 int tl_vk_framegen_capture_arm(const char *directory,uint32_t first,uint32_t stride,uint32_t pairs){assert(directory&&first==180&&stride==90&&pairs==1);captures++;return 1;}
 static bool tl_ue4_efficiency_enabled(void){return efficient;}
 static void husk_ue4_set_efficiency(bool e,int f){assert(e);fps=f;}
 static void tl_log_line(const char*fmt,...){(void)fmt;}
 static int configure(const tl_fg_config*c){calls++;assert(c->version==1&&c->size==sizeof(*c)&&c->width==1816&&c->height==1280);return accept;}
 static void pause_driver(int p){paused=p;}
+static bool tl_vk_require_framegen_contract(void *entry){assert(entry);return model_ok;}
 static void*vk_symbol(const char*n){if(!available)return 0;if(!strcmp(n,"vkHuskFramegenConfigure"))return(void*)configure;if(!strcmp(n,"vkHuskFramegenPause"))return(void*)pause_driver;return 0;}
 """+part+r"""
 static bool vk_ready(void){return available;}
@@ -181,6 +182,7 @@ int main(void){
  husk_ue4_set_frame_generation(true);assert(!tl_vk_framegen_prepare(0,1816,1280));assert(!tl_vk_framegen_prepare("Other",1816,1280));
  efficient=false;assert(!tl_vk_framegen_prepare("Dungeons",1816,1280));efficient=true;
  available=false;assert(!tl_vk_framegen_prepare("Dungeons",1816,1280)&&fps==60&&!calls);available=true;
+ model_ok=false;assert(!tl_vk_framegen_prepare("Dungeons",1816,1280)&&fps==60&&!calls);model_ok=true;
  strcpy(framegen_capture_directory,"/pending-evidence");
  accept=false;assert(!tl_vk_framegen_prepare("Dungeons",1816,1280)&&fps==60&&calls==1);
  assert(!captures&&framegen_capture_directory[0]);

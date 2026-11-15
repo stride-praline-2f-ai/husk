@@ -85,7 +85,7 @@ enum FrameEvidenceFiles {
                     try snapshot(url, "capture/" + name)
                     guard name.hasPrefix("pair-"), name.hasSuffix(".json") else { continue }
                     guard let record = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any],
-                          let files = record["files"] as? [[String: Any]], files.count <= 6 else { throw Failure.invalidMetadata }
+                          let files = record["files"] as? [[String: Any]], files.count <= 11 else { throw Failure.invalidMetadata }
                     pairs.append(["manifest": name, "state": record["state"] ?? "UNAVAILABLE", "stages_saved": files.count, "error": record["error"] ?? NSNull()])
                     for item in files {
                         guard let file = item["file"] as? String, safeName(file), file.hasPrefix("pair-") else { throw Failure.unsafeFile }
@@ -102,6 +102,12 @@ enum FrameEvidenceFiles {
                                   let height = item["height"] as? Int, let row = item["row_bytes"] as? Int,
                                   (1...256).contains(width), (1...256).contains(height), row == ((width * 8 + 255) & ~255),
                                   try regular(raw, limit: 1024 * 1024) == row * height else { throw Failure.invalidMetadata }
+                            try add(raw, "capture/" + file)
+                        }
+                        else if file.hasSuffix(".f32") {
+                            guard item["format"] as? String == "RGBA32Float", item["width"] as? Int == 1,
+                                  item["height"] as? Int == 1, item["row_bytes"] as? Int == 256,
+                                  try regular(raw, limit: 256) == 256 else { throw Failure.invalidMetadata }
                             try add(raw, "capture/" + file)
                         }
                         else { throw Failure.unsafeFile }
@@ -129,7 +135,7 @@ enum FrameEvidenceFiles {
         let manifest: [String: Any] = ["schema": 1, "plan_ids": ["M1", "M3", "M9"], "capture_present": capture != nil,
             "entries": index, "omissions": omissions, "capture_pairs": pairs, "complete_pairs": pairs.filter { $0["state"] as? String == "complete" }.count,
             "native_log_mirrored_in_husk_log": true,
-            "scope": "Captured guest colour, generated/following-real RGB, raw flow fields, consumer timings and contextual logs where available. Missing stages remain unavailable.",
+            "scope": "Captured guest colour, generated/following-real RGB, staged flow fields, GPU quality decision, consumer timings and contextual logs where available. Missing stages remain unavailable.",
             "limitations": "Capture copies are intrusive. Requested engine CVars are not runtime readback. Logs and capture may have different session IDs; compare identities. No panel, input-latency, temperature or power measurement."]
         let manifestURL = work.appendingPathComponent("bundle-index.json")
         try JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys]).write(to: manifestURL)
