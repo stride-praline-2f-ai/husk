@@ -1,0 +1,19 @@
+{
+  "requested_by_user": "TRY MAKE ipa",
+  "source": "a597f11bff10ce403d1b8b77f7aed0f3f2d0ba88",
+  "run_id": 43658021067,
+  "attempt": 2,
+  "job_id": 132642759964,
+  "runner_id": 0,
+  "runner_name": "",
+  "labels": [
+    "xcode-27"
+  ],
+  "steps": [],
+  "conclusion": "failure",
+  "updated_at": "2026-11-15T00:32:04Z",
+  "logs": "GitHub returned 404 BlobNotFound; no logs exist",
+  "artifact": null,
+  "reason": "Not exposed through the available API; requested the run-page error annotation from user",
+  "scope": "Release validation for M0/M3/M6/M8/M10 candidate 162; no source change and no new validation credit"
+}
