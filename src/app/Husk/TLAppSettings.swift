@@ -442,6 +442,7 @@ struct TLAppSettingsView: View {
                         }), in: 65...100, step: 1)
                         Text("\(settings.dungeonsResolutionPercent)%").monospacedDigit().frame(width: 42, alignment: .trailing)
                     }
+                    .disabled(!settings.usesEfficientGraphics(for: app))
                 }
             } header: { Text(app.label) } footer: {
                 Text(settings.frameGeneration
