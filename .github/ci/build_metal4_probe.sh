@@ -52,6 +52,8 @@ if '#if !TARGET_OS_IPHONE /* Husk SDK guard */' not in s:
 PY
 if [ "${HUSK_METAL4_UPSTREAM_ONLY:-0}" != 1 ]; then
     python3 "$ROOT/scripts/prepare_metal4_source.py" "$WORK/mesa"
+    # Check public SDK signatures before compiling the full NIR/driver tree.
+    xcrun --sdk iphoneos clang++ -target arm64-apple-ios26.0 -isysroot "$(xcrun --sdk iphoneos --show-sdk-path)" -std=c++17 -fblocks -fno-objc-arc -fsyntax-only "$WORK/mesa/src/kosmickrisp/bridge/HuskMetal4Compiler.mm" "$WORK/mesa/src/kosmickrisp/bridge/HuskMetal4Framegen.mm"
 fi
 export MACOSX_DEPLOYMENT_TARGET=26.0
 COMMON=(-Dvulkan-drivers=kosmickrisp -Dgallium-drivers= -Dopengl=false -Dgles1=disabled -Dgles2=disabled -Dglx=disabled -Degl=disabled -Dgbm=disabled -Dzstd=disabled -Dbuildtype=release -Dwrap_mode=nofallback)
