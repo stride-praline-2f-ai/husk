@@ -410,8 +410,12 @@ final class TLUnityUIView: UIView, UIKeyInput {
         efficientFrameLimit = DuoDisplayPolicy.fps
         let gpuName = DuoDisplayPolicy.detectedGPUName
         let cpuCount = ProcessInfo.processInfo.processorCount
-        automaticFastWorkerBudget = DuoDisplayPolicy.fastWorkerBudget(gpuName: gpuName, cpuCount: cpuCount, enabled: a20EfficiencyWorkers)
-        threadPolicy = DuoDisplayPolicy.workerPolicy(gpuName: gpuName, cpuCount: cpuCount, enabled: a20EfficiencyWorkers)
+        let topology = DuoDisplayPolicy.runtimeCoreCounts
+        automaticFastWorkerBudget = DuoDisplayPolicy.fastWorkerBudget(gpuName: gpuName, cpuCount: cpuCount, enabled: a20EfficiencyWorkers,
+                                                                       performanceCores: topology.performance, efficiencyCores: topology.efficiency)
+        threadPolicy = DuoDisplayPolicy.workerPolicy(gpuName: gpuName, cpuCount: cpuCount, enabled: a20EfficiencyWorkers,
+                                                     performanceCores: topology.performance, efficiencyCores: topology.efficiency)
+        HuskLog.log("tl", "[NX18-HENGE-A20-v1] worker topology: total \(cpuCount), performance \(topology.performance), efficiency \(topology.efficiency); zero means unavailable; allowance \(automaticFastWorkerBudget), no core affinity")
         submissionMode = DuoDisplayPolicy.submission
         spatialUpscaling = true
         spatialInputPercent = DuoDisplayPolicy.inputPercent
@@ -522,7 +526,7 @@ final class TLUnityUIView: UIView, UIKeyInput {
                 if metal4Renderer && !frameGeneration {
                     let metal4 = fw + "/KosmicKrisp.framework/KosmicKrisp"
                     if #available(iOS 26.0, *), FileManager.default.fileExists(atPath: metal4),
-                       MTLCreateSystemDefaultDevice()?.supportsFamily(.apple7) == true {
+                       husk_metal4_preflight() {
                         selected = metal4
                         // This independent driver has neither the custom spatial
                         // bridge nor archive ABI. Do not lower its guest extent

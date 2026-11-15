@@ -204,7 +204,7 @@ void tl_thread_policy_activate(const char *project)
     atomic_store(&trial_active, false); atomic_fetch_add(&revision, 1);
     stable_ns = cooldown_until = last_sample = 0; previous_power = -1; cadence_rejected = false;
     last_reason = NULL; reason_at = 0; reset_baseline();
-    if (trial_mode(mode)) tl_log_line("thread-policy adaptive: runtime CPU count %d, reserved normal-worker budget %d; total-capacity heuristic, not detected P/E topology", atomic_load(&capacity_cpus), atomic_load(&fast_workers));
+    if (trial_mode(mode)) tl_log_line("thread-policy adaptive: runtime CPU capacity hint %d, reserved normal-worker budget %d; caller override or capacity heuristic, no core affinity", atomic_load(&capacity_cpus), atomic_load(&fast_workers));
     if (mode) tl_log_line("thread-policy: %s for Dungeons; normal Default and background Utility baseline; extra caps only in admitted Adaptive trials; no core affinity",
                          mode == 4 ? "Baseline-Relative Trial (experimental)" : mode == 3 ? "Adaptive Trial (experimental)" : mode == 2 ? "Balanced (experimental)" : "Observe Only");
     pthread_mutex_unlock(&controller_mu);
