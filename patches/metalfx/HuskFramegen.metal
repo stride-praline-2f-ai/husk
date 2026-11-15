@@ -40,31 +40,38 @@ kernel void huskInterpolate(texture2d<float,access::sample> previous [[texture(0
     uint2 size=uint2(output.get_width(),output.get_height());if(any(p>=size))return;
     float2 uv=(float2(p)+0.5f)/float2(size);
     float4 result=current.sample(fgSampler,uv);
-    float3 directDifference=abs(previous.sample(fgSampler,uv).rgb-result.rgb);
-    // A coarse background vector must not move stationary HUD/text pixels.
-    // This also skips the flow/warp reads when the actual pixel is unchanged.
-    if(max(directDifference.r,max(directDifference.g,directDifference.b))>1.0f/255.0f){
-        float4 f=forward.sample(fgSampler,uv);
-        float2 previousUV=uv+0.5f*f.xy/float2(size);
-        float2 currentUV=uv-0.5f*f.xy/float2(size);
-        float2 margin=0.5f/float2(size);
-        bool inside=all(previousUV>=margin)&&all(previousUV<=1.0f-margin)&&
-                    all(currentUV>=margin)&&all(currentUV<=1.0f-margin);
-        // Zero/ambiguous motion cannot justify a temporal cross-fade. Outside
-        // the image, clamped sampling would stretch an edge into a false warp.
-        if(inside && length(f.xy)>=0.5f && f.z<0.08f){
-            float4 b=backward.sample(fgSampler,uv+f.xy/float2(size));
-            if(b.z<0.08f && length(f.xy+b.xy)<2.5f){
-                float4 a=previous.sample(fgSampler,previousUV);
-                float4 c=current.sample(fgSampler,currentUV);
-                float3 difference=abs(a.rgb-c.rgb);
-                // Flow confidence describes a tile, not this pixel. Reject
-                // locally disagreeing colours/edges instead of averaging two
-                // misregistered pictures into blur. RGB also catches colours
-                // that have equal luminance. At most ~5/255 of blend deviation
-                // is admitted per channel relative to either warped sample.
-                if(max(difference.r,max(difference.g,difference.b))<=0.04f)
-                    result=mix(a,c,0.5f);
+    float4 f=forward.sample(fgSampler,uv);
+    float2 previousUV=uv+0.5f*f.xy/float2(size);
+    float2 currentUV=uv-0.5f*f.xy/float2(size);
+    float2 margin=0.5f/float2(size);
+    bool inside=all(previousUV>=margin)&&all(previousUV<=1.0f-margin)&&
+                all(currentUV>=margin)&&all(currentUV<=1.0f-margin);
+    // Zero/ambiguous motion cannot justify a temporal cross-fade. Clamping an
+    // out-of-image warp would stretch the boundary into false correspondence.
+    if(inside && length(f.xy)>=0.5f && f.z<0.08f){
+        float4 b=backward.sample(fgSampler,uv+f.xy/float2(size));
+        if(b.z<0.08f && length(f.xy+b.xy)<2.5f){
+            float4 a=previous.sample(fgSampler,previousUV);
+            float4 c=current.sample(fgSampler,currentUV);
+            float3 difference=abs(a.rgb-c.rgb);
+            // Tile confidence does not establish per-pixel RGB agreement.
+            if(max(difference.r,max(difference.g,difference.b))<=0.04f){
+                bool blend=true;
+                float3 change=abs(c.rgb-result.rgb);
+                if(max(change.r,max(change.g,change.b))>0.04f){
+                    float3 stable=abs(previous.sample(fgSampler,uv).rgb-result.rgb);
+                    if(max(stable.r,max(stable.g,stable.b))<=1.0f/255.0f){
+                        // A static thin glyph can sit over a moving background:
+                        // both projected positions in the CURRENT image then
+                        // see that background, though its centre is unchanged.
+                        // A genuinely moving thin object has one projected
+                        // position on the object and the other on background;
+                        // retain its valid intermediate position in that case.
+                        float3 sides=abs(current.sample(fgSampler,previousUV).rgb-c.rgb);
+                        blend=max(sides.r,max(sides.g,sides.b))>0.04f;
+                    }
+                }
+                if(blend)result=mix(a,c,0.5f);
             }
         }
     }

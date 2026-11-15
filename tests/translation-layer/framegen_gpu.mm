@@ -78,9 +78,22 @@ int main(int argc,char**argv){@autoreleasepool{
         [command commit];[command waitUntilCompleted];assert(command.status==MTLCommandBufferStatusCompleted);
         [out getBytes:pixels bytesPerRow:256 fromRegion:MTLRegionMake2D(0,0,64,64) mipmapLevel:0];
     };
+    // Unchanged background at the midpoint is not a static HUD. A thin
+    // moving object must still appear between its two disjoint real positions.
     for(unsigned image=0;image<2;image++){
         for(unsigned y=0;y<64;y++)for(unsigned x=0;x<64;x++){
-            unsigned q=(y*64+x)*4;uint8_t bg=((x+image*8)%16)<8?32:80;
+            unsigned q=(y*64+x)*4;unsigned origin=20+image*8;
+            pixels[q]=pixels[q+1]=pixels[q+2]=(x>=origin&&x<origin+2)?255:0;pixels[q+3]=255;
+        }
+        [(image?b:a) replaceRegion:MTLRegionMake2D(0,0,64,64) mipmapLevel:0 withBytes:pixels bytesPerRow:256];
+    }
+    interpolateOnly();
+    if(pixels[(32*64+24)*4]!=255||pixels[(32*64+25)*4]!=255||pixels[(32*64+28)*4]!=0){
+        fprintf(stderr,"QUALITY_REJECT: true moving thin object lost its intermediate position\n");return 3;
+    }
+    for(unsigned image=0;image<2;image++){
+        for(unsigned y=0;y<64;y++)for(unsigned x=0;x<64;x++){
+            unsigned q=(y*64+x)*4;uint8_t bg=(uint8_t)(32+x-image*8);
             pixels[q]=pixels[q+1]=pixels[q+2]=(x==32||x==33)?255:bg;pixels[q+3]=255;
         }
         [(image?b:a) replaceRegion:MTLRegionMake2D(0,0,64,64) mipmapLevel:0 withBytes:pixels bytesPerRow:256];
