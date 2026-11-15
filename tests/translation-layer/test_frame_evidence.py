@@ -10,7 +10,7 @@ class FrameEvidenceTests(unittest.TestCase):
    p=Path(d);capture=p/'capture';frames=capture/'frames';frames.mkdir(parents=True)
    (capture/'host-session.json').write_text('{"host_session_id":"test-capture"}')
    files=[]
-   for i,stage in enumerate(['previous','current','generated','following-real','forward','backward']):
+   for i,stage in enumerate(['previous','current','generated','following-real','forward','backward','raw-forward','raw-backward','coarse-forward','coarse-backward']):
     field=i>=4;name='pair-01-'+stage+('.f16'if field else'.bgra')
     raw=b''.join(b''.join(bytes([3+i+x+y*2,10+i+x+y*2,100+i+x+y*2,255])for x in range(2))+bytes(248)for y in range(2))if not field else bytes([i])*512
     (frames/name).write_bytes(raw)

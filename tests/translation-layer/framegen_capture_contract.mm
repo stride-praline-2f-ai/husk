@@ -83,6 +83,8 @@ int main(int argc,char **argv){@autoreleasepool{
     c.enabled=1;snprintf(c.directory,sizeof c.directory,"%s",large.fileSystemRepresentation);assert(vkHuskFramegenCaptureConfigure(&c));
     assert(!fgCaptureReserve(d,4096,4096,128,128,4,5,9,4,5));assert([record(large)[@"state"] isEqual:@"incomplete"]);
     c.enabled=0;assert(vkHuskFramegenCaptureConfigure(&c));
+    dispatch_sync(fgCaptureWriter(),^{});
+    for(unsigned i=0;i<200;i++){bool busy;{std::lock_guard<std::mutex> lock(fgCaptureLock);busy=fgCaptureBusy!=0;}if(!busy)break;std::this_thread::sleep_for(std::chrono::milliseconds(10));}
     NSString *ring=[root stringByAppendingPathComponent:@"ring"];[[NSFileManager defaultManager] createDirectoryAtPath:ring withIntermediateDirectories:NO attributes:nil error:nil];
     c.enabled=1;snprintf(c.directory,sizeof c.directory,"%s",ring.fileSystemRepresentation);assert(vkHuskFramegenCaptureConfigure(&c));
     auto *pinned=[TimingDrawable new],*unavailable=[TimingDrawable new],*late=[TimingDrawable new];

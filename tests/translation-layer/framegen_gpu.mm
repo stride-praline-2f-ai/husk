@@ -257,7 +257,7 @@ int main(int argc,char**argv){@autoreleasepool{
         __fp16 vectors[64];[forward getBytes:vectors bytesPerRow:32 fromRegion:MTLRegionMake2D(0,0,4,4) mipmapLevel:0];
         [out getBytes:pixels bytesPerRow:256 fromRegion:MTLRegionMake2D(0,0,64,64) mipmapLevel:0];
         if(fabs((float)vectors[(2*4+2)*4]+motion)>0.26f||fabs(pixels[(32*64+32)*4]-(32-motion/2)*4)>2){
-            fprintf(stderr,"QUALITY_REJECT: fractional translation not reconstructed (%.1f pixels)\n",motion);return 4;
+            fprintf(stderr,"QUALITY_REJECT: fractional translation not reconstructed (%.1f pixels; flow %.5f/%.5f, output %u)\n",motion,(float)vectors[(2*4+2)*4],(float)vectors[(2*4+2)*4+1],pixels[(32*64+32)*4]);return 4;
         }
     }
     // Confidence rejection remains active for unreliable motion fields.

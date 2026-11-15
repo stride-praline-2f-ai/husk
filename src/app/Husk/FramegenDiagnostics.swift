@@ -85,7 +85,12 @@ import Metal
         guard let data = try? Data(contentsOf: file), let result = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return "Capture queued or waiting for rendered frames. A missing pair is not a successful capture."
         }
-        return result["state"] as? String == "complete" ? "Matched images, staged flow and GPU quality decision saved locally. Share the diagnostic bundle when ready." : "Capture incomplete: \(result["error"] ?? "reason unavailable"). Logs can still be shared."
+        if result["state"] as? String == "complete" {
+            return result["reconstruction_quality"] as? [String: Any] != nil
+                ? "Matched images, staged flow and GPU quality decision saved locally. Share the diagnostic bundle when ready."
+                : "Older matched images and final flow saved; GPU quality decision unavailable in that capture. Build identity is in the bundle."
+        }
+        return "Capture incomplete: \(result["error"] ?? "reason unavailable"). Logs can still be shared."
     }
     static func exportContext() throws -> (URL?, [URL], Data, URL) {
         let fm = FileManager.default

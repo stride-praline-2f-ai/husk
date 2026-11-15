@@ -80,15 +80,19 @@ kernel void huskFlow(texture2d<float,access::sample> previous [[texture(0)]],
     float2 displacement=seed;float best=INFINITY,residual=INFINITY;
     // Small residual search plus actual coarse corner hypotheses/zero. The
     // wide search is paid only on the coarse grid, with a spatial prior.
-    for(uint choice=0;choice<14;choice++){
+    for(uint choice=0;choice<18;choice++){
         float2 candidate;
         if(choice<9)candidate=seed+float2(int(choice%3)-1,int(choice/3)-1);
         else if(choice==9)candidate=0;
-        else{
+        else if(choice<14){
             float2 grid=uv*float2(coarse.get_width(),coarse.get_height())-0.5f;
             int2 pos=int2(floor(grid))+int2((choice-10)%2,(choice-10)/2);
             pos=clamp(pos,int2(0),int2(coarse.get_width(),coarse.get_height())-1);
             candidate=coarse.read(uint2(pos)).xy;
+        }else{
+            // Preserve fractional motion even on a constant-gradient surface,
+            // where centred continuous refinement has no second-order signal.
+            uint axis=choice-14;candidate=seed+float2(axis<2?(axis==0?0.5f:-0.5f):0,axis>=2?(axis==2?0.5f:-0.5f):0);
         }
         float error=fgPatchError(previous,current,centre,candidate,2.0f,0);
         float2 delta=candidate-seed;
