@@ -869,6 +869,7 @@ static void pace_efficient_frame(void)
     static _Thread_local double intervals[600];
     static _Thread_local unsigned count, late;
     static _Thread_local uint64_t last_ns[TIMING_COUNT], last_calls[TIMING_COUNT];
+    static _Thread_local uint64_t wait_requested_ns, wait_actual_ns, wait_excess_max_ns, wait_samples;
     int64_t now = monotonic_ns();
     if (!sampled_at || now - sampled_at >= 1000000000LL) {
         int observed = 0, low_power = 0;
@@ -894,6 +895,7 @@ static void pace_efficient_frame(void)
     if (wanted != cap) {
         cap = wanted; deadline = 0;
         count = late = 0; previous = 0; report_at = now;
+        wait_requested_ns = wait_actual_ns = wait_excess_max_ns = wait_samples = 0;
         tl_log_line("ue4 timing: requested cap %d FPS (0 game controlled), host cap %d (0 no extra limiter), thermal %d; selected launch resolution retained", cap, host_cap, thermal);
     }
     int64_t delay = tl_ue4_frame_delay_ns(now, host_cap, &deadline);
@@ -903,6 +905,10 @@ static void pace_efficient_frame(void)
         while (nanosleep(&wait, &wait) != 0 && errno == EINTR) {}
         record_host_timing(TIMING_SLEEP, sleep_started);
         now = monotonic_ns();
+        uint64_t elapsed = (uint64_t)(now - sleep_started);
+        uint64_t excess = elapsed > (uint64_t)delay ? elapsed - (uint64_t)delay : 0;
+        wait_requested_ns += (uint64_t)delay; wait_actual_ns += elapsed; wait_samples++;
+        if (excess > wait_excess_max_ns) wait_excess_max_ns = excess;
     }
     tl_em_frame(now);
     /* Present-to-present wall-clock cadence including pacing, not GPU time.
@@ -914,6 +920,7 @@ static void pace_efficient_frame(void)
         if (ms > 1000.0 / (cap ? cap : 60) * 1.2) late++;
     } else {
         count = late = 0; report_at = now;
+        wait_requested_ns = wait_actual_ns = wait_excess_max_ns = wait_samples = 0;
         atomic_exchange_explicit(&pipeline_window_max, 0, memory_order_relaxed);
         atomic_exchange_explicit(&pipeline_window_slow, 0, memory_order_relaxed);
         if (!pthread_mutex_trylock(&pipeline_event_mu)) { worst_pipeline = (struct pipeline_event){0}; pthread_mutex_unlock(&pipeline_event_mu); }
@@ -963,6 +970,10 @@ static void pace_efficient_frame(void)
                     (unsigned long long)atomic_load_explicit(&cache_host_seed_bytes, memory_order_relaxed),
                     pipeline_ns / 1e6, pipeline_max / 1e6, (unsigned long long)pipeline_slow, inflight);
         report_pipeline_event();
+        if (wait_samples) tl_log_line("[M4/M9 pacing-wait] requested %.3f ms average, actual %.3f ms average, max overshoot %.3f ms (%llu sleeps); current-thread host wait, not engine/GPU duration",
+            wait_requested_ns / (1e6 * wait_samples), wait_actual_ns / (1e6 * wait_samples),
+            wait_excess_max_ns / 1e6, (unsigned long long)wait_samples);
+        wait_requested_ns = wait_actual_ns = wait_excess_max_ns = wait_samples = 0;
     if(framegen_requested){
         tl_fg_stats fg;
         if(tl_vk_framegen_snapshot(&fg))tl_log_line("[M9-FRAMEGEN] active %u failed %u; since-launch GPU-completed rendered %llu, presented real %llu/generated %llu, dropped %llu, resets %llu, GPU errors %llu; generated includes low-confidence real-image fallback; not energy or unique-pixel measurement",fg.active,fg.failed,(unsigned long long)fg.rendered,(unsigned long long)fg.presented_real,(unsigned long long)fg.generated,(unsigned long long)fg.dropped,(unsigned long long)fg.resets,(unsigned long long)fg.gpu_errors);

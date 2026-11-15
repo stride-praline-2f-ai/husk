@@ -1,0 +1,138 @@
+{
+  "schema": 1,
+  "plan_ids": [
+    "M1",
+    "M3",
+    "M4",
+    "M6",
+    "M8",
+    "M9",
+    "M10"
+  ],
+  "subsystem": "Dungeons returned frame-generation run",
+  "observation_date_utc": "2026-11-15",
+  "provenance": "User-pasted run log; selected verbatim excerpts and parsed observations, not the complete log",
+  "source_identity": "Build162 expected from delivery context and matching new worker log wording; no explicit source/build stamp in pasted excerpt",
+  "occurrence_wall_clock": "unavailable",
+  "phase": "Startup followed by unmarked rendering and lifecycle interruptions; mission/gameplay/input/visual quality unknown",
+  "device_gpu_reported": "Apple A20 Pro GPU",
+  "os_renderer_reported": "Version 27.3 (Build 24C5037i)",
+  "renderer": {
+    "status": "EXTERNAL",
+    "library": "HuskMoltenVK.framework/HuskMoltenVK",
+    "native_metal4_active": false,
+    "reason": "Frame generation explicitly selects custom MoltenVK; supplied launch names that library"
+  },
+  "frame_generation": {
+    "status": "EXTERNAL",
+    "requested_render_fps": 30,
+    "requested_present_hz": 60,
+    "last_gpu_completed_rendered": 952,
+    "last_presented_real": 938,
+    "last_presented_generated": 929,
+    "last_dropped": 11,
+    "last_resets": 2,
+    "gpu_errors": 0,
+    "limitations": "Generated count includes low-confidence real-image fallback; not confirmed unique images, display refresh, visual quality, latency or energy"
+  },
+  "resolution": {
+    "status": "EXTERNAL",
+    "output": [
+      1816,
+      1280
+    ],
+    "guest_swapchain": [
+      1448,
+      1024
+    ],
+    "spatial_percent": 80,
+    "internal_3d_resolution": "unavailable"
+  },
+  "reported_host_cadence_fps": [
+    27.5,
+    28.0,
+    27.6
+  ],
+  "reported_host_p95_ms": [
+    37.73,
+    37.8,
+    38.1
+  ],
+  "reported_host_max_interval_ms": [
+    557.71,
+    253.49,
+    187.86
+  ],
+  "cadence_scope": "Host render/present-call timing, not displayed/generated frame timing; includes unmarked startup/pause/LPM conditions",
+  "pipeline": {
+    "status": "EXTERNAL",
+    "restored_compatible_bytes": 3260016,
+    "host_seed_accepted": true,
+    "worst_reported_host_create_ms": 245.511,
+    "verified_cache_hits": "unavailable",
+    "implication": "Long host pipeline creation calls are plausible stutter contributors; cache acceptance does not eliminate later compilation"
+  },
+  "worker_policy": {
+    "status": "EXTERNAL",
+    "requested_mode": 4,
+    "normal_allowance": 2,
+    "last_wait_reason": "thermal pressure",
+    "trial_admission_observed": false,
+    "background_workers_utility_observed": true,
+    "normal_and_critical_roles_preserved": true,
+    "runtime_p_e_split": "unavailable in excerpt",
+    "core_affinity_or_energy": "unavailable"
+  },
+  "power": {
+    "status": "EXTERNAL",
+    "low_power_transition": [
+      1,
+      0
+    ],
+    "thermal": 1,
+    "thermal_label": "fair; not a temperature measurement"
+  },
+  "memory": {
+    "status": "EXTERNAL",
+    "last_shared_mapped_mib": 1920,
+    "last_shared_in_use_mib": 1106,
+    "last_shared_free_mib": 813,
+    "last_reserve_misses": 25,
+    "reported_headroom_mib_min_observed": 4727,
+    "interpretation": "No terminal allocation failure/jet-sam in excerpt; shared mapping is not added physical RAM"
+  },
+  "lifecycle": {
+    "status": "EXTERNAL",
+    "observed_sequences": [
+      {
+        "sequence": 1,
+        "paused": true
+      },
+      {
+        "sequence": 2,
+        "paused": false
+      },
+      {
+        "sequence": 3,
+        "paused": true
+      }
+    ],
+    "last_frame_counter": 959,
+    "resume_after_sequence3_present": false,
+    "heartbeats_continue": true,
+    "freeze_cause": "User confirmed opening logs/backgrounding Husk; final pause is intentional, not a reported foreground freeze",
+    "last_pause_exclusion": "Confirmed manual log/background interruption; exclude stopped tail from gameplay/pacing assessment"
+  },
+  "terminal_exception_or_gpu_failure": "none reported in excerpt",
+  "verbatim_excerpts": [
+    "[M9-FRAMEGEN] explicit colour-flow beta: 30 rendered FPS, 60 Hz presentation target; generated images add latency/work; actual display/quality/energy pending",
+    "thread-policy adaptive: waiting: thermal pressure; stable 0.0/20 s, pipeline total 2174.874 ms max 181.610 ms in-flight 0; heuristic limits 2 ms/call and 0.5%/window",
+    "[M9-FRAMEGEN] active 1 failed 0; since-launch GPU-completed rendered 952, presented real 938/generated 929, dropped 11, resets 2, GPU errors 0; generated includes low-confidence real-image fallback; not energy or unique-pixel measurement",
+    "[M1/M6/M9 lifecycle] apply begin sequence 3 paused 1 on activity UiThread",
+    "[M1/M6/M9 lifecycle] apply complete sequence 3 paused 1",
+    "unity: alive: 959 frames (+0), 5144 MiB left before jetsam, 7.7 GiB of address space mapped (0.9 GiB by the game); VA sample age 33.9 s (-1 unavailable)"
+  ],
+  "disposition": "Retain as partial framegen mechanism/lifecycle observation. Does not pass nativeMetal4, A20 trial, full gameplay/reliability or energy gates.",
+  "next": "No final-stop repair needed. NativeMetal4 correctness remains Frame Generation OFF / Metal4 ON and complete restart; retain build162, selected output and current data/caches. No new IPA or broad run needed.",
+  "user_clarification": "I opened logs/backgrounded Husk"
+}

@@ -214,6 +214,32 @@ public final class AppRunner {
         Intent i = a.getIntent();
         return i != null && i.getComponent() != null ? i.getComponent().getClassName() : a.getClass().getName();
     }
+    /** Reuse unique manifest activities. singleInstance brings its existing
+     * screen forward without destroying unrelated screens from another task;
+     * the runtime still has one host activity stack, not separate OS processes. */
+    private static boolean reuseUniqueActivity(Intent intent, int mode) {
+        if (mode != 2 && mode != 3) return false;
+        String target = intent.getComponent().getClassName();
+        for (int k = sStack.size() - 1; k >= 0; k--) {
+            Activity existing = sStack.get(k);
+            if (existing.isFinishing() || !startedAs(existing).equals(target)) continue;
+            Activity previous = top();
+            if (mode == 2) {
+                while (top() != existing) finishNow(top(), false);
+            } else if (previous != existing) {
+                if (previous != null && previous.isResumedHusk()) previous.huskPause();
+                sStack.remove(k); sStack.add(existing);
+            }
+            existing.huskNewIntent(intent);
+            if (!existing.isResumedHusk()) {
+                if (!existing.huskVisible()) { existing.huskRestart(); existing.huskStart(); }
+                existing.huskResume();
+            }
+            if (mode == 3 && previous != null && previous != existing && !existing.getWindow().isFloating()) previous.huskStop();
+            return true;
+        }
+        return false;
+    }
     /** Context.startActivity: an activity of the app's own, or something the host can open (a web page, mail, the store). */
     public static void startActivity(Context from, Intent i, int request, Bundle opts) {
         Manifest.Component c = Manifest.resolve(i);
@@ -224,6 +250,7 @@ public final class AppRunner {
             if (intent.getComponent() == null) intent.setComponent(new ComponentName(Native.packageName(), c.name));
             sHandler.post(() -> {
                 try {
+                    if (reuseUniqueActivity(intent, c.launchMode)) return;
                     if ((intent.getFlags() & Intent.FLAG_ACTIVITY_CLEAR_TOP) != 0) {
                         for (int k = sStack.size() - 1; k >= 0; k--) if (startedAs(sStack.get(k)).equals(intent.getComponent().getClassName())) {
                             Activity existing = sStack.get(k);

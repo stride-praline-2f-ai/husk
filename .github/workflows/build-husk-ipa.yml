@@ -204,6 +204,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python3 tests/translation-layer/test_anki_activity_reuse.py 2>&1 | tee build/logs/anki-activity-reuse.log
           if python3 scripts/ipa_build_cache.py restore java '${{ steps.cache_keys.outputs.java }}'; then
             echo 'Reused source-matched tested Java DEX; fresh app build still required' | tee build/logs/java-framework.log
           else

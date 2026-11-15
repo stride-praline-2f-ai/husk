@@ -135,6 +135,14 @@ struct TLAppSettings: Codable, Equatable {
     var a20EfficiencyWorkers = true
     var frameGeneration = false
     var metal4Renderer = false
+    mutating func selectMetal4(_ enabled: Bool) {
+        metal4Renderer = enabled
+        if enabled { frameGeneration = false }
+    }
+    mutating func selectFrameGeneration(_ enabled: Bool) {
+        frameGeneration = enabled
+        if enabled { metal4Renderer = false }
+    }
     var sharedMemoryReserve = true
     var spatialUpscaling = false
     var spatialInputPercent = 80
@@ -246,6 +254,7 @@ struct TLAppSettings: Codable, Equatable {
         a20EfficiencyWorkers = try c.decodeIfPresent(Bool.self, forKey: .a20EfficiencyWorkers) ?? true
         frameGeneration = try c.decodeIfPresent(Bool.self, forKey: .frameGeneration) ?? false
         metal4Renderer = try c.decodeIfPresent(Bool.self, forKey: .metal4Renderer) ?? false
+        frameGeneration = DuoDisplayPolicy.usesFrameGeneration(metal4: metal4Renderer, requested: frameGeneration)
         sharedMemoryReserve = try c.decodeIfPresent(Bool.self, forKey: .sharedMemoryReserve) ?? true
         spatialUpscaling = try c.decodeIfPresent(Bool.self, forKey: .spatialUpscaling) ?? false
         let inputPercent = try c.decodeIfPresent(Int.self, forKey: .spatialInputPercent) ?? 80
@@ -363,13 +372,13 @@ struct TLAppSettingsView: View {
                     }
                     LabeledContent("Active Preset", value: settings.usesEfficientGraphics(for: app) ? "Sharp / Efficient" : (settings.usesSharpGraphics(for: app) ? "Sharp / High Quality" : "Game Default"))
                     if #available(iOS 26.0, *), FileManager.default.fileExists(atPath: (Bundle.main.privateFrameworksPath ?? "") + "/KosmicKrisp.framework/KosmicKrisp") {
-                        Toggle("Metal 4 Vulkan (Beta)", isOn: $settings.metal4Renderer)
+                        Toggle("Metal 4 Vulkan (Beta)", isOn: Binding(get: { settings.metal4Renderer }, set: { settings.selectMetal4($0) }))
                         Text("Separate KosmicKrisp renderer. Spatial upscaling and native pipeline archives are unavailable in this beta; it renders at the selected output resolution. Restart required. Turn off to restore MoltenVK and MetalFX.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                     if settings.usesEfficientGraphics(for: app) && app.label.lowercased().contains("dungeons") {
-                        Toggle("Dungeons Frame Generation (Beta)", isOn: $settings.frameGeneration)
-                        Text("30 rendered → 60 presented target. Estimates motion from colour frames; may add artifacts and input latency. Uses MoltenVK with your spatial upscaling; Metal 4 selection is ignored while this mode is on. Restart required. Turn off to restore your rendered-FPS setting.")
+                        Toggle("Dungeons Frame Generation (Beta)", isOn: Binding(get: { settings.frameGeneration }, set: { settings.selectFrameGeneration($0) }))
+                        Text("30 rendered → 60 output target, including generated images. May add artifacts and input latency. Enabling this selects MoltenVK and turns Metal 4 off; enabling Metal 4 turns this off. Restart required. Turn off to restore your rendered-FPS setting.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                     Toggle("Shared Game Memory", isOn: $settings.sharedMemoryReserve)

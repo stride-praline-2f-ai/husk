@@ -31,12 +31,26 @@ static BOOL has_event(NSString *kind) {
  }
  pthread_mutex_unlock(&g_ev_lock);return found;
 }
+static void clear_events(void) {
+ pthread_mutex_lock(&g_ev_lock);for(int i=0;i<g_nev;i++)free(g_ev[i]);g_nev=0;pthread_mutex_unlock(&g_ev_lock);
+}
+static int asset_requests;
 static void pump(void) {
  [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:.01]];
  // A test navigation has no guest override; deliver its actual parked completion.
  for(NSNumber *key in g_pending.allKeys) if(g_pending[key].kind==HuskWebNavigation) {
   jvalue reply[2]={0},result={0};reply[0].i=key.intValue;reply[1].l=(jobj *)"\1nav-allow";
   W_reply(NULL,reply,&result);
+ }
+ for(NSNumber *key in g_pending.allKeys) if(g_pending[key].kind==HuskWebScheme) {
+  id<WKURLSchemeTask> task=g_pending[key].value;
+  assert([task.request.URL.host isEqualToString:@"android_asset"]);
+  BOOL script=[task.request.URL.path hasSuffix:@"card.js"];
+  NSString *body=script?@"window._showQuestion=function(){document.getElementById('qa').textContent='ANKI-CARD-READY';};":@"body{color:rgb(1,2,3)}";
+  NSData *bytes=[body dataUsingEncoding:NSUTF8StringEncoding];
+  jobj data={.kind=TL_K_PRIM_ARRAY};data.arr.data=(void*)bytes.bytes;data.arr.len=(uint32_t)bytes.length;
+  jvalue a[7]={0},r={0};a[0].i=key.intValue;a[1].i=200;a[2].l=(jobj*)"OK";a[3].l=(jobj*)(script?"text/javascript":"text/css");a[4].l=(jobj*)"utf-8";a[6].l=&data;
+  W_respond(NULL,a,&r);asset_requests++;
  }
 }
 int main(int argc,char **argv) { @autoreleasepool {
@@ -50,7 +64,29 @@ int main(int argc,char **argv) { @autoreleasepool {
  args[1].i=1;args[2].l=NULL;args[3].i=100;args[4].i=0;W_settings(NULL,args,&ret);
  for(int i=0;i<5;i++)pump();
  NSString *base=[NSString stringWithUTF8String:argv[1]];
- h.apiLoad=YES;[h.web loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:base]]];
+ // Only virtual Android resource prefixes are rewritten; arbitrary files,
+ // public URLs, non-text and non-UTF8 bytes retain their original payload.
+ NSData *sample=[@"file:///android_asset/a.js file:/android_res/b.css file:///private/keep https://keep" dataUsingEncoding:NSUTF8StringEncoding];
+ NSString *mapped=[[NSString alloc]initWithData:android_resource_urls(sample,@"text/html",@"utf-8") encoding:NSUTF8StringEncoding];
+ assert([mapped containsString:@"huskapp://android_asset/a.js"]&&[mapped containsString:@"huskapp://android_res/b.css"]&&[mapped containsString:@"file:///private/keep https://keep"]);
+ assert(android_resource_urls(sample,@"application/octet-stream",nil)==sample);
+ assert(android_resource_urls(sample,@"text/html",@"utf-16")==sample);
+ unsigned char invalid[]={255,254,255};NSData *binary=[NSData dataWithBytes:invalid length:3];assert(android_resource_urls(binary,@"text/html",@"utf-8")==binary);
+ NSString *card=@"<html><head><link rel='stylesheet' href='file:///android_asset/flashcard.css'><script src='file:///android_asset/scripts/card.js'></script></head><body id='qa'></body></html>";
+ NSData *cardBytes=[card dataUsingEncoding:NSUTF8StringEncoding];
+ // Reproduce WebKit's failure before applying the production mapping.
+ clear_events();h.apiLoad=YES;[h.web loadData:cardBytes MIMEType:@"text/html" characterEncodingName:@"utf-8" baseURL:[NSURL URLWithString:base]];
+ for(int i=0;i<1000&&!has_event(@"f");i++)pump();assert(has_event(@"f"));
+ __block BOOL checked=NO;[h.web evaluateJavaScript:@"typeof _showQuestion" completionHandler:^(id r,NSError*e){assert(!e&&[r isEqual:@"undefined"]);checked=YES;}];
+ for(int i=0;i<500&&!checked;i++)pump();assert(checked);
+ // Actual W_loadData/W_respond path must load the same file:///android_asset
+ // references used by Anki's pinned card_template.html, before page-finished.
+ clear_events();jobj data={.kind=TL_K_PRIM_ARRAY};data.arr.data=(void*)cardBytes.bytes;data.arr.len=(uint32_t)cardBytes.length;
+ jvalue load[5]={0};load[0].i=1;load[1].l=&data;load[2].l=(jobj*)"text/html";load[3].l=(jobj*)"utf-8";load[4].l=(jobj*)base.UTF8String;W_loadData(NULL,load,&ret);
+ for(int i=0;i<1000&&!has_event(@"f");i++)pump();assert(has_event(@"f")&&asset_requests>=2);
+ checked=NO;[h.web evaluateJavaScript:@"_showQuestion();document.body.textContent" completionHandler:^(id r,NSError*e){assert(!e&&[r containsString:@"ANKI-CARD-READY"]);checked=YES;}];
+ for(int i=0;i<500&&!checked;i++)pump();assert(checked);
+ clear_events();h.apiLoad=YES;[h.web loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:base]]];
  for(int i=0;i<1000 && !has_event(@"f");i++)pump();assert(has_event(@"f"));
  __block BOOL evaluated=NO;__block NSString *text=nil;
  [h.web evaluateJavaScript:@"document.body.textContent" completionHandler:^(id result,NSError *error){assert(!error);text=result;evaluated=YES;}];
@@ -61,7 +97,7 @@ int main(int argc,char **argv) { @autoreleasepool {
  h.apiLoad=YES;[h.web loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:[base stringByAppendingString:@"rate"]]]];
  for(int i=0;i<1000 && !has_event(@"H");i++)pump();assert(has_event(@"H"));
  [h teardown];pending_cancel_all();[window close];
- puts("actual WKWebView module page/frame/attachment/HTTP429 passed");return 0;
+ puts("actual WKWebView Android card assets/_showQuestion/module page/frame/attachment/HTTP429 passed");return 0;
 } }
 '''
 @unittest.skipUnless(platform.system()=='Darwin','WebKit executes on Apple cloud runner')
@@ -73,7 +109,7 @@ class WebKitTests(unittest.TestCase):
     p=Path(td);(p/'test.m').write_text(PROGRAM)
     cmd=['clang','-fobjc-arc','-fblocks','-Wno-deprecated-declarations','-I',str(ROOT/'src/translation-layer-next'),str(p/'test.m'),'-framework','Cocoa','-framework','WebKit','-Wl,-undefined,dynamic_lookup','-o',str(p/'test')]
     c=subprocess.run(cmd,capture_output=True,text=True);self.assertEqual(c.returncode,0,c.stdout+c.stderr)
-    r=subprocess.run([str(p/'test'),f'http://127.0.0.1:{server.server_port}/'],capture_output=True,text=True,timeout=50)
+    r=subprocess.run([str(p/'test'),f'http://127.0.0.1:{server.server_port}/'],capture_output=True,text=True,timeout=90)
     self.assertEqual(r.returncode,0,r.stdout+r.stderr)
   finally:server.shutdown();server.server_close()
 if __name__=='__main__':unittest.main(verbosity=2)
