@@ -39,6 +39,13 @@ if mode=="geometry" {
 } else if mode=="a20" {
  assert(DuoDisplayPolicy.fastWorkerBudget(gpuName:"Apple A20 Pro GPU",cpuCount:6)==2)
  assert(DuoDisplayPolicy.workerPolicy(gpuName:"Apple A20 Pro GPU",cpuCount:6)==4)
+ assert(DuoDisplayPolicy.fastWorkerBudget(gpuName:"Apple A20 GPU",cpuCount:6,performanceCores:2,efficiencyCores:4)==2)
+ assert(DuoDisplayPolicy.fastWorkerBudget(gpuName:"Apple A20 Pro GPU",cpuCount:6,performanceCores:1,efficiencyCores:5)==1)
+ assert(DuoDisplayPolicy.fastWorkerBudget(gpuName:"Apple A20 GPU",cpuCount:6)==0) // unknown split has no model fallback
+ assert(DuoDisplayPolicy.fastWorkerBudget(gpuName:"Apple A20 Pro GPU",cpuCount:6,performanceCores:2,efficiencyCores:3)==0)
+ assert(DuoDisplayPolicy.fastWorkerBudget(gpuName:"Apple A20 Pro GPU",cpuCount:6,enabled:false,performanceCores:2,efficiencyCores:4)==0)
+ assert(DuoDisplayPolicy.fastWorkerBudget(gpuName:"Apple M4 GPU",cpuCount:10,performanceCores:4,efficiencyCores:6)==0)
+
  for name in ["Apple M4 GPU","Apple A19 Pro GPU","Apple GPU",""] {
   assert(DuoDisplayPolicy.fastWorkerBudget(gpuName:name,cpuCount:6)==0)
   assert(DuoDisplayPolicy.workerPolicy(gpuName:name,cpuCount:6)==2)

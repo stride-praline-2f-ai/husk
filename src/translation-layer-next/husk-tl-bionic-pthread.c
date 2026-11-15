@@ -515,7 +515,7 @@ static int b_detach(pthread_t t) { return rc(pthread_detach(t)); }
 static uint32_t sigset_to_darwin(uint64_t g)
 {
     uint32_t d = 0;
-    for (int s = 1; s < 32; s++) if (g & (1ull << (s - 1))) { int ds = tl_signal_to_darwin(s); if (ds > 0) d |= 1u << (ds - 1); }
+    for (int s = 1; s <= 64; s++) if (g & (1ull << (s - 1))) { int ds = tl_signal_to_darwin(s); if (ds > 0 && ds < 32) d |= 1u << (ds - 1); }
     return d;
 }
 static uint64_t sigset_from_darwin(uint32_t d)
@@ -526,7 +526,7 @@ static uint64_t sigset_from_darwin(uint32_t d)
 }
 static int b_sigmask(int how, const uint64_t *set, uint64_t *old)
 {
-    sigset_t ds, od;
+    sigset_t ds = {0}, od = {0};
     int dh = how == 0 ? SIG_BLOCK : how == 1 ? SIG_UNBLOCK : SIG_SETMASK;
     if (set) { uint32_t m = sigset_to_darwin(*set); memcpy(&ds, &m, sizeof(m)); }
     int r = pthread_sigmask(dh, set ? &ds : NULL, old ? &od : NULL);

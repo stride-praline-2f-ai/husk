@@ -1,0 +1,14 @@
+{
+  "source": "3410d90996390cf4e8c3e34ec26d6d96d6ef2480",
+  "tree": "5b82f6b3cc45b41db511538c38ad5d3c81ce4119",
+  "workflow": "19da7f06f2394af86a3d548e578775d32d2c435c",
+  "run_id": 43655343175,
+  "job_id": 132632512527,
+  "runner": "macos-latest",
+  "conclusion": "failure before runner allocation",
+  "steps": [],
+  "artifact": null,
+  "cause": "unavailable; no job steps/logs",
+  "local_validation": "Close signal native component passes; Apple ARM64 / Swift geometry / native IPA not executed. No IPA delivered.",
+  "next": "Need available Apple build runner; preserve exact source while independent requested NX18/Henge review proceeds."
+}

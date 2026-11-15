@@ -154,6 +154,9 @@ jobs:
           python3 tests/translation-layer/test_anki_web_resilience.py 2>&1 | tee build/logs/anki-web-regressions.log
           python3 tests/translation-layer/test_anki_downloads.py 2>&1 | tee build/logs/anki-download-regressions.log
           python3 tests/translation-layer/test_anki_webkit.py 2>&1 | tee build/logs/anki-webkit-regressions.log
+          python3 tests/translation-layer/test_anki_socket_close.py 2>&1 | tee build/logs/anki-socket-close.log
+          python3 tests/translation-layer/test_host_topology.py 2>&1 | tee build/logs/host-topology.log
+          python3 tests/translation-layer/test_metal4_admission.py 2>&1 | tee build/logs/metal4-admission.log
           python3 scripts/run_mac_regressions.py 2>&1 | tee build/logs/regressions.log
       - name: Prepare clean cloud Mac build tools and check Vulkan SDK ABI
         id: tools

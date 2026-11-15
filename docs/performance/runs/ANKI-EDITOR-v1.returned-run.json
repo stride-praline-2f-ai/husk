@@ -1,0 +1,25 @@
+{
+  "plan_id": "ANKI-EDITOR-v1",
+  "observed_at": "2026-11-14T23:47:33.879690+00:00",
+  "occurrence_time": "unknown; user supplied current run after build160 handover",
+  "origin": "User pasted log and screenshot; excerpts below are not the full raw log",
+  "runtime": "/private/var/containers/Bundle/Application/1B4C663D-71F6-4478-BE9A-89FE5A734BDC/Husk.app/java-runtime",
+  "framework_classes": 5995,
+  "surface": [
+    2853,
+    2007
+  ],
+  "loaded_collection": true,
+  "local_base_ports": [
+    52288,
+    52289
+  ],
+  "last_app_event": "NoteEditorActivity::TemplatePreviewerFragment::onViewDestroyed",
+  "last_presented_frames": 55,
+  "later_frames": 55,
+  "later_headroom_mib": 5452,
+  "user_observation": "Immediate freeze opening Add; Husk Close remains responsive; user closed Anki and is independently testing Shared Decks",
+  "exception_at_freeze": null,
+  "warning": "E/AsynchronousCloseMonitor: setting blocked thread signal handler failed: Invalid argument",
+  "conclusion": "Updated runtime confirmed; editor cleanup hang remains. Exact phone thread stack unavailable. Native binary uses signal34, which old shim rejects; candidate regression reproduces this defect and verifies blocked accept interruption with fixed wrappers. Device causality still pending."
+}

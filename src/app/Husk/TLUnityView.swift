@@ -75,6 +75,23 @@ final class TLUnityUIView: UIView, UIKeyInput {
     private(set) var launchedSize: CGSize?
     /// In a floating window rather than full screen: no notch or home indicator to keep clear of.
     var windowed = false
+    /// Native controls occupy guest-safe space, without resizing its render surface.
+    var javaChromeClearance: CGFloat? = nil {
+        didSet { if javaChromeClearance != oldValue { publishJavaInsets() } }
+    }
+    private var javaKeyboardOverlap: CGFloat = 0
+    private var lastJavaInsets: [Int32]?
+
+    private func publishJavaInsets(force: Bool = false) {
+        guard engine == .java, let window else { return }
+        let inset = windowed ? UIEdgeInsets.zero : window.safeAreaInsets
+        let values = JavaAppChromeLayout.pixelInsets(system: [inset.left, inset.top, inset.right, inset.bottom],
+                                                     chromeClearance: windowed ? nil : javaChromeClearance,
+                                                     keyboard: javaKeyboardOverlap, scale: contentScaleFactor)
+        guard force || values != lastJavaInsets else { return }
+        lastJavaInsets = values
+        husk_java_set_insets(values[0], values[1], values[2], values[3], values[4])
+    }
     /// Where the corner statistics go when this view does not draw them itself (a landscape game has its own bar).
     var onStats: ((String) -> Void)?
     /// Active touches by UITouch identity, each given a small stable id like Android's pointer ids.
@@ -266,8 +283,8 @@ final class TLUnityUIView: UIView, UIKeyInput {
         let mine = convert(bounds, to: window)
         let covered = hiding ? 0 : max(0, mine.maxY - window.convert(end, from: nil).minY)
         if engine == .java {
-            let k = contentScaleFactor, inset = windowed ? UIEdgeInsets.zero : window.safeAreaInsets
-            husk_java_set_insets(Int32(inset.left * k), Int32(inset.top * k), Int32(inset.right * k), Int32(inset.bottom * k), Int32((covered * k).rounded()))
+            javaKeyboardOverlap = covered
+            publishJavaInsets()
             if hiding, isFirstResponder == false { husk_java_keyboard_closed() }
             return
         }
@@ -302,6 +319,7 @@ final class TLUnityUIView: UIView, UIKeyInput {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        publishJavaInsets()
         stats.frame = CGRect(x: bounds.width - 148, y: bounds.height - 22, width: 142, height: 16)
         if let webHost, webHost.frame != frame { webHost.frame = frame }
         if touchBounds != bounds { cancelActiveTouches(); touchBounds = bounds }
@@ -392,8 +410,12 @@ final class TLUnityUIView: UIView, UIKeyInput {
         efficientFrameLimit = DuoDisplayPolicy.fps
         let gpuName = DuoDisplayPolicy.detectedGPUName
         let cpuCount = ProcessInfo.processInfo.processorCount
-        automaticFastWorkerBudget = DuoDisplayPolicy.fastWorkerBudget(gpuName: gpuName, cpuCount: cpuCount, enabled: a20EfficiencyWorkers)
-        threadPolicy = DuoDisplayPolicy.workerPolicy(gpuName: gpuName, cpuCount: cpuCount, enabled: a20EfficiencyWorkers)
+        let topology = DuoDisplayPolicy.runtimeCoreCounts
+        automaticFastWorkerBudget = DuoDisplayPolicy.fastWorkerBudget(gpuName: gpuName, cpuCount: cpuCount, enabled: a20EfficiencyWorkers,
+                                                                       performanceCores: topology.performance, efficiencyCores: topology.efficiency)
+        threadPolicy = DuoDisplayPolicy.workerPolicy(gpuName: gpuName, cpuCount: cpuCount, enabled: a20EfficiencyWorkers,
+                                                     performanceCores: topology.performance, efficiencyCores: topology.efficiency)
+        HuskLog.log("tl", "[NX18-HENGE-A20-v1] worker topology: total \(cpuCount), performance \(topology.performance), efficiency \(topology.efficiency); zero means unavailable; allowance \(automaticFastWorkerBudget), no core affinity")
         submissionMode = DuoDisplayPolicy.submission
         spatialUpscaling = true
         spatialInputPercent = DuoDisplayPolicy.inputPercent
@@ -504,7 +526,7 @@ final class TLUnityUIView: UIView, UIKeyInput {
                 if metal4Renderer && !frameGeneration {
                     let metal4 = fw + "/KosmicKrisp.framework/KosmicKrisp"
                     if #available(iOS 26.0, *), FileManager.default.fileExists(atPath: metal4),
-                       MTLCreateSystemDefaultDevice()?.supportsFamily(.apple7) == true {
+                       husk_metal4_preflight() {
                         selected = metal4
                         // This independent driver has neither the custom spatial
                         // bridge nor archive ABI. Do not lower its guest extent
@@ -541,10 +563,7 @@ final class TLUnityUIView: UIView, UIKeyInput {
             husk_java_set_runtime((Bundle.main.resourcePath ?? "") + "/java-runtime", Float(contentScaleFactor))
             husk_java_set_night_mode(traitCollection.userInterfaceStyle == .dark ? 1 : 0)
             // The notch and the home indicator, in surface pixels: the app's window keeps its content out of them.
-            if let inset = windowed ? UIEdgeInsets.zero : window?.safeAreaInsets {
-                let k = contentScaleFactor
-                husk_java_set_insets(Int32(inset.left * k), Int32(inset.top * k), Int32(inset.right * k), Int32(inset.bottom * k), 0)
-            }
+            publishJavaInsets(force: true)
             attachWebHost(fresh: true)
             started = husk_java_launch(apk, dataDir, layerPtr, Int32(width), Int32(height), angle, ca)
         case .gamemaker: started = husk_gamemaker_launch(apk, dataDir, layerPtr, Int32(width), Int32(height), angle, ca)
@@ -1001,6 +1020,7 @@ struct TLUnityScreen: UIViewRepresentable {
     var a20EfficiencyWorkers = true
     var metal4Renderer = false
     var frameGeneration = false
+    var javaChromeClearance: CGFloat? = nil
     var onStats: ((String) -> Void)? = nil
     var onThreeFingerTap: (() -> Void)? = nil
     /// One view per game for the life of the process. The engine's GPU surface belongs to this view's layer and an
@@ -1018,16 +1038,21 @@ struct TLUnityScreen: UIViewRepresentable {
     func makeUIView(context: Context) -> TLUnityUIView {
         if let view = Self.shared[apk] {
             view.windowed = false
+            view.javaChromeClearance = javaChromeClearance
             view.transform = .identity
             view.onStats = onStats; view.onThreeFingerTap = onThreeFingerTap; return view
         }
         let view = TLUnityUIView(apk: apk, extraApks: extraApks, dataDir: dataDir, engine: engine, portrait: portrait, scale: scale, sharpGraphics: sharpGraphics, efficientGraphics: efficientGraphics, efficientFrameLimit: efficientFrameLimit, threadPolicy: threadPolicy, submissionMode: submissionMode, driverProfiling: driverProfiling, pipelineIdentification: pipelineIdentification, engineOnlyLimiter: engineOnlyLimiter, renderTargetInventory: renderTargetInventory, pipelineFeedback: pipelineFeedback, spatialUpscaling: spatialUpscaling, spatialInputPercent: spatialInputPercent, clockPresentation: clockPresentation, feedbackClockCorrection: feedbackClockCorrection, nativePipelineArchiveMode: nativePipelineArchiveMode, nativeArchiveVerification: nativeArchiveVerification, execution: execution, automaticDuoProfile: automaticDuoProfile, a20EfficiencyWorkers: a20EfficiencyWorkers, metal4Renderer: metal4Renderer, frameGeneration: frameGeneration)
         view.onStats = onStats
         view.onThreeFingerTap = onThreeFingerTap
+        view.javaChromeClearance = javaChromeClearance
         Self.shared[apk] = view
         return view
     }
-    func updateUIView(_ view: TLUnityUIView, context: Context) { view.onStats = onStats; view.onThreeFingerTap = onThreeFingerTap }
+    func updateUIView(_ view: TLUnityUIView, context: Context) {
+        view.onStats = onStats; view.onThreeFingerTap = onThreeFingerTap
+        view.javaChromeClearance = javaChromeClearance
+    }
 }
 
 /// Poll quickly during startup and once per second during gameplay. Copy the
@@ -1179,7 +1204,7 @@ struct TLCocosAttemptView: View {
                     // The game always has the whole screen: it is told its size once, as it starts, so nothing may take space from it.
                     // The bar and the log are drawn over it instead, and hiding them shows everything underneath.
                     TLUnityScreen(apk: apk, extraApks: Array(app.apks.dropFirst()), dataDir: dataDir, engine: engine, portrait: portrait,
-                                  scale: settings.renderScale(for: app), sharpGraphics: settings.usesSharpGraphics(for: app), efficientGraphics: settings.usesEfficientGraphics(for: app), efficientFrameLimit: settings.efficientFrameRate.rawValue, threadPolicy: settings.workerScheduling.rawValue, submissionMode: settings.vulkanSubmission.rawValue, driverProfiling: settings.driverPhaseProfiling, pipelineIdentification: settings.pipelineIdentification, engineOnlyLimiter: settings.engineOnlyLimiter, renderTargetInventory: settings.renderTargetInventory, pipelineFeedback: settings.pipelineFeedback, spatialUpscaling: settings.spatialUpscaling, spatialInputPercent: settings.spatialInputPercent, clockPresentation: settings.clockPresentation, feedbackClockCorrection: settings.feedbackClockCorrection, nativePipelineArchiveMode: settings.nativePipelineArchiveMode, nativeArchiveVerification: settings.nativeArchiveVerification, execution: settings.execution, automaticDuoProfile: settings.supportsDuoAutomatic(for: app), a20EfficiencyWorkers: settings.a20EfficiencyWorkers, metal4Renderer: settings.metal4Renderer, frameGeneration: settings.frameGeneration, onStats: { stats = $0 }, onThreeFingerTap: { toggleInterface() })
+                                  scale: settings.renderScale(for: app), sharpGraphics: settings.usesSharpGraphics(for: app), efficientGraphics: settings.usesEfficientGraphics(for: app), efficientFrameLimit: settings.efficientFrameRate.rawValue, threadPolicy: settings.workerScheduling.rawValue, submissionMode: settings.vulkanSubmission.rawValue, driverProfiling: settings.driverPhaseProfiling, pipelineIdentification: settings.pipelineIdentification, engineOnlyLimiter: settings.engineOnlyLimiter, renderTargetInventory: settings.renderTargetInventory, pipelineFeedback: settings.pipelineFeedback, spatialUpscaling: settings.spatialUpscaling, spatialInputPercent: settings.spatialInputPercent, clockPresentation: settings.clockPresentation, feedbackClockCorrection: settings.feedbackClockCorrection, nativePipelineArchiveMode: settings.nativePipelineArchiveMode, nativeArchiveVerification: settings.nativeArchiveVerification, execution: settings.execution, automaticDuoProfile: settings.supportsDuoAutomatic(for: app), a20EfficiencyWorkers: settings.a20EfficiencyWorkers, metal4Renderer: settings.metal4Renderer, frameGeneration: settings.frameGeneration, javaChromeClearance: engine == .java && !uiHidden ? chromeClearance.top : nil, onStats: { stats = $0 }, onThreeFingerTap: { toggleInterface() })
                         .background(Color.black)
                     .overlay {
                         // A game whose menus answer only a controller: with none paired, one on the glass. Hiding the bar leaves
@@ -1301,7 +1326,27 @@ struct TLCocosAttemptView: View {
         .font(.system(size: 13, weight: .semibold))
     }
 
-    private var bar: some View {
+    @ViewBuilder private var bar: some View {
+        if engine == .java {
+            if #available(iOS 26, *) {
+                barControls
+                    .buttonStyle(JavaChromeButtonStyle())
+                    .padding(.horizontal, 8).frame(height: JavaAppChromeLayout.toolbarHeight)
+                    .glassEffect(.regular, in: .rect(cornerRadius: 18))
+                    .padding(.horizontal, 8).padding(.vertical, 4)
+            } else {
+                barControls
+                    .buttonStyle(JavaChromeButtonStyle())
+                    .padding(.horizontal, 8).frame(height: JavaAppChromeLayout.toolbarHeight)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+                    .padding(.horizontal, 8).padding(.vertical, 4)
+            }
+        } else {
+            barControls.padding(.horizontal, 14).frame(height: 30).background(Color(white: 0.08))
+        }
+    }
+
+    private var barControls: some View {
         HStack(spacing: 12) {
             if engine == .ue4 {
                 Button { efficiencySheet = true } label: {
@@ -1362,9 +1407,6 @@ struct TLCocosAttemptView: View {
             }
             .tint(.white)
         }
-        .padding(.horizontal, 14)
-        .frame(height: 30)
-        .background(Color(white: 0.08))
     }
 
     private var logPanel: some View {
@@ -1450,5 +1492,17 @@ extension TLApp {
             guard screenEngine == .sdl || screenEngine == .nativeactivity || screenEngine == .unity || screenEngine == .godot, let apk = apks.first else { return false }
             return husk_sdl_apk_is_portrait(apk) != 0
         }
+    }
+}
+
+
+/// Native host controls remain tappable even if the guest's main thread stops.
+private struct JavaChromeButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding(.horizontal, 4)
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
+            .opacity(configuration.isPressed ? 0.55 : 1)
     }
 }

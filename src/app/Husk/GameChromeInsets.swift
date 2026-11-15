@@ -31,6 +31,22 @@ enum GameChromeLayout {
     }
 }
 
+/// ANKI-EDITOR-v1: reserve native toolbar space in Java window insets only.
+/// The fixed guest render surface and pixel/touch coordinates stay unchanged.
+enum JavaAppChromeLayout {
+    static let toolbarHeight: CGFloat = 44
+    static let toolbarExtent: CGFloat = toolbarHeight + 8
+    static func pixelInsets(system: [CGFloat], chromeClearance: CGFloat?, keyboard: CGFloat, scale: CGFloat) -> [Int32] {
+        precondition(system.count == 4)
+        let top = chromeClearance.map { max(system[1], $0) + toolbarExtent } ?? system[1]
+        let k = scale.isFinite && scale > 0 ? scale : 1
+        return [system[0], top, system[2], system[3], keyboard].map {
+            let value = $0.isFinite ? max(0, $0) * k : 0
+            return Int32(min(CGFloat(Int32.max), value.rounded()))
+        }
+    }
+}
+
 #if canImport(UIKit) && canImport(SwiftUI)
 import UIKit
 import SwiftUI

@@ -1,0 +1,42 @@
+{
+  "candidate_build": "162",
+  "scope": "M0 Anki editor + M3/M6/M8/M10 NX18-HENGE-A20-v1",
+  "environment": "Linux; no Apple SDK or Swift compiler",
+  "passed": 77,
+  "skipped": 9,
+  "suites": {
+    "host_topology": {
+      "passed": 3
+    },
+    "thread_policy": {
+      "passed": 39
+    },
+    "anki_socket_close": {
+      "passed": 1
+    },
+    "upstream_native": {
+      "passed": 13
+    },
+    "native_display": {
+      "passed": 12
+    },
+    "ipa_build_cache": {
+      "passed": 9
+    },
+    "duo_automatic": {
+      "skipped": 7
+    },
+    "metal4_admission": {
+      "skipped": 1
+    },
+    "game_chrome": {
+      "skipped": 1
+    }
+  },
+  "limits": [
+    "Portable harness executes production C with controlled platform sysctls.",
+    "Skipped Swift/Metal/geometry checks require the Apple runner.",
+    "No IPA, device reliability, GPU performance or energy result."
+  ],
+  "diff_check": "passed"
+}

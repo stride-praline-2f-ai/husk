@@ -41,19 +41,36 @@ enum DuoDisplayPolicy {
     static let worker = 2 // Balanced: preserves critical roles, no core affinity.
     static let submission = 0 // Driver Default.
 
-    /// Runtime-matched A20 Pro only. A worker allowance is not P-core affinity.
-    static func fastWorkerBudget(gpuName: String, cpuCount: Int, enabled: Bool = true) -> Int {
+    /// Runtime-matched A20 family. Prefer a validated kernel topology over a model fallback.
+    /// A worker allowance is not P-core affinity.
+    static func fastWorkerBudget(gpuName: String, cpuCount: Int, enabled: Bool = true,
+                                 performanceCores: Int = 0, efficiencyCores: Int = 0) -> Int {
         let name = gpuName.lowercased().filter { $0.isLetter || $0.isNumber }
-        return enabled && cpuCount == 6 && ["applea20progpu", "applea20pro"].contains(name) ? 2 : 0
+        guard enabled, ["applea20gpu", "applea20", "applea20progpu", "applea20pro"].contains(name) else { return 0 }
+        if (2...256).contains(cpuCount), performanceCores > 0, performanceCores <= 4,
+           efficiencyCores > 0, efficiencyCores < cpuCount, performanceCores + efficiencyCores == cpuCount {
+            return performanceCores
+        }
+        // Retain the existing documented A20 Pro six-core fallback only when neither count is available.
+        return performanceCores == 0 && efficiencyCores == 0 && cpuCount == 6 &&
+            ["applea20progpu", "applea20pro"].contains(name) ? 2 : 0
     }
-    static func workerPolicy(gpuName: String, cpuCount: Int, enabled: Bool = true) -> Int {
-        fastWorkerBudget(gpuName: gpuName, cpuCount: cpuCount, enabled: enabled) > 0 ? 4 : worker
+    static func workerPolicy(gpuName: String, cpuCount: Int, enabled: Bool = true,
+                             performanceCores: Int = 0, efficiencyCores: Int = 0) -> Int {
+        fastWorkerBudget(gpuName: gpuName, cpuCount: cpuCount, enabled: enabled,
+                         performanceCores: performanceCores, efficiencyCores: efficiencyCores) > 0 ? 4 : worker
     }
 
 #if canImport(UIKit)
-    @MainActor static var detectedGPUName: String { MTLCreateSystemDefaultDevice()?.name ?? "" }
+    @MainActor static let detectedGPUName: String = MTLCreateSystemDefaultDevice()?.name ?? ""
+    @MainActor static let runtimeCoreCounts: (performance: Int, efficiency: Int) = {
+        var info = tl_host_cpu_info(); tl_host_cpu_topology(&info)
+        guard Int(info.total) == ProcessInfo.processInfo.processorCount else { return (0, 0) }
+        return (Int(info.performance), Int(info.efficiency))
+    }()
     @MainActor static var supportsA20Workers: Bool {
-        fastWorkerBudget(gpuName: detectedGPUName, cpuCount: ProcessInfo.processInfo.processorCount) > 0
+        fastWorkerBudget(gpuName: detectedGPUName, cpuCount: ProcessInfo.processInfo.processorCount,
+                         performanceCores: runtimeCoreCounts.performance, efficiencyCores: runtimeCoreCounts.efficiency) > 0
     }
     @MainActor static func metrics(screen: UIScreen) -> Metrics {
         Metrics(pointWidth: Double(screen.bounds.width), pointHeight: Double(screen.bounds.height),

@@ -380,11 +380,11 @@ struct TLAppSettingsView: View {
                             Toggle("Automatic Duo Inner Screen", isOn: $settings.automaticDuoProfile)
                             if settings.duoAutomaticActive(for: app) {
                                 if DuoDisplayPolicy.supportsA20Workers {
-                                    Toggle("A20 Pro Efficiency Workers", isOn: $settings.a20EfficiencyWorkers)
-                                    Text("Keeps two normal-priority worker slots; extra eligible workers use lower priority only after stable gameplay. Turn off to restore Balanced without changing resolution or MetalFX. Restart required.")
+                                    Toggle("A20 Efficiency Workers", isOn: $settings.a20EfficiencyWorkers)
+                                    Text("Uses the runtime performance-core count for the normal-priority worker allowance; extra eligible workers use lower priority only after stable gameplay. Turn off to restore Balanced without changing resolution or MetalFX. Restart required.")
                                         .font(.footnote).foregroundStyle(.secondary)
                                 }
-                                Text(settings.frameGeneration ? "Reduced output with MetalFX 80%. Frame Generation requests 30 rendered FPS and targets 60 presented images; input latency and image quality differ from 60 real FPS. Restart required." : (settings.metal4Renderer ? "Metal 4 beta uses the reduced output target at 60 real FPS without the MoltenVK spatial pass. Detailed profiling stays off. Restart required." : "Reduced inner-screen output, MetalFX 80%, 60 FPS and Driver Default. A20 Pro can favour efficiency cores for extra workers with automatic performance rollback; other chips retain Balanced. Detailed profiling stays off. Restart required."))
+                                Text(settings.frameGeneration ? "Reduced output with MetalFX 80%. Frame Generation requests 30 rendered FPS and targets 60 presented images; input latency and image quality differ from 60 real FPS. Restart required." : (settings.metal4Renderer ? "Metal 4 beta uses the reduced output target at 60 real FPS without the MoltenVK spatial pass. Detailed profiling stays off. Restart required." : "Reduced inner-screen output, MetalFX 80%, 60 FPS and Driver Default. Supported A20 devices can favour efficiency cores for extra workers with automatic performance rollback; other chips retain Balanced. Detailed profiling stays off. Restart required."))
                                     .font(.footnote).foregroundStyle(.secondary)
                             }
                         }

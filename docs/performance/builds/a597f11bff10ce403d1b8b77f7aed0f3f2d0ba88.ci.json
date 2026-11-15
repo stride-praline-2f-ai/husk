@@ -1,0 +1,22 @@
+{
+  "source": "a597f11bff10ce403d1b8b77f7aed0f3f2d0ba88",
+  "tree": "732bf4f78a366dcd447db903680ad443e1baf891",
+  "candidate_build": "162",
+  "workflow": "b33cbeb5ce0cd7d8f391572d85f23fa2ccd94a30",
+  "run_id": 43658021067,
+  "job_id": 132640835060,
+  "runner_label": [
+    "xcode-27"
+  ],
+  "runner_id": 0,
+  "runner_name": "",
+  "conclusion": "failure before runner allocation",
+  "steps": [],
+  "artifact": null,
+  "cause": "Unavailable through available tools; no build step ran",
+  "local_validation": {
+    "passed": 77,
+    "skipped_apple_only": 9
+  },
+  "next": "An available Apple runner is required; do not describe this source candidate as a verified IPA."
+}

@@ -1,0 +1,16 @@
+{
+  "source": "4dbb5e65ee891419cba5e63615b59cc2b0a3a289",
+  "tree": "b27fa24e5f28da72927e5d3c63cd2f056e837b7b",
+  "workflow": "1a4acb66b52b9fa2f01ae4c7bc5afbb5c3c97029",
+  "run_id": 43655114047,
+  "jobs": [
+    132631822996,
+    132632014225
+  ],
+  "runner": "xcode-27",
+  "conclusion": "failure before runner allocation",
+  "steps": [],
+  "artifact": null,
+  "cause": "unavailable; no job steps/logs",
+  "next": "Retain failed attempt. Refine reserved-signal no-allocation path; try standard macOS runner without changing required gates."
+}
