@@ -1,0 +1,35 @@
+{
+  "download_url": "https://filebin.net/e9d1376994fc2b90213a7d0d/Husk-3.4-build167-Framegen-Quality.ipa",
+  "file": {
+    "filename": "Husk-3.4-build167-Framegen-Quality.ipa",
+    "content-type": "application/zip",
+    "bytes": 154256767,
+    "bytes_readable": "154 MB",
+    "md5": "IL+sVBBTIQluVFR7M/2tdg==",
+    "sha1": "1eed36bd3d00d0fb581291a4205d745bfe189458",
+    "sha256": "805a9977d15f269a702d0e3c6bef5af8caafb5a219140e26bcaf433e8252987c",
+    "updated_at": "2026-11-15T11:06:03.691169Z",
+    "updated_at_relative": "now",
+    "created_at": "2026-11-15T11:06:03.691169Z",
+    "created_at_relative": "now"
+  },
+  "bin": {
+    "id": "e9d1376994fc2b90213a7d0d",
+    "readonly": false,
+    "bytes": 0,
+    "bytes_readable": "0 B",
+    "files": 0,
+    "updated_at": "2026-11-15T11:06:03.731334Z",
+    "updated_at_relative": "now",
+    "created_at": "2026-11-15T11:05:55.61084Z",
+    "created_at_relative": "now",
+    "expired_at": "2026-11-22T11:06:03.731333Z",
+    "expired_at_relative": "6 days from now"
+  },
+  "anonymous_full_download_verified": true,
+  "downloaded_bytes": 154256767,
+  "downloaded_sha256": "805a9977d15f269a702d0e3c6bef5af8caafb5a219140e26bcaf433e8252987c",
+  "magic": "504b0304",
+  "source": "3fcf97c285124e3d7a8e9e01d40e17abe00635b6",
+  "candidate_build": "167"
+}

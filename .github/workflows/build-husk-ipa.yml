@@ -60,6 +60,11 @@ jobs:
             echo "Source objects sent; connected GitHub tool will finish branch publication."
           fi
           python3 "$RUNNER_TEMP/husk-build-status.py"
+      - name: Check generated-frame sequence quality before rebuilding drivers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tests/translation-layer/test_spatial_lifetime.py SpatialLifetimeTests.test_real_optical_flow_shader_compiles_and_interpolates_on_available_host_gpu -v
       - name: Fingerprint reusable build components
         id: cache_keys
         run: |

@@ -1,0 +1,162 @@
+{
+  "schema": 1,
+  "scope": "M9-FG-QUALITY-v1 returned167 paired modes",
+  "provenance": [
+    {
+      "name": "1-husk-native-prev.log",
+      "bytes": 38944,
+      "sha256": "afbba955cc6391435d34d545e589cf9184b37075323073bc1c8c763dd2e524be"
+    },
+    {
+      "name": "2-husk-prev.log",
+      "bytes": 49755,
+      "sha256": "e1acf0185e3bc37bf4cd2802ad7c07ca7f6afcff47355b825ffb8fdb577a5d09"
+    },
+    {
+      "name": "3-husk-native.log",
+      "bytes": 35898,
+      "sha256": "d9a118e6b36b644dceff729bd9e9517d7e761939dbc64668b47c5d1c40e53ab0"
+    },
+    {
+      "name": "4-husk.log",
+      "bytes": 49859,
+      "sha256": "f2c8ed8b63988c1dc4e31ff168d9dd01a87812710ddef30d2a20a7aeb40a9d89"
+    }
+  ],
+  "sessions": {
+    "on": {
+      "primary": "2-husk-prev.log",
+      "native_mirror": "1-husk-native-prev.log",
+      "identity": [
+        "[     2.51ms][boot] device      : iPhone19,4",
+        "[     3.08ms][boot] system      : iOS 27.3",
+        "[     3.11ms][boot] processors  : 6 (active 6)",
+        "[     3.59ms][boot] build       : 3.4 (167) 3fcf97c285124e3d7a8e9e01d40e17abe00635b6-dirty built 2026-11-15 11:02 UTC"
+      ],
+      "configuration": [
+        "[ 20537.00ms][tl] [M3/M9 METAL4] source-built enhancements requested; native archive/framegen configure calls decide activation; selected output retained",
+        "[ 20537.05ms][tl] [M3/M9 renderer] selected KosmicKrisp Metal 4 beta; spatial requested false, frame generation requested true; native preflight decides activation",
+        "[M3/M9 METAL4] KosmicKrisp iOS driver active; source-built archive/framegen bridge available; actual game correctness/energy unverified",
+        "ue4 graphics: actual guest swapchain buffer 1816x1280 (M9 experiment may upscale to a separate drawable; not a measurement of internal 3D resolution)",
+        "ue4 power: low-power mode 0, reported thermal 0 (0 nominal, 1 fair, 2 serious, 3 critical); settings and pacing unchanged by observation",
+        "ue4 timing: requested cap 30 FPS (0 game controlled), host cap 30 (0 no extra limiter), thermal 0; selected launch resolution retained",
+        "ue4 graphics: actual guest swapchain buffer 1816x1280 (M9 experiment may upscale to a separate drawable; not a measurement of internal 3D resolution)",
+        "ue4 power: low-power mode 1, reported thermal 0 (0 nominal, 1 fair, 2 serious, 3 critical); settings and pacing unchanged by observation",
+        "ue4 graphics: actual guest swapchain buffer 1816x1280 (M9 experiment may upscale to a separate drawable; not a measurement of internal 3D resolution)",
+        "ue4 graphics: actual guest swapchain buffer 1816x1280 (M9 experiment may upscale to a separate drawable; not a measurement of internal 3D resolution)"
+      ],
+      "timing_windows": [
+        "ue4 timing: cadence 26.6 FPS, p95 38.18 ms, max 552.14 ms, 10/267 intervals >120% of 30 FPS reference; thermal 0, engine cap 30, host cap 30; host call averages acquire 0.211 ms (267), submit 0.051 ms (1165), present 0.039 ms (267), sleep 29.841 ms (256); calls may overlap; not GPU execution or displayed-frame timing",
+        "ue4 timing: cadence 29.9 FPS, p95 38.76 ms, max 55.06 ms, 11/299 intervals >120% of 30 FPS reference; thermal 0, engine cap 30, host cap 30; host call averages acquire 0.199 ms (299), submit 0.175 ms (599), present 0.047 ms (299), sleep 27.460 ms (295); calls may overlap; not GPU execution or displayed-frame timing",
+        "ue4 timing: cadence 21.7 FPS, p95 115.00 ms, max 424.80 ms, 31/218 intervals >120% of 30 FPS reference; thermal 0, engine cap 30, host cap 30; host call averages acquire 0.596 ms (218), submit 0.493 ms (436), present 0.567 ms (218), sleep 29.148 ms (196); calls may overlap; not GPU execution or displayed-frame timing"
+      ],
+      "wait_windows": [
+        "[M4/M9 pacing-wait] requested 26.562 ms average, actual 29.842 ms average, max overshoot 23.104 ms (256 sleeps); current-thread host wait, not engine/GPU duration",
+        "[M4/M9 pacing-wait] requested 23.843 ms average, actual 27.461 ms average, max overshoot 25.924 ms (295 sleeps); current-thread host wait, not engine/GPU duration",
+        "[M4/M9 pacing-wait] requested 22.932 ms average, actual 29.149 ms average, max overshoot 244.735 ms (196 sleeps); current-thread host wait, not engine/GPU duration"
+      ],
+      "pipeline_windows": [
+        "ue4 cache detail: host seeds accepted 0 (0 bytes); pipeline window total 938.299 ms, max 50.210 ms, calls >=16.67 ms 24, in-flight 0; aggregate calls may overlap",
+        "ue4 pipeline stall: worst observed graphics call 50.210 ms, store-lock wait 0.000 ms, batch 1, cache yes, result 0, finished monotonic 63107.666407 s; host duration, not exclusive frame/GPU time or verified cache miss",
+        "ue4 cache detail: host seeds accepted 0 (0 bytes); pipeline window total 46.645 ms, max 36.833 ms, calls >=16.67 ms 1, in-flight 0; aggregate calls may overlap",
+        "ue4 pipeline stall: worst observed graphics call 36.833 ms, store-lock wait 0.001 ms, batch 1, cache yes, result 0, finished monotonic 63114.786522 s; host duration, not exclusive frame/GPU time or verified cache miss",
+        "ue4 cache detail: host seeds accepted 0 (0 bytes); pipeline window total 0.000 ms, max 0.000 ms, calls >=16.67 ms 0, in-flight 0; aggregate calls may overlap"
+      ],
+      "framegen_windows": [
+        "[M9-FRAMEGEN] active 1 failed 0; since-launch GPU-completed rendered 325, presented real 319/generated 313, dropped 3, resets 2, GPU errors 0; generated includes low-confidence real-image fallback; not energy or unique-pixel measurement",
+        "[M9-FRAMEGEN] active 1 failed 0; since-launch GPU-completed rendered 624, presented real 618/generated 612, dropped 3, resets 2, GPU errors 0; generated includes low-confidence real-image fallback; not energy or unique-pixel measurement",
+        "[M9-FRAMEGEN] active 1 failed 0; since-launch GPU-completed rendered 842, presented real 838/generated 823, dropped 3, resets 2, GPU errors 0; generated includes low-confidence real-image fallback; not energy or unique-pixel measurement"
+      ],
+      "cache_restore_and_checkpoint": [
+        "ue4 cache: game initial data 0 bytes, host restored 0 bytes, host seed accepted 0, result 0; acceptance is not proof of cache hits",
+        "ue4 cache store: pause checkpoint saved (5175736 bytes)",
+        "ue4 cache store: pause checkpoint saved (13017161 bytes)",
+        "ue4 cache store: unchanged; skipped pause snapshot and disk write",
+        "ue4 cache store: unchanged; skipped pause snapshot and disk write"
+      ],
+      "completed_lifecycle_sequences": 7,
+      "lifecycle_sequences": [
+        "[M1/M6/M9 lifecycle] apply complete sequence 1 paused 1",
+        "[M1/M6/M9 lifecycle] apply complete sequence 2 paused 0",
+        "[M1/M6/M9 lifecycle] apply complete sequence 3 paused 1",
+        "[M1/M6/M9 lifecycle] apply complete sequence 4 paused 0",
+        "[M1/M6/M9 lifecycle] apply complete sequence 5 paused 1",
+        "[M1/M6/M9 lifecycle] apply complete sequence 6 paused 0",
+        "[M1/M6/M9 lifecycle] apply complete sequence 7 paused 1"
+      ],
+      "screenshot_notifications": [
+        "[ 53501.80ms][lifecycle] [M1/M6/M9 lifecycle] screenshot_observed; attached true, app-active true, owning-scene-active true, touches 0; fixed render target retained",
+        "[ 53508.35ms][lifecycle] [M1/M6/M9 lifecycle] screenshot_observed; attached true, app-active true, owning-scene-active true, touches 0; fixed render target retained",
+        "[ 55953.57ms][lifecycle] [M1/M6/M9 lifecycle] screenshot_observed; attached true, app-active true, owning-scene-active true, touches 0; fixed render target retained",
+        "[ 56002.27ms][lifecycle] [M1/M6/M9 lifecycle] screenshot_observed; attached true, app-active true, owning-scene-active true, touches 0; fixed render target retained",
+        "[ 65681.58ms][lifecycle] [M1/M6/M9 lifecycle] screenshot_observed; attached true, app-active true, owning-scene-active true, touches 0; fixed render target retained",
+        "[ 65689.29ms][lifecycle] [M1/M6/M9 lifecycle] screenshot_observed; attached true, app-active true, owning-scene-active true, touches 0; fixed render target retained"
+      ],
+      "heartbeat_tail": [
+        "unity: alive: 1207 frames (+0), 5116 MiB left before jetsam, 8.0 GiB of address space mapped (0.9 GiB by the game); VA sample age 76.7 s (-1 unavailable)",
+        "unity: alive: 1207 frames (+0), 5112 MiB left before jetsam, 8.0 GiB of address space mapped (0.9 GiB by the game); VA sample age 79.7 s (-1 unavailable)",
+        "unity: alive: 1207 frames (+0), 5112 MiB left before jetsam, 8.0 GiB of address space mapped (0.9 GiB by the game); VA sample age 82.8 s (-1 unavailable)"
+      ]
+    },
+    "off": {
+      "primary": "4-husk.log",
+      "native_mirror": "3-husk-native.log",
+      "identity": [
+        "[     1.67ms][boot] device      : iPhone19,4",
+        "[     2.53ms][boot] system      : iOS 27.3",
+        "[     2.56ms][boot] processors  : 6 (active 6)",
+        "[     2.85ms][boot] build       : 3.4 (167) 3fcf97c285124e3d7a8e9e01d40e17abe00635b6-dirty built 2026-11-15 11:02 UTC"
+      ],
+      "configuration": [
+        "[  7007.79ms][tl] [M3/M9 METAL4] source-built enhancements requested; native archive/framegen configure calls decide activation; selected output retained",
+        "[  7007.83ms][tl] [M3/M9 renderer] selected KosmicKrisp Metal 4 beta; spatial requested false, frame generation requested false; native preflight decides activation",
+        "[M3/M9 METAL4] KosmicKrisp iOS driver active; source-built archive/framegen bridge available; actual game correctness/energy unverified",
+        "ue4 graphics: actual guest swapchain buffer 1816x1280 (M9 experiment may upscale to a separate drawable; not a measurement of internal 3D resolution)",
+        "ue4 power: low-power mode 0, reported thermal 0 (0 nominal, 1 fair, 2 serious, 3 critical); settings and pacing unchanged by observation",
+        "ue4 timing: requested cap 60 FPS (0 game controlled), host cap 60 (0 no extra limiter), thermal 0; selected launch resolution retained",
+        "ue4 graphics: actual guest swapchain buffer 1816x1280 (M9 experiment may upscale to a separate drawable; not a measurement of internal 3D resolution)",
+        "ue4 power: low-power mode 1, reported thermal 0 (0 nominal, 1 fair, 2 serious, 3 critical); settings and pacing unchanged by observation",
+        "ue4 graphics: actual guest swapchain buffer 1816x1280 (M9 experiment may upscale to a separate drawable; not a measurement of internal 3D resolution)",
+        "ue4 graphics: actual guest swapchain buffer 1816x1280 (M9 experiment may upscale to a separate drawable; not a measurement of internal 3D resolution)",
+        "ue4 graphics: actual guest swapchain buffer 1816x1280 (M9 experiment may upscale to a separate drawable; not a measurement of internal 3D resolution)"
+      ],
+      "timing_windows": [
+        "ue4 timing: cadence 58.1 FPS, p95 20.84 ms, max 49.79 ms, 43/581 intervals >120% of 60 FPS reference; thermal 0, engine cap 60, host cap 60; host call averages acquire 5.238 ms (581), submit 0.187 ms (1163), present 0.145 ms (581), sleep 7.466 ms (516); calls may overlap; not GPU execution or displayed-frame timing"
+      ],
+      "wait_windows": [
+        "[M4/M9 pacing-wait] requested 6.150 ms average, actual 7.467 ms average, max overshoot 17.657 ms (516 sleeps); current-thread host wait, not engine/GPU duration"
+      ],
+      "pipeline_windows": [
+        "ue4 cache detail: host seeds accepted 1 (13017161 bytes); pipeline window total 15.553 ms, max 8.674 ms, calls >=16.67 ms 0, in-flight 0; aggregate calls may overlap"
+      ],
+      "framegen_windows": [],
+      "cache_restore_and_checkpoint": [
+        "ue4 cache store: loaded 13017161 compatible bytes; cache hit still depends on shader/config keys",
+        "ue4 cache: game initial data 0 bytes, host restored 13017161 bytes, host seed accepted 1, result 0; acceptance is not proof of cache hits",
+        "ue4 cache store: pause checkpoint saved (13017162 bytes)",
+        "ue4 cache store: pause checkpoint saved (13017162 bytes)",
+        "ue4 cache store: unchanged; skipped pause snapshot and disk write",
+        "ue4 cache store: pause checkpoint saved (13117218 bytes)",
+        "ue4 cache store: pause checkpoint saved (13255818 bytes)"
+      ],
+      "completed_lifecycle_sequences": 9,
+      "lifecycle_sequences": [
+        "[M1/M6/M9 lifecycle] apply complete sequence 1 paused 1",
+        "[M1/M6/M9 lifecycle] apply complete sequence 2 paused 0",
+        "[M1/M6/M9 lifecycle] apply complete sequence 3 paused 1",
+        "[M1/M6/M9 lifecycle] apply complete sequence 4 paused 0",
+        "[M1/M6/M9 lifecycle] apply complete sequence 5 paused 1",
+        "[M1/M6/M9 lifecycle] apply complete sequence 6 paused 0",
+        "[M1/M6/M9 lifecycle] apply complete sequence 7 paused 1",
+        "[M1/M6/M9 lifecycle] apply complete sequence 8 paused 0",
+        "[M1/M6/M9 lifecycle] apply complete sequence 9 paused 1"
+      ],
+      "screenshot_notifications": [],
+      "heartbeat_tail": [
+        "unity: alive: 1611 frames (+24), 5060 MiB left before jetsam, 7.9 GiB of address space mapped (1.0 GiB by the game); VA sample age 23.9 s (-1 unavailable)",
+        "unity: alive: 1611 frames (+0), 5080 MiB left before jetsam, 7.9 GiB of address space mapped (1.0 GiB by the game); VA sample age 26.9 s (-1 unavailable)",
+        "unity: alive: 1611 frames (+0), 5073 MiB left before jetsam, 7.9 GiB of address space mapped (1.0 GiB by the game); VA sample age 29.9 s (-1 unavailable)"
+      ]
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "scope": "M9-FG-QUALITY-v1 valid replacement MOV visual analysis",
+  "file_name": "1-ScreenRecording_11-15-2026-11-41-38_1.mov",
+  "bytes": 5933036,
+  "sha256": "21e236c9d94aa60527f0063622dc53d920d36b41eb68363da8d76a68355f676a",
+  "decoded_frames": 88,
+  "first_decoded_pts_seconds": 0.0,
+  "last_decoded_pts_seconds": 1.45,
+  "container_duration_seconds": 1.48,
+  "encoded_dimensions": [
+    2008,
+    2854
+  ],
+  "display_rotation_degrees": -90,
+  "codec": "HEVC",
+  "color_space": "BT.709",
+  "analysis_dimensions": [
+    1427,
+    1004
+  ],
+  "mean_encoded_luma_min": 0.3866514563560486,
+  "mean_encoded_luma_max": 0.3995143175125122,
+  "max_adjacent_mean_encoded_luma_change": 0.0009930133819580078,
+  "observations": [
+    "Moving scene shows softer/doubled fine edges and changing apparent clarity around character, wall and ground.",
+    "No large whole-frame brightness step is apparent in this short recording; local changes and actual panel behavior remain unmeasured.",
+    "Host controller overlay remains visually steady relative to the moving scene."
+  ],
+  "limits": [
+    "No per-frame marker identifies real versus generated captured images.",
+    "Video itself does not independently stamp app build or prove FG state. Paired logs/user context establish the reported mode issue.",
+    "Capture/compression/resizing affect pixels; encoded frame cadence is not device display timing.",
+    "No OFF30 control provided, no medical cause established, no energy measurement."
+  ],
+  "decision": "Enough visual evidence of reported quality failure to suspend further uncomfortable tests. Preserve FG OFF/native60 workaround; no tested runtime repair claimed."
+}

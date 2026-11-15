@@ -1,5 +1,7 @@
 # M9-FG-QUALITY-v1 — returned166 cadence and moving-image fuzziness
 
+**Superseded phone status, 15 November:** [The returned167 pair](61-returned167-framegen-quality.md) independently confirms the delivered source and continued fuzzy movement with FG ON; user says FG OFF fixes it. Real-game visual criterion failed. Synthetic/build passes below remain valid only within their stated scope. All seven ON/nine OFF lifecycle sequences complete in the new evidence. No new shader change/IPA or visual/energy acceptance is claimed. Use the existing sourceMetal4/FG-OFF60 route; the optional remaining discriminator is OFF30 versus ON30 with an actual affected image, not another general log.
+
 15 November 2026. Follows [the launch lease repair](59-metal4-framegen-launch-freeze.md) and verified166/sourceeacafb426fc73fcf02e9b07103dd4c7f342f3ddf. Latest pasted native log lacks a source/build stamp;166is inferred from delivery context, not independently proven by this excerpt. The user reports fuzzy movement that clears when stationary, has not compared FG OFF yet, and confirms changing Low Power Mode near the late transition. Preserve working166launch and all data/output/cache/worker/thermal/renderer controls.
 
 ## Full returned-log analysis
@@ -27,3 +29,8 @@ M9-FG-QUALITY-v1 checklist1: I1 source guard/review; I2 actualGPU before/after p
 
 
 Pre-delivery review caught a flaw in the first draft: unconditional stable-pixel preservation would suppress a thin object appearing between disjoint real-frame positions. It was replaced with the projected-side test above, and that exact true-motion case was added to the GPU fixture before delivery. The first167source2cf2b37 was queued for CI but is superseded; no IPA from it is to be delivered or credited. Final exact-source checks must pass again.
+
+
+## Final167 exact-source verification
+
+Source`3fcf97c285124e3d7a8e9e01d40e17abe00635b6`, tree`2c53d9a3b9e586ae806b157acee53ae378b8868e`; [complete handover](builds/3fcf97c285124e3d7a8e9e01d40e17abe00635b6.md). Actual Apple43705655385/job132786151457 passes461test executions/60invocations/zero test skips. Original49-suite/font/SDK31structures96offsets/10setupgroups plus actual syntheticGPU cases pass. Same GPUfixture rejects frozen166stationaryHUDghosting, while finalshader preserves both stationaryHUD and genuine disjoint-position thin-object interpolation, false-confident/equal-luminancecolour and imageboundary cases plus original4/16pxtranslation/copy. Both matching drivers, app/threeextensions/sign/package freshly rebuilt. Independent actual shader/code/patch/ABI/source/driver/Anki/font/helper/773notice-set checks and raw154256767byteIPA/full anonymous redownload match SHA256`805a9977d15f269a702d0e3c6bef5af8caafb5a219140e26bcaf433e8252987c`. I3/3=100%, physicalD0/2, E0/1UNKNOWN; fixed31.11/I79.795918/M4scope34.5667/Duo0 unchanged. No physical-game blur reduction or energy saving has been assumed.

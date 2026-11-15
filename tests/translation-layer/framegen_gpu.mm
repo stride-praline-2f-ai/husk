@@ -7,6 +7,8 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <algorithm>
+#include <initializer_list>
 
 static id<MTLTexture> texture(id<MTLDevice> device,NSUInteger w,NSUInteger h,MTLPixelFormat format){
     auto*d=[MTLTextureDescriptor texture2DDescriptorWithPixelFormat:format width:w height:h mipmapped:NO];
@@ -128,6 +130,84 @@ int main(int argc,char**argv){@autoreleasepool{
         fprintf(stderr,"QUALITY_REJECT: out-of-frame warp stretched the edge\n");return 3;
     }
     puts("PASS: stationary HUD and locally inconsistent/equal-luminance colours preserve the real pixel without ghost blending");
+    // Whole generated/real sequences over textured motion. Some materials
+    // change illumination while others do not. Geometry still shares ONE
+    // intermediate phase.167's per-pixel RGB gate incorrectly splices phases.
+    uint8_t currentPixels[64*64*4];
+    for(unsigned pair=0;pair<4;pair++){
+        for(unsigned image=0;image<2;image++){
+            unsigned phase=pair+image;
+            for(unsigned y=0;y<64;y++)for(unsigned x=0;x<64;x++){
+                int world=(int)x-(int)phase*4;
+                unsigned q=(y*64+x)*4;
+                unsigned seed=(unsigned)(world+128)*1973u+y*9277u;
+                seed=(seed^(seed>>7))*26699u;
+                unsigned material=((unsigned)(world+128)/7+y/5)%3;
+                unsigned lighting=material?phase*13:0;
+                for(unsigned channel=0;channel<3;channel++){
+                    unsigned detail=(seed>>(channel*5))&63;
+                    unsigned brick=(((world+128)/8+(y/6)%2)%2)*28;
+                    pixels[q+channel]=(uint8_t)(25+detail+brick+lighting);
+                }
+                pixels[q+3]=255;
+            }
+            [(image?b:a) replaceRegion:MTLRegionMake2D(0,0,64,64) mipmapLevel:0 withBytes:pixels bytesPerRow:256];
+            if(image)memcpy(currentPixels,pixels,sizeof pixels);
+        }
+        for(unsigned reverse=0;reverse<2;reverse++){
+            for(unsigned v=0;v<16;v++){
+                controlled[v*4]=reverse?4:-4;controlled[v*4+1]=0;
+                controlled[v*4+2]=0;controlled[v*4+3]=1;
+            }
+            [(reverse?backward:forward) replaceRegion:MTLRegionMake2D(0,0,4,4) mipmapLevel:0 withBytes:controlled bytesPerRow:32];
+        }
+        interpolateOnly();unsigned worst=0;double sum=0;unsigned count=0;
+        for(unsigned y=8;y<56;y++)for(unsigned x=8;x<54;x++)for(unsigned channel=0;channel<3;channel++){
+            // Four real pixels of translation means two at the midpoint;
+            // retain the current source's exposure, not mixed exposures.
+            unsigned error=(unsigned)abs((int)pixels[(y*64+x)*4+channel]-(int)currentPixels[(y*64+x+2)*4+channel]);
+            worst=std::max(worst,error);sum+=error;count++;
+        }
+        if(worst>1||sum/count>0.1){
+            fprintf(stderr,"QUALITY_REJECT: intermediate textured sequence jumps to real-frame phase (pair %u max %u mean %.3f)\n",pair,worst,sum/count);return 4;
+        }
+        // Do not hide instability by blurring/resampling every real frame.
+        auto command=[queue commandBuffer];auto e=[command computeCommandEncoder];
+        [e setTexture:b atIndex:0];[e setTexture:out atIndex:1];dispatch(e,copy,64,64);[e endEncoding];
+        [command commit];[command waitUntilCompleted];assert(command.status==MTLCommandBufferStatusCompleted);
+        [out getBytes:pixels bytesPerRow:256 fromRegion:MTLRegionMake2D(0,0,64,64) mipmapLevel:0];
+        assert(!memcmp(pixels,currentPixels,sizeof pixels));
+    }
+    // Odd/fractional translations on a known band-limited linear signal.
+    for(float motion:{3.0f,3.5f}){
+        for(unsigned image=0;image<2;image++){
+            for(unsigned y=0;y<64;y++)for(unsigned x=0;x<64;x++){
+                unsigned q=(y*64+x)*4;
+                uint8_t value=(uint8_t)std::max(0.0f,((float)x-image*motion)*4);
+                pixels[q]=pixels[q+1]=pixels[q+2]=value;pixels[q+3]=255;
+            }
+            [(image?b:a) replaceRegion:MTLRegionMake2D(0,0,64,64) mipmapLevel:0 withBytes:pixels bytesPerRow:256];
+        }
+        auto command=[queue commandBuffer];
+        for(unsigned reverse=0;reverse<2;reverse++){
+            auto e=[command computeCommandEncoder];[e setTexture:reverse?b:a atIndex:0];[e setTexture:reverse?a:b atIndex:1];
+            [e setTexture:reverse?backward:forward atIndex:2];dispatch(e,flow,4,4);[e endEncoding];
+        }
+        auto e=[command computeCommandEncoder];[e setTexture:a atIndex:0];[e setTexture:b atIndex:1];[e setTexture:forward atIndex:2];
+        [e setTexture:backward atIndex:3];[e setTexture:out atIndex:4];dispatch(e,interpolate,64,64);[e endEncoding];
+        [command commit];[command waitUntilCompleted];assert(command.status==MTLCommandBufferStatusCompleted);
+        __fp16 vectors[64];[forward getBytes:vectors bytesPerRow:32 fromRegion:MTLRegionMake2D(0,0,4,4) mipmapLevel:0];
+        [out getBytes:pixels bytesPerRow:256 fromRegion:MTLRegionMake2D(0,0,64,64) mipmapLevel:0];
+        if(fabs((float)vectors[(2*4+2)*4]+motion)>0.26f||fabs(pixels[(32*64+32)*4]-(32-motion/2)*4)>2){
+            fprintf(stderr,"QUALITY_REJECT: fractional translation not reconstructed (%.1f pixels)\n",motion);return 4;
+        }
+    }
+    // Confidence rejection remains active for unreliable motion fields.
+    for(unsigned v=0;v<16;v++){controlled[v*4]=-4;controlled[v*4+1]=0;controlled[v*4+2]=0.2;controlled[v*4+3]=1;}
+    [forward replaceRegion:MTLRegionMake2D(0,0,4,4) mipmapLevel:0 withBytes:controlled bytesPerRow:32];
+    [b getBytes:currentPixels bytesPerRow:256 fromRegion:MTLRegionMake2D(0,0,64,64) mipmapLevel:0];
+    interpolateOnly();assert(!memcmp(pixels,currentPixels,sizeof pixels));
+    puts("PASS: textured generated/real sequence has one motion phase; real frames exact; odd/fractional flow and unreliable-field fallback verified");
     printf("PASS: real GPU shader compilation, bidirectional translation, intermediate image and real-frame copy on %s\n",device.name.UTF8String);
     [queue release];[a release];[b release];[forward release];[backward release];[out release];
     [flow release];[interpolate release];[copy release];[f release];[i release];[c release];[library release];[options release];[device release];

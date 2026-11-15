@@ -147,5 +147,10 @@ int main(){@autoreleasepool{
    self.assertEqual(old.returncode,3,old.stdout)
    self.assertIn('QUALITY_REJECT: stationary HUD changed',old.stdout)
    print('PASS: frozen166 shader rejected for stationary HUD ghosting; repaired shader passes the same GPU cases')
+   prior=subprocess.run([str(exe),str(ROOT/'tests/translation-layer/fixtures/framegen-167.metal')],text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=30)
+   self.assertEqual(prior.returncode,4,prior.stdout)
+   self.assertIn('QUALITY_REJECT: intermediate textured sequence jumps to real-frame phase',prior.stdout)
+   print(prior.stdout)
+   print('PASS: frozen167 rejected for mixed motion phases; current shader passes whole generated/real sequences and fractional motion')
 
 if __name__=='__main__':unittest.main()

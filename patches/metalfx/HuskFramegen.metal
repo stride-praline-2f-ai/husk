@@ -4,6 +4,32 @@ using namespace metal;
 // interpolation and does not fabricate engine depth or motion-vector inputs.
 constexpr sampler fgSampler(coord::normalized,address::clamp_to_edge,filter::linear);
 float fgLuma(float3 c){return dot(c,float3(0.2126,0.7152,0.0722));}
+float fgDifference(float3 a,float3 b){float3 d=abs(a-b);return max(d.r,max(d.g,d.b));}
+bool fgStable(texture2d<float,access::sample> previous,
+              texture2d<float,access::sample> current,float2 uv){
+    return fgDifference(previous.sample(fgSampler,uv).rgb,current.sample(fgSampler,uv).rgb)<=1.0f/255.0f;
+}
+float4 fgCubicWeights(float t){
+    float t2=t*t,t3=t2*t;
+    return float4(-0.5f*t+t2-0.5f*t3,1.0f-2.5f*t2+1.5f*t3,
+                  0.5f*t+2.0f*t2-1.5f*t3,-0.5f*t2+0.5f*t3);
+}
+// Reconstruct one source at the intermediate position. Clamp the cubic
+// response to its central footprint: no ringing/bright halos on sharp edges.
+float4 fgReproject(texture2d<float,access::sample> source,float2 uv){
+    int2 extent=int2(source.get_width(),source.get_height());
+    float2 pixel=uv*float2(extent)-0.5f;
+    int2 base=int2(floor(pixel));float2 fraction=fract(pixel);
+    if(all(fraction<0.00001f))return source.read(uint2(clamp(base,int2(0),extent-1)));
+    float4 wx=fgCubicWeights(fraction.x),wy=fgCubicWeights(fraction.y);
+    float4 value=0,low=INFINITY,high=-INFINITY;
+    for(int y=0;y<4;y++)for(int x=0;x<4;x++){
+        float4 texel=source.read(uint2(clamp(base+int2(x-1,y-1),int2(0),extent-1)));
+        value+=texel*wx[x]*wy[y];
+        if(x>=1&&x<=2&&y>=1&&y<=2){low=min(low,texel);high=max(high,texel);}
+    }
+    return clamp(value,low,high);
+}
 kernel void huskFlow(texture2d<float,access::sample> previous [[texture(0)]],
                      texture2d<float,access::sample> current [[texture(1)]],
                      texture2d<half,access::write> flow [[texture(2)]],
@@ -11,25 +37,28 @@ kernel void huskFlow(texture2d<float,access::sample> previous [[texture(0)]],
     if(any(tid>=uint2(flow.get_width(),flow.get_height())))return;
     float2 size=float2(current.get_width(),current.get_height());
     float2 centre=(float2(tid)+0.5f)*size/float2(flow.get_width(),flow.get_height());
-    float best=INFINITY;float2 displacement=0;
-    // A bounded two-level search covers normal camera movement without a
-    // full-resolution dense-flow solve: +/-16px coarse, +/-4px refinement.
-    for(uint level=0;level<2;level++){
-        int step=level?2:8,radius=level?4:16;
+    float best=INFINITY,residual=INFINITY;float2 displacement=0;
+    // Keep the bounded tile search, then resolve odd/fractional movement.
+    // The regularizer breaks ties; it must not dominate real correspondence
+    // or be reported as the photometric confidence error.
+    for(uint level=0;level<3;level++){
+        float step=level==0?8.0f:(level==1?2.0f:0.5f);
+        float radius=level==0?16.0f:(level==1?4.0f:1.0f);
         float2 origin=level?displacement:float2(0);
-        for(int y=-radius;y<=radius;y+=step)for(int x=-radius;x<=radius;x+=step){
+        for(float y=-radius;y<=radius;y+=step)for(float x=-radius;x<=radius;x+=step){
             float2 candidate=origin+float2(x,y);float error=0;
             for(int v=-1;v<=1;v++)for(int u=-1;u<=1;u++){
                 float2 p=centre+float2(u,v)*3.0f;
-                float a=fgLuma(previous.sample(fgSampler,(p+candidate)/size).rgb);
-                float b=fgLuma(current.sample(fgSampler,p/size).rgb);
-                error+=abs(a-b);
+                float3 a=previous.sample(fgSampler,(p+candidate)/size).rgb;
+                float3 b=current.sample(fgSampler,p/size).rgb;
+                error+=dot(abs(a-b),float3(0.2126f,0.7152f,0.0722f));
             }
-            error=error/9.0f+0.0001f*dot(candidate,candidate);
-            if(error<best){best=error;displacement=candidate;}
+            error=error/9.0f;
+            float score=error+0.000001f*dot(candidate,candidate);
+            if(score<best){best=score;residual=error;displacement=candidate;}
         }
     }
-    flow.write(half4(half2(displacement),half(best),1),tid);
+    flow.write(half4(half2(displacement),half(residual),1),tid);
 }
 kernel void huskInterpolate(texture2d<float,access::sample> previous [[texture(0)]],
                             texture2d<float,access::sample> current [[texture(1)]],
@@ -51,28 +80,28 @@ kernel void huskInterpolate(texture2d<float,access::sample> previous [[texture(0
     if(inside && length(f.xy)>=0.5f && f.z<0.08f){
         float4 b=backward.sample(fgSampler,uv+f.xy/float2(size));
         if(b.z<0.08f && length(f.xy+b.xy)<2.5f){
-            float4 a=previous.sample(fgSampler,previousUV);
-            float4 c=current.sample(fgSampler,currentUV);
-            float3 difference=abs(a.rgb-c.rgb);
-            // Tile confidence does not establish per-pixel RGB agreement.
-            if(max(difference.r,max(difference.g,difference.b))<=0.04f){
-                bool blend=true;
-                float3 change=abs(c.rgb-result.rgb);
-                if(max(change.r,max(change.g,change.b))>0.04f){
-                    float3 stable=abs(previous.sample(fgSampler,uv).rgb-result.rgb);
-                    if(max(stable.r,max(stable.g,stable.b))<=1.0f/255.0f){
-                        // A static thin glyph can sit over a moving background:
-                        // both projected positions in the CURRENT image then
-                        // see that background, though its centre is unchanged.
-                        // A genuinely moving thin object has one projected
-                        // position on the object and the other on background;
-                        // retain its valid intermediate position in that case.
-                        float3 sides=abs(current.sample(fgSampler,previousUV).rgb-c.rgb);
-                        blend=max(sides.r,max(sides.g,sides.b))>0.04f;
-                    }
+            // All admitted scene pixels use the same intermediate motion
+            // phase and a SINGLE source. A per-pixel colour-difference gate
+            // previously spliced unwarped current pixels among warped pixels;
+            // averaging two misregistered sources added doubled contours.
+            float4 reconstructed=fgReproject(current,currentUV);
+            bool stationary=false;
+            float3 change=abs(reconstructed.rgb-result.rgb);
+            if(max(change.r,max(change.g,change.b))>0.04f){
+                float3 stable=abs(previous.sample(fgSampler,uv).rgb-result.rgb);
+                if(max(stable.r,max(stable.g,stable.b))<=1.0f/255.0f){
+                    // Preserve stable thin HUD detail without masking a real
+                    // moving object between disjoint real-frame positions.
+                    float2 pixel=1.0f/float2(size);
+                    bool vertical=fgStable(previous,current,uv+float2(0,pixel.y))&&
+                                  fgStable(previous,current,uv-float2(0,pixel.y));
+                    bool horizontal=fgStable(previous,current,uv+float2(pixel.x,0))&&
+                                    fgStable(previous,current,uv-float2(pixel.x,0));
+                    // An isolated colour coincidence is not a static layer.
+                    stationary=(vertical||horizontal)&&fgDifference(current.sample(fgSampler,previousUV).rgb,reconstructed.rgb)<=0.04f;
                 }
-                if(blend)result=mix(a,c,0.5f);
             }
+            if(!stationary)result=reconstructed;
         }
     }
     output.write(half4(result),p);
