@@ -3,6 +3,9 @@ using namespace metal;
 // Colour-only bidirectional block matching. This is NOT MetalFX temporal
 // interpolation and does not fabricate engine depth or motion-vector inputs.
 constexpr sampler fgSampler(coord::normalized,address::clamp_to_edge,filter::linear);
+// A non-mipmapped sampler can force level0 despite a supplied LOD. Motion
+// correspondence must explicitly enable mip selection; final colour stays L0.
+constexpr sampler fgMotionSampler(coord::normalized,address::clamp_to_edge,filter::linear,mip_filter::nearest);
 float fgLuma(float3 c){return dot(c,float3(0.2126,0.7152,0.0722));}
 float fgDifference(float3 a,float3 b){float3 d=abs(a-b);return max(d.r,max(d.g,d.b));}
 bool fgStable(texture2d<float,access::sample> previous,
@@ -39,8 +42,8 @@ float fgPatchError(texture2d<float,access::sample> previous,
     float2 size=float2(current.get_width(),current.get_height());float error=0;
     for(int y=-2;y<=2;y++)for(int x=-2;x<=2;x++){
         float2 p=centre+float2(x,y)*spacing;
-        float3 a=previous.sample(fgSampler,(p+displacement)/size,level(float(lod))).rgb;
-        float3 b=current.sample(fgSampler,p/size,level(float(lod))).rgb;
+        float3 a=previous.sample(fgMotionSampler,(p+displacement)/size,level(float(lod))).rgb;
+        float3 b=current.sample(fgMotionSampler,p/size,level(float(lod))).rgb;
         error+=dot(abs(a-b),float3(0.2126f,0.7152f,0.0722f));
     }
     return error/25.0f;

@@ -148,6 +148,11 @@ int main(){@autoreleasepool{
   with tempfile.TemporaryDirectory() as d:
    exe=Path(d)/'gpu'
    subprocess.run(['clang++','-std=c++17','-fno-objc-arc','-framework','Foundation','-framework','Metal',str(ROOT/'tests/translation-layer/framegen_gpu.mm'),'-o',str(exe)],check=True)
+   current_mip=subprocess.run([str(exe),str(ROOT/'patches/metalfx/HuskFramegen.metal'),'mip-only'],text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=30)
+   self.assertEqual(current_mip.returncode,0,current_mip.stdout)
+   print(current_mip.stdout)
+   old_mip=subprocess.run([str(exe),str(ROOT/'tests/translation-layer/fixtures/framegen-169.metal'),'mip-only'],text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=30)
+   print('Frozen169 mip witness:',old_mip.returncode,old_mip.stdout)
    result=subprocess.run([str(exe),str(ROOT/'patches/metalfx/HuskFramegen.metal')],text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=30)
    print(result.stdout)
    if result.returncode==77:self.skipTest('runner exposes no Metal GPU; shader execution unavailable')
@@ -177,6 +182,8 @@ int main(){@autoreleasepool{
    self.assertEqual(patchwork.returncode,6,patchwork.stdout)
    self.assertIn('QUALITY_REJECT: incoherent field produced patchwork intermediate',patchwork.stdout)
    print(patchwork.stdout)
+
+
 
 
 if __name__=='__main__':unittest.main()

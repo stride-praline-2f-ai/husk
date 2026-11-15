@@ -21,6 +21,8 @@ static void dispatch(id<MTLComputeCommandEncoder> encoder,id<MTLComputePipelineS
     [encoder setComputePipelineState:pipeline];
     [encoder dispatchThreads:MTLSizeMake(w,h,1) threadsPerThreadgroup:MTLSizeMake(8,8,1)];
 }
+static bool saveMotionDebug;
+static id<MTLTexture> debugCoarse,debugRaw;
 static void motionPass(id<MTLCommandBuffer> command,id<MTLTexture> previous,id<MTLTexture> current,id<MTLTexture> output,
                        id<MTLComputePipelineState> flow,id<MTLComputePipelineState> coarsePSO,id<MTLComputePipelineState> regularizePSO){
     id<MTLTexture> raw=output,coarse=nil;
@@ -32,18 +34,37 @@ static void motionPass(id<MTLCommandBuffer> command,id<MTLTexture> previous,id<M
     auto e=[command computeCommandEncoder];[e setTexture:previous atIndex:0];[e setTexture:current atIndex:1];[e setTexture:raw atIndex:2];if(coarse)[e setTexture:coarse atIndex:3];dispatch(e,flow,raw.width,raw.height);[e endEncoding];
     if(coarse){
         e=[command computeCommandEncoder];[e setTexture:previous atIndex:0];[e setTexture:current atIndex:1];[e setTexture:raw atIndex:2];[e setTexture:output atIndex:3];dispatch(e,regularizePSO,output.width,output.height);[e endEncoding];
+        if(saveMotionDebug){[debugCoarse release];[debugRaw release];debugCoarse=[coarse retain];debugRaw=[raw retain];}
         [raw release];[coarse release];
     }
 }
 int main(int argc,char**argv){@autoreleasepool{
-    assert(argc==2);
+    assert(argc==2||argc==3);
     id<MTLDevice> device=MTLCreateSystemDefaultDevice();
     if(!device){puts("UNAVAILABLE: runner exposes no Metal GPU");return 77;}
     NSError*error=nil;
     NSString*source=[NSString stringWithContentsOfFile:[NSString stringWithUTF8String:argv[1]] encoding:NSUTF8StringEncoding error:&error];assert(source);
+    bool hasMotionSampler=[source containsString:@"constexpr sampler fgMotionSampler"];
+    NSString *witness=[NSString stringWithFormat:@"\nkernel void huskMipWitness(texture2d<float,access::sample> input [[texture(0)]],texture2d<half,access::write> output [[texture(1)]]){output.write(half4(input.sample(%@,float2(0.5f),level(2.0f))),uint2(0));}\n",hasMotionSampler?@"fgMotionSampler":@"fgSampler"];
+    source=[source stringByAppendingString:witness];
     MTLCompileOptions*options=[MTLCompileOptions new];options.fastMathEnabled=NO;
     id<MTLLibrary>library=[device newLibraryWithSource:source options:options error:&error];
     if(!library){fprintf(stderr,"%s\n",error.description.UTF8String);return 1;}
+    if(argc==3){
+        auto input=texture(device,4,4,MTLPixelFormatRGBA8Unorm,true),output=texture(device,1,1,MTLPixelFormatRGBA8Unorm);
+        uint8_t red[4*4*4],green[2*2*4],blue[4]={0,0,255,255};
+        for(unsigned k=0;k<16;k++){red[k*4]=255;red[k*4+1]=red[k*4+2]=0;red[k*4+3]=255;}
+        for(unsigned k=0;k<4;k++){green[k*4]=green[k*4+2]=0;green[k*4+1]=green[k*4+3]=255;}
+        [input replaceRegion:MTLRegionMake2D(0,0,4,4) mipmapLevel:0 withBytes:red bytesPerRow:16];
+        [input replaceRegion:MTLRegionMake2D(0,0,2,2) mipmapLevel:1 withBytes:green bytesPerRow:8];
+        [input replaceRegion:MTLRegionMake2D(0,0,1,1) mipmapLevel:2 withBytes:blue bytesPerRow:4];
+        id<MTLFunction> fn=[library newFunctionWithName:@"huskMipWitness"];auto state=[device newComputePipelineStateWithFunction:fn error:&error];assert(state);
+        auto q=[device newCommandQueue];auto command=[q commandBuffer];auto e=[command computeCommandEncoder];[e setTexture:input atIndex:0];[e setTexture:output atIndex:1];dispatch(e,state,1,1);[e endEncoding];[command commit];[command waitUntilCompleted];assert(command.status==MTLCommandBufferStatusCompleted);
+        uint8_t pixel[4];[output getBytes:pixel bytesPerRow:4 fromRegion:MTLRegionMake2D(0,0,1,1) mipmapLevel:0];
+        if(memcmp(pixel,blue,4)){fprintf(stderr,"QUALITY_REJECT: motion sampler ignored requested mip level (RGB %u/%u/%u)\n",pixel[0],pixel[1],pixel[2]);return 8;}
+        puts("PASS: production motion sampler selects actual mip2 rather than base-level aliasing");
+        [state release];[fn release];[q release];[input release];[output release];[library release];[options release];[device release];return 0;
+    }
     id<MTLFunction>f=[library newFunctionWithName:@"huskFlow"],i=[library newFunctionWithName:@"huskInterpolate"],c=[library newFunctionWithName:@"huskCopyFrame"];
     auto flow=[device newComputePipelineStateWithFunction:f error:&error];
     auto interpolate=[device newComputePipelineStateWithFunction:i error:&error];
@@ -335,13 +356,21 @@ int main(int argc,char**argv){@autoreleasepool{
             [(image?current:previous) replaceRegion:MTLRegionMake2D(0,0,W,H) mipmapLevel:0 withBytes:scenePixels.data() bytesPerRow:W*4];
         }
         auto command=[queue commandBuffer];auto blit=[command blitCommandEncoder];[blit generateMipmapsForTexture:previous];[blit generateMipmapsForTexture:current];[blit endEncoding];
-        motionPass(command,previous,current,result,flow,coarsePSO,regularizePSO);[command commit];[command waitUntilCompleted];assert(command.status==MTLCommandBufferStatusCompleted);
+        saveMotionDebug=true;motionPass(command,previous,current,result,flow,coarsePSO,regularizePSO);saveMotionDebug=false;[command commit];[command waitUntilCompleted];assert(command.status==MTLCommandBufferStatusCompleted);
         std::vector<__fp16> vectors(FW*FH*4);[result getBytes:vectors.data() bytesPerRow:FW*8 fromRegion:MTLRegionMake2D(0,0,FW,FH) mipmapLevel:0];std::vector<float> errors;
         for(unsigned y=2;y<FH-2;y++)for(unsigned x=2;x<FW-2;x++){float px=(x+.5f)*16,py=(y+.5f)*16,dx=(float)vectors[(y*FW+x)*4]-(2.25f+.006f*py),dy=(float)vectors[(y*FW+x)*4+1]-(7.25f+.012f*px);errors.push_back(hypotf(dx,dy));}
         std::sort(errors.begin(),errors.end());float p50=errors[errors.size()/2],p90=errors[errors.size()*9/10];
-        if(p50>.8f||p90>1.5f){fprintf(stderr,"QUALITY_REJECT: repeated scenery camera flow inaccurate (p50 %.4f p90 %.4f pixels)\n",p50,p90);return 7;}
+        if(p50>.8f||p90>1.5f){
+            unsigned printed=0;
+            for(unsigned y=2;y<FH-2&&printed<12;y++)for(unsigned x=2;x<FW-2&&printed<12;x++){
+                float dx=(float)vectors[(y*FW+x)*4],dy=(float)vectors[(y*FW+x)*4+1],tx=2.25f+.006f*(y+.5f)*16,ty=7.25f+.012f*(x+.5f)*16;
+                if(hypotf(dx-tx,dy-ty)>2){fprintf(stderr,"flow outlier tile %u/%u actual %.4f/%.4f expected %.4f/%.4f\n",x,y,dx,dy,tx,ty);printed++;}
+            }
+            if(debugCoarse){std::vector<__fp16> coarse(debugCoarse.width*debugCoarse.height*4);[debugCoarse getBytes:coarse.data() bytesPerRow:debugCoarse.width*8 fromRegion:MTLRegionMake2D(0,0,debugCoarse.width,debugCoarse.height) mipmapLevel:0];for(unsigned y=0;y<debugCoarse.height;y++){fprintf(stderr,"coarse row %u:",y);for(unsigned x=0;x<debugCoarse.width;x++)fprintf(stderr," %.1f/%.1f",(float)coarse[(y*debugCoarse.width+x)*4],(float)coarse[(y*debugCoarse.width+x)*4+1]);fprintf(stderr,"\n");}}
+            fprintf(stderr,"QUALITY_REJECT: repeated scenery camera flow inaccurate (p50 %.4f p90 %.4f pixels)\n",p50,p90);return 7;
+        }
         printf("PASS: multi-cell repeated scenery with affine camera motion and temporal noise (p50 %.4f p90 %.4f pixels)\n",p50,p90);
-        [previous release];[current release];[result release];
+        [previous release];[current release];[result release];[debugCoarse release];[debugRaw release];debugCoarse=nil;debugRaw=nil;
     }
     printf("PASS: real GPU shader compilation, bidirectional translation, intermediate image and real-frame copy on %s\n",device.name.UTF8String);
     [queue release];[a release];[b release];[forward release];[backward release];[out release];
