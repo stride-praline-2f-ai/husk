@@ -52,8 +52,10 @@ static NSString *huskDigest(NSData *data){
 @interface HuskMetal4Compiler : NSObject {
     id<MTLDevice> _device;
     HuskMetal4CompileEpoch *_epoch;
-    NSLock *_lock,*_libraryLock;
+    NSLock *_lock;
+    NSCondition *_libraryLock;
     NSMutableDictionary *_libraries;
+    NSMutableSet *_loading;
     NSMutableArray *_libraryOrder;
     NSUInteger _libraryBytes;
     NSArray *_archives;
@@ -79,8 +81,8 @@ static NSString *huskDigest(NSData *data){
 @implementation HuskMetal4Compiler
 - (instancetype)initWithDevice:(id<MTLDevice>)device {
     if(!(self=[super init]))return nil;
-    _device=[device retain];_lock=[NSLock new];_libraryLock=[NSLock new];
-    _libraries=[NSMutableDictionary new];_libraryOrder=[NSMutableArray new];_archives=[NSArray new];_pending=0;
+    _device=[device retain];_lock=[NSLock new];_libraryLock=[NSCondition new];
+    _libraries=[NSMutableDictionary new];_loading=[NSMutableSet new];_libraryOrder=[NSMutableArray new];_archives=[NSArray new];_pending=0;
     NSString *path=nil;{std::lock_guard<std::mutex> guard(ownersLock);_enabled=archiveEnabled;path=[archiveRoot copy];}
     if(_enabled&&path.length){
         NSOperatingSystemVersion os=NSProcessInfo.processInfo.operatingSystemVersion;
@@ -126,7 +128,7 @@ static NSString *huskDigest(NSData *data){
         if(archive){[loaded addObject:archive];bytes+=st.st_size;[archive release];}
         else ++readErrors;
     }
-    [_archives release];_archives=[loaded copy];readBytes+=bytes;
+    NSArray *next=[loaded copy];[_lock lock];NSArray *old=_archives;_archives=next;[_lock unlock];[old release];readBytes+=bytes;
 }
 - (HuskMetal4CompileEpoch *)epoch {
     [_lock lock];HuskMetal4CompileEpoch *e=[_epoch retain];
@@ -140,17 +142,20 @@ static NSString *huskDigest(NSData *data){
     NSMutableData *key=[NSMutableData dataWithData:[contract dataUsingEncoding:NSUTF8StringEncoding]];[key appendData:[desc.source dataUsingEncoding:NSUTF8StringEncoding]];
     // This entrypoint is used only with Mesa's fixed options above. Exact MSL
     // plus all options set by mtl_new_library form the immutable key.
-    [_libraryLock lock];id<MTLLibrary> cached=_libraries[key];
+    [_libraryLock lock];while([_loading containsObject:key])[_libraryLock wait];
+    id<MTLLibrary> cached=_libraries[key];
     if(cached){++libraryHits;[cached retain];[_libraryOrder removeObject:key];[_libraryOrder addObject:key];[_libraryLock unlock];if(error)*error=nil;return cached;}
+    NSData *loading=[key copy];[_loading addObject:loading];[loading release];[_libraryLock unlock];
     ++libraryLoads;HuskMetal4CompileEpoch *e=[self epoch];id<MTLLibrary> library;
     {std::shared_lock<std::shared_mutex> gate(e->gate,std::adopt_lock);library=[e->compiler newLibraryWithDescriptor:desc error:error];}[e release];
+    [_libraryLock lock];
     if(library&&key.length<=(32ULL<<20)&&!getenv("HUSK_METAL4_LIBRARY_CACHE_OFF")){
         while(_libraryOrder.count&&(_libraryOrder.count>=64||_libraryBytes>(32ULL<<20)-key.length)){
             NSData *old=[[_libraryOrder objectAtIndex:0]retain];_libraryBytes-=old.length;[_libraries removeObjectForKey:old];[_libraryOrder removeObjectAtIndex:0];[old release];
         }
         NSData *copy=[key copy];_libraries[copy]=library;[_libraryOrder addObject:copy];_libraryBytes+=copy.length;[copy release];
     }
-    [_libraryLock unlock];return library;
+    [_loading removeObject:key];[_libraryLock broadcast];[_libraryLock unlock];return library;
 }
 - (id)pipeline:(id)desc compute:(BOOL)compute options:(MTL4CompilerTaskOptions *)options error:(NSError **)error {
     [_lock lock];NSArray *archives=[_archives retain];[_lock unlock];id state=nil;
@@ -177,8 +182,11 @@ static NSString *huskDigest(NSData *data){
 - (void)save {
     [_lock lock];_savingScheduled=NO;
     if(!_enabled||!_pending.load()||!_epoch->capture){[_lock unlock];return;}
+    [_lock unlock];
     HuskMetal4CompileEpoch *next=[[HuskMetal4CompileEpoch alloc]initWithDevice:_device capture:YES];
-    if(!next){++writeErrors;[_lock unlock];return;}
+    if(!next){++writeErrors;return;}
+    [_lock lock];
+    if(!_pending.load()){[_lock unlock];[next release];return;}
     HuskMetal4CompileEpoch *old=_epoch;_epoch=next;[_lock unlock];
     // No future caller can obtain old. Wait only on Utility for already active
     // compiles; normal pipeline compilation keeps shared parallel access.
@@ -188,13 +196,13 @@ static NSString *huskDigest(NSData *data){
     BOOL saved=[old->capture serializeAsArchiveAndFlushToURL:temporary error:&error];
     struct stat st;if(saved)saved=!lstat(temporary.path.fileSystemRepresentation,&st)&&S_ISREG(st.st_mode)&&st.st_size>=256&&st.st_size<=(64LL<<20);
     if(saved)saved=[NSFileManager.defaultManager moveItemAtURL:temporary toURL:final error:&error];
-    if(saved){++writes;writeBytes+=st.st_size;[self prune];[_lock lock];[self loadArchives];[_lock unlock];}
+    if(saved){++writes;writeBytes+=st.st_size;[self prune];[self loadArchives];}
     else{++writeErrors;[NSFileManager.defaultManager removeItemAtURL:temporary error:nil];}
     _pending.fetch_sub(old->pending.load());gate.unlock();[old release];
 }
 - (void)dealloc {
     {std::lock_guard<std::mutex> guard(ownersLock);auto i=std::find(compilerOwners.begin(),compilerOwners.end(),self);if(i!=compilerOwners.end())compilerOwners.erase(i);}
-    [_epoch release];[_device release];[_lock release];[_libraryLock release];[_libraries release];[_libraryOrder release];[_archives release];[_directory release];[_root release];
+    [_epoch release];[_device release];[_lock release];[_libraryLock release];[_libraries release];[_loading release];[_libraryOrder release];[_archives release];[_directory release];[_root release];
 #if OS_OBJECT_USE_OBJC
     [(id)_saveQueue release];
 #else

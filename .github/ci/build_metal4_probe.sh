@@ -3,6 +3,7 @@
 # Rebuild the exact iOS Mesa/KosmicKrisp source; never overwrite the donor.
 set -euo pipefail
 ROOT="${HUSK_SOURCE_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+test "$(uname -s)" = Darwin || { echo 'An Apple SDK build host is required' >&2; exit 1; }
 WORK="${HUSK_METAL4_BUILD_ROOT:-$ROOT/third_party/build/metal4-source}"
 mkdir -p "$WORK" "$ROOT/build/logs"
 export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1
@@ -10,6 +11,7 @@ brew install llvm spirv-tools spirv-llvm-translator libclc bison flex pkgconf
 LLVM_PREFIX="$(brew --prefix llvm)"
 export PATH="$LLVM_PREFIX/bin:$(brew --prefix bison)/bin:$(brew --prefix flex)/bin:$PATH"
 export PKG_CONFIG_PATH="$(brew --prefix spirv-llvm-translator)/lib/pkgconfig:$(brew --prefix spirv-tools)/lib/pkgconfig:$(brew --prefix libclc)/share/pkgconfig:$LLVM_PREFIX/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+test "$(llvm-config --version | cut -d. -f1)" = 23 || { echo 'Unreviewed host LLVM major; expected 23' >&2; exit 1; }
 python3 -m venv "$WORK/venv"
 "$WORK/venv/bin/python" -m pip install 'meson==1.12.1' 'ninja==1.13.0' mako pyyaml packaging ply
 export PATH="$WORK/venv/bin:$PATH"
@@ -54,6 +56,7 @@ if [ "${HUSK_METAL4_UPSTREAM_ONLY:-0}" != 1 ]; then
     python3 "$ROOT/scripts/prepare_metal4_source.py" "$WORK/mesa"
     # Check public SDK signatures before compiling the full NIR/driver tree.
     xcrun --sdk iphoneos clang++ -target arm64-apple-ios26.0 -isysroot "$(xcrun --sdk iphoneos --show-sdk-path)" -std=c++17 -fblocks -fno-objc-arc -fsyntax-only "$WORK/mesa/src/kosmickrisp/bridge/HuskMetal4Compiler.mm" "$WORK/mesa/src/kosmickrisp/bridge/HuskMetal4Framegen.mm"
+    python3 "$ROOT/tests/translation-layer/test_metal4_components.py" -v
 fi
 export MACOSX_DEPLOYMENT_TARGET=26.0
 COMMON=(-Dvulkan-drivers=kosmickrisp -Dgallium-drivers= -Dopengl=false -Dgles1=disabled -Dgles2=disabled -Dglx=disabled -Degl=disabled -Dgbm=disabled -Dzstd=disabled -Dbuildtype=release -Dwrap_mode=nofallback)
@@ -95,4 +98,41 @@ cp "$WORK/ios/src/kosmickrisp/vulkan/libvulkan_kosmickrisp.dylib" "$OUT/HuskKosm
 install_name_tool -id @rpath/HuskKosmicKrisp.framework/HuskKosmicKrisp "$OUT/HuskKosmicKrisp"
 cp "$WORK/source-inputs.json" "$OUT/HuskMetal4Source.json"
 python3 "$WORK/playport/build/check-macho-imports.py" --sdk "$SDK" --platform ios --minos 26.0 --exports vkGetInstanceProcAddr,vkGetDeviceProcAddr "$OUT/HuskKosmicKrisp"
+if [ "${HUSK_METAL4_UPSTREAM_ONLY:-0}" != 1 ]; then
+    xcrun nm -gU "$OUT/HuskKosmicKrisp" > "$ROOT/build/logs/metal4-source-exports.txt"
+    for symbol in ArchiveConfigure ArchiveSnapshot ArchivePrepare ArchiveForget FramegenConfigure FramegenSnapshot FramegenPause Metal4Checkpoint; do
+        grep -E "_vkHusk${symbol}$" "$ROOT/build/logs/metal4-source-exports.txt"
+    done
+    python3 - "$ROOT" "$WORK" "$OUT" <<'PY'
+from pathlib import Path
+import sys,json,plistlib,subprocess,hashlib,struct,shutil
+root,work,out=map(Path,sys.argv[1:]);patch=json.loads((work/'mesa/HuskMetal4Patch.json').read_text())
+b=(out/'HuskKosmicKrisp').read_bytes();p=32;code=None
+assert struct.unpack_from('<II',b)==(0xfeedfacf,0x100000c)
+for _ in range(struct.unpack_from('<I',b,16)[0]):
+    cmd,n=struct.unpack_from('<II',b,p)
+    if cmd==0x19:
+        for i in range(struct.unpack_from('<I',b,p+64)[0]):
+            q=p+72+i*80
+            if b[q:q+16].split(b'\0')[0]==b'__text'and b[q+16:q+32].split(b'\0')[0]==b'__TEXT':
+                size=struct.unpack_from('<Q',b,q+40)[0];offset=struct.unpack_from('<I',b,q+48)[0];code=hashlib.sha256(b[offset:offset+size]).hexdigest()
+    p+=n
+assert code
+meta={'schema':2,'backend':'KosmicKrisp','api':'Metal 4','source':patch['playport'],'mesa':patch['mesa'],'husk_bridge_abi':1,'native_archive_abi':2,'frame_generation':True,'metalfx_spatial':False,'minimum_ios':'26.0','compiler_contract':'husk-kk-native-v1','patch_sha256':patch['patch_sha256'],'code_sha256':code,'binary_sha256_before_signing':hashlib.sha256(b).hexdigest(),'sdk_build':subprocess.check_output(['xcrun','--sdk','iphoneos','--show-sdk-build-version'],text=True).strip(),'xcode':subprocess.check_output(['xcodebuild','-version'],text=True).strip(),'host_llvm':subprocess.check_output(['llvm-config','--version'],text=True).strip()}
+(out/'HuskMetal4Build.json').write_text(json.dumps(meta,indent=2)+'\n')
+info={'CFBundleExecutable':'HuskKosmicKrisp','CFBundleName':'HuskKosmicKrisp','CFBundleIdentifier':'com.husk.experimental.KosmicKrisp','CFBundlePackageType':'FMWK','CFBundleShortVersionString':'1.0','CFBundleVersion':patch['patch_sha256'][:12],'CFBundleSupportedPlatforms':['iPhoneOS'],'MinimumOSVersion':'26.0'}
+(out/'Info.plist').write_bytes(plistlib.dumps(info))
+notices=root/'build/ios-arm64/lib/KosmicKrisp.framework/Licenses'
+if notices.exists():shutil.copytree(notices,out/'Licenses',dirs_exist_ok=True)
+(out/'HuskSourceNotice.txt').write_text('Husk source bridge: GPL-2.0-or-later. Colour-flow source: Apache-2.0. Mesa and full upstream attribution retained in Licenses and the companion KosmicKrisp framework.\nSource: https://github.com/stride-praline-2f-ai/husk ; upstream: https://github.com/playportdev/playport/tree/'+patch['playport']+'\n')
+project=root/'src/app/project.yml'
+if project.exists():
+    text=project.read_text();dependency='      - framework: ../../build/ios-arm64/lib/HuskKosmicKrisp.framework\n        embed: true\n        codeSign: true\n        link: false\n'
+    if 'framework: ../../build/ios-arm64/lib/HuskKosmicKrisp.framework'not in text:
+        anchor='      # The PS4 layer: Bachata-S4'
+        if text.count(anchor)!=1:raise ValueError('Unexpected source driver embedding layout')
+        project.write_text(text.replace(anchor,dependency+anchor))
+print('Source bridge contract, ARM64 code, eight exports and metadata verified')
+PY
+fi
 echo 'Pinned source-built iOS Metal4 driver passed import/export validation'

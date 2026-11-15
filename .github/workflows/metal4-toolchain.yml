@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
-      - name: Build exact pinned upstream driver before host extensions
+      - name: Build source Metal4 bridge and component contracts
         shell: bash
         env:
           HUSK_SOURCE_ROOT: ${{ github.workspace }}

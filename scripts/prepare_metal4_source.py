@@ -11,6 +11,14 @@ INPUTS=['patches/metal4/HuskMetal4Bridge.h','patches/metal4/HuskMetal4Framegen.m
         'patches/metal4/HuskMetal4Compiler.mm','patches/metalfx/HuskFramegen.inc',
         'patches/metalfx/HuskFramegen.metal','src/translation-layer-next/husk-tl-framegen.h',
         'src/translation-layer-next/husk-tl-native-archive.h','scripts/prepare_metal4_source.py']
+def framegen_include():
+    inc=(ROOT/'patches/metalfx/HuskFramegen.inc').read_text().replace('#if TARGET_OS_IOS','#if TARGET_OS_IOS || defined(HUSK_FG_METAL4)',1)
+    # The same real GPU algorithm can be exercised by native Mac regression
+    # hosts; only the platform display-link factory and memory admission differ.
+    inc=inc.replace('    if(os_proc_available_memory() < (384ULL<<20)){[self release];return nil;}', '#if TARGET_OS_IOS\n    if(os_proc_available_memory() < (384ULL<<20)){[self release];return nil;}\n#endif')
+    inc=inc.replace('        _link=[[CADisplayLink displayLinkWithTarget:self selector:@selector(tick:)] retain];', '#if TARGET_OS_IOS\n        _link=[[CADisplayLink displayLinkWithTarget:self selector:@selector(tick:)] retain];\n#else\n        _link=[[[NSScreen mainScreen] displayLinkWithTarget:self selector:@selector(tick:)] retain];\n#endif')
+    return inc
+
 def prepare(mesa):
     digest=hashlib.sha256()
     for name in INPUTS:digest.update(name.encode()+b'\0'+(ROOT/name).read_bytes()+b'\0')
@@ -62,11 +70,7 @@ mtl_new_compiler(mtl_device *device)
     for name in ['HuskMetal4Bridge.h','HuskMetal4Framegen.mm','HuskMetal4Compiler.mm']:shutil.copy2(ROOT/'patches/metal4'/name,out/name)
     shutil.copy2(ROOT/'src/translation-layer-next/husk-tl-framegen.h',out/'HuskFramegenABI.h')
     shutil.copy2(ROOT/'src/translation-layer-next/husk-tl-native-archive.h',out/'HuskNativeArchiveABI.h')
-    inc=(ROOT/'patches/metalfx/HuskFramegen.inc').read_text().replace('#if TARGET_OS_IOS','#if TARGET_OS_IOS || defined(HUSK_FG_METAL4)',1)
-    # The same real GPU algorithm can be exercised by native Mac regression
-    # hosts; only the platform display-link factory and memory admission differ.
-    inc=inc.replace('    if(os_proc_available_memory() < (384ULL<<20)){[self release];return nil;}', '#if TARGET_OS_IOS\n    if(os_proc_available_memory() < (384ULL<<20)){[self release];return nil;}\n#endif')
-    inc=inc.replace('        _link=[[CADisplayLink displayLinkWithTarget:self selector:@selector(tick:)] retain];', '#if TARGET_OS_IOS\n        _link=[[CADisplayLink displayLinkWithTarget:self selector:@selector(tick:)] retain];\n#else\n        _link=[[[NSScreen mainScreen] displayLinkWithTarget:self selector:@selector(tick:)] retain];\n#endif')
+    inc=framegen_include()
     (out/'HuskFramegen.inc').write_text(inc)
     shader=(ROOT/'patches/metalfx/HuskFramegen.metal').read_text()
     (out/'HuskFramegenShader.inc').write_text('static const char *huskFramegenShader=R"HUSKFG('+shader+')HUSKFG";\n')
