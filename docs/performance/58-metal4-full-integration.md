@@ -1,0 +1,58 @@
+# METAL4-FULL-v1 — compiler reuse, A20 guard correctness and combined frame generation
+
+15 November 2026. M3/M6/M8/M9/M10 follow-through on [the real Metal4 run](56-metal4-cache-cadence.md), [164's cache repair](builds/1d431a2d6ed7069f02e107e5e5fa696075211a7c.md) and [the missing bridge inventory](57-metal4-framegen-feasibility.md). The user explicitly requests complete implementation of the remaining named mechanisms, rather than another feasibility-only handover. Build164/data/cache and its active check remain available. This record distinguishes implemented code, build gates and actual device benefit.
+
+## Architecture and complete disposition of this scope
+
+| Item | Concrete implementation | Remaining acceptance |
+| --- | --- | --- |
+| Native compilation stalls | Separate source-built KosmicKrisp, exact pinned Mesa plus109Playport patches; bounded exact-MSL/options library reuse; real Metal4 pipeline serializers and archive lookups with native fallback | Final source app/package gates, actual archive compatibility/hits and scene hitches on the phone |
+| Metal4 frame generation | Typed WSI/queue bridge; real Metal4 GPU completion hands retained offscreen frames to the existing colour-flow presenter; resident texture ownership and output retirement | Final app/package, actual Dungeons images/input/audio/cadence/lifecycle and latency |
+| A20 adaptation | Retained validated runtime P/E topology, GPU/capability admission, protected critical roles and worker budgets; repaired render-rate-aware admission/fast rollback for30/45/60renderedFPS | Actual trial admission/application/rollback, responsiveness and energy on the reported A20 device |
+| Integration and rollback | Verified package manifest/ABIs admit combined mode; default-OFF enhancement choice; fullscreen/windowed settings; original publishedMetal4 and original/customMoltenVK retained | Full Apple application/extension/sign/package and independently inspected rawIPA |
+
+This is a Vulkan frontend adaptation. NX18 NVN and Henge PVG/VM commands, title-specific shader tables and guest priority numbers are not Android Vulkan inputs. Their reusable archive/library/completion mechanisms are adapted to the actual Mesa descriptor and queue boundaries. No generic native-60FPS, perfect first-use compilation or whole-plan/energy claim follows from this implementation.
+
+## Native compiler and persistent archives
+
+The new framework is `HuskKosmicKrisp.framework`, alongside the unchanged published `KosmicKrisp.framework` and both MoltenVK frameworks. Source pins remain Playport26620bf5319a0f5a5cca47cfecec797cafe45493 and Mesa b39d173ca9369c19fda2635be6655d308067e52d. Source tar hashes and every upstream patch are checked; source Git roots prevent an outer checkout from silently skipping patches. Structural edits fail on unexpected anchors; repeat preparation verifies generated file hashes. Public iOS SDK signatures and all Mach-O imports/eight bridge exports are validated.
+
+An owned exact-source/options cache retains at most64libraries/32MiB of keys. Concurrent requests for the same key share the completed library; different keys compile in parallel. It never hashes raw object pointers as pipeline identity. Native pipeline descriptors are offered directly to Metal-owned archives; a miss compiles normally. Archive mode remains an explicit existing user choice.
+
+Compiler epochs keep shared leases during native calls. Rotation admits new work to a new compiler; only the retired epoch is exclusively locked for serialization on Utility. A lease is acquired atomically with epoch selection, preventing a delayed caller from compiling after its epoch was flushed. Archive loading/compiler construction/file I/O do not hold the normal admission lock. Capture is checkpointed after64pending pipelines or an8second one-shot delay, and at a normal pause; no idle polling or speculative precompile loop is added.
+
+Archives use per-game GPU/OS/build/compiler-contract namespaces. Disk retention is32files/128MiB across that game's old namespaces; reader mappings are capped at16files/64MiB. Metal validates its own format. Symlink cache roots/files are rejected, writes use unique temporary paths plus atomic moves, and invalid/missing/read/write failures fall back to native compilation. Vulkan/Mesa shader/native archive paths are separate for the source renderer; original compatible caches are not deleted. The unchanged ABI2 header and compiler contract are recorded separately from full package provenance. Failed writes are reported; saved bytes/accepted files are not cache-hit or energy claims.
+
+This removes a missing reuse mechanism, not the need to compile unknown future pipelines. A native archive hit may still require library work. No unobserved game PSO is manufactured, and no captured pipeline is pretended to exist offline.
+
+## Actual Metal4 producer to colour-flow consumer
+
+Mesa's WSI creates bounded owned offscreen leases for the chosen swapchain extent. They are never passed into Metal4 `waitForDrawable`/`signalDrawable`. Their allocations are made resident on the producer queue. The exact submitted primary or replay commit attaches a real `MTL4CommitOptions` feedback handler retaining its lease. Only successful GPU-completion feedback enqueues that image; CPU present/submission callbacks cannot publish unfinished contents. Producer errors retire the frame and fail the optional presenter.
+
+The existing shader/presenter owns real output drawables, optical-flow/interpolation, bounded in-flight sampling and completion retirement. MRC blocks retain input frames until consumer GPU work is finished. Pause/resize/superseded-swapchain epochs reject stale frames and preserve outstanding GPU ownership. Presented/generated counts continue to use actual drawable callbacks and include explicitly documented fallback copies. The selected output extent is retained.
+
+This is colour-flow generation at an explicit30rendered→60output target. It is not native MetalFX temporal interpolation, supplied engine motion/depth, or60realFPS. It can add latency/work/artifacts and cannot bridge an arbitrary418ms engine/compiler freeze. MoltenVK spatial upscaling remains a separate existing option; the source Metal4 mode does not silently claim it is active.
+
+## A20 correctness repair
+
+The existing worker guard demanded at least55/59renderedFPS and used60Hz fast-frame thresholds even when frame generation deliberately requested30. Such a run could never enter the intended trial. The guard now receives the actual accepted render cap when that cap changes. Supported30/45/60targets use the same relative admission floor and absolute jitter allowance above their own frame period. The60FPS behavior is unchanged. Generated output is never an admission input.
+
+The20second stable baseline, nominal thermal requirement, Low Power Mode guard, maximum2ms pipeline call/0.5%window cost, protected render/audio/high-priority roles,2%relative cadence/+0.5msP95 rollback,50ms absolute spike protection and launch rejection/cooldown remain. Unsupported/game-controlled caps retain Balanced. Target changes release active caps before re-admission. The render target is exported with the existing worker summary, without another timer. All43production policy tests pass, including the original39.
+
+## Honest gates and test economy
+
+Source toolchain history is retained: probe1 built host tools but failed iOS `displaySyncEnabled` and a logging pipe masked the result; strict pipe failure propagation is now explicit. Probe2 caught skipped upstream patches in a nested Git checkout; probe3 caught a WSI base-offset violation. Probe4/run43669490706 compiled the integrated driver and validated imports/exports. Probe5 caught a test fixture mutating an options object after Metal had copied it. Probe6 had no run because its changed paths were outside the original workflow filter; the filter now covers source/ABI/tests. Probe7/run43671503963 passed both actual-wrapper control suites and rebuilt/validated the source driver. Control fixtures use mocked Metal objects and do not count as actual GPU output or physical native archive hits.
+
+The final revision adds the cache-root safety case, final manifest/admission/rollback and render-rate policy integration, so the full final Apple/application/package gates must run again. Original49-suite inventory remains, with added component checks rather than replacing it. Package verification will prove source/tree, actual bridge symbols/code sections, original drivers, framework DEX/fonts and all helper extensions before delivery. A standalone driver probe is not an installable IPA.
+
+METAL4-FULL-v1 checklist1: I1 complete named source mechanisms and review; I2 final Apple component/driver checks; I3 full application/extensions/sign/package; I4 independent package/raw delivery. Device D1 cache-compatible restart/reuse; D2 combined rendering/input/audio/lifecycle/rollback; D3 correctly admitted A20 trial and relative performance. E1 matched energy/latency/quality acceptance remains unknown. Do not call this4/4 until all build gates pass, or replace whole-plan completion with this batch's checklist.
+
+Only after a verified candidate: a short same-scene cache restart check, then a separate explicit frame-generation check at the same chosen output. Keep worker policy fixed while checking renderer/FG; evaluate worker admission independently. No cache deletion, repeated generic gameplay campaign or new Anki test is needed; Java/Anki code is unchanged from163/164. Fixed roadmap scores remain unchanged until an actual existing gate is met; M4 and Duo evidence stay separate.
+
+
+Final-app attempt1/run43673025963/sourcec1d9df374bb81503716fccf18a05df388608f6a5 built and validated both source drivers (new Metal4 imports/eight exports, actual wrapper suites twice). It executed461tests/60invocations but the full49-suite inventory caught one lifecycle fixture compile error: extracting the production pause helper also extracted the newly added Metal4 checkpoint call, whose isolated fixture lacked its declaration. The strict setup gate correctly prevented app compilation/package. The fixture now implements the callback and asserts owner-thread/pause-phase/exactly-once checkpoint delivery. This does not remove the production call or weaken the lifecycle test. The first progress report incorrectly inferred success from the Actions continue-on-error step conclusion; final setup outcomes and full logs are authoritative, and the error was corrected to the user. A complete rerun is required; no IPA was produced.
+
+
+## Final165 implementation/build/package evidence
+
+Source`62689726af641a121d72a17346cabcdb9eb10507`, tree`4ea04aa7f4c65afdb1d063dc50e33df5bd7f65a7`; [final handover and exact checklist](builds/62689726af641a121d72a17346cabcdb9eb10507.md). Apple43674234506 passes459tests/59invocations/zero test skips, full49-suite inventory/font/SDK31structures96offsets,10strict setup groups, fresh app/three extensions/sign/package. Source-matched driver caches were verified, with the actual new source framework compiled/validated underc1d9df3 in the first attempt; unchanged compiler/bridge input hashes and actual signed code-section hash independently match the final source. Package confirms eight exports, exact shader, all775upstream notices, original drivers, retained AnkiDEX/fonts/assets/helper extensions. Raw154255964byteIPA SHA256`70f0021fccc200318ea7cdd8c89c8693e1394cc98401f2793723005ef24a83c6`; full anonymous re-download matches. I4/4=100% for METAL4-FULL-v1; D0/3, E0/1UNKNOWN. Fixed overall31.11/I79.795918/M4scope34.5667/Duo0 unchanged; physical device and real-engine/external measurement dependencies remain.

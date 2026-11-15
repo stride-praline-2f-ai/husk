@@ -78,6 +78,7 @@ static struct {
 
 static tl_vkd_dispatch driver_dispatch = TL_VKD_INITIALIZER;
 static bool metal4_backend;
+static atomic_bool metal4_extended_active;
 static void *vk_symbol(const char *name) {
     if (!metal4_backend) return V.lib ? dlsym(V.lib, name) : NULL;
     return tl_vkd_lookup(&driver_dispatch, name);
@@ -158,8 +159,9 @@ static void vk_load(void)
     V.lib = V.have_path ? dlopen(V.path, RTLD_NOW | RTLD_LOCAL) : RTLD_DEFAULT;
     if(!V.lib&&V.have_path){
         const char *suffix=strstr(V.path,"HuskMoltenVK.framework/HuskMoltenVK");
+        if(!suffix)suffix=strstr(V.path,"HuskKosmicKrisp.framework/HuskKosmicKrisp");
         if(!suffix)suffix=strstr(V.path,"KosmicKrisp.framework/KosmicKrisp");
-        if(suffix&&(!strcmp(suffix,"HuskMoltenVK.framework/HuskMoltenVK")||!strcmp(suffix,"KosmicKrisp.framework/KosmicKrisp"))){
+        if(suffix&&(!strcmp(suffix,"HuskMoltenVK.framework/HuskMoltenVK")||!strcmp(suffix,"KosmicKrisp.framework/KosmicKrisp")||!strcmp(suffix,"HuskKosmicKrisp.framework/HuskKosmicKrisp"))){
             char original[sizeof(V.path)];
             snprintf(original,sizeof(original),"%.*sMoltenVK.framework/MoltenVK",(int)(suffix-V.path),V.path);
             V.lib=dlopen(original,RTLD_NOW|RTLD_LOCAL);
@@ -167,7 +169,7 @@ static void vk_load(void)
             tl_log_line("[M9-SPATIAL] experimental driver load failed; original driver fallback %s",V.lib?"loaded":"unavailable");
         }
     }
-    metal4_backend = V.have_path && strstr(V.path,"KosmicKrisp.framework/KosmicKrisp") != NULL;
+    metal4_backend = V.have_path && (strstr(V.path,"KosmicKrisp.framework/KosmicKrisp") != NULL || strstr(V.path,"HuskKosmicKrisp.framework/HuskKosmicKrisp") != NULL);
     V.gipa = V.lib ? (pfn_gipa)dlsym(V.lib,"vkGetInstanceProcAddr") : NULL;
     driver_dispatch.library=V.lib; driver_dispatch.symbol=dlsym; driver_dispatch.gipa=V.gipa;
     tl_vk_display_driver(V.lib);
@@ -198,7 +200,8 @@ static void vk_load(void)
                     submission_mode ? "Async (experimental)" : "Driver Default", prefix[2], prefix[3], prefix[4]);
     else tl_log_line("ue4 submission: configuration unavailable rc=%d; no runtime layout assumptions used beyond size-checked prefix", cr);
     tl_log_line("vulkan: %s", V.gipa ? (V.have_path ? V.path : "MoltenVK linked into the process") : "Vulkan driver not found");
-    if(metal4_backend)tl_log_line("[M3/M9 METAL4] KosmicKrisp iOS driver active; actual game correctness/energy unverified; no MoltenVK spatial/archive ABI");
+    atomic_store(&metal4_extended_active, metal4_backend && vk_symbol("vkHuskMetal4Checkpoint") != NULL);
+    if(metal4_backend)tl_log_line("[M3/M9 METAL4] KosmicKrisp iOS driver active; source-built archive/framegen bridge %s; actual game correctness/energy unverified",atomic_load(&metal4_extended_active)?"available":"unavailable");
 }
 static bool vk_ready(void) { pthread_once(&V.once, vk_load); return V.gipa != NULL; }
 void tl_vk_archive_configure(const char *project,const char *directory){
@@ -206,6 +209,13 @@ void tl_vk_archive_configure(const char *project,const char *directory){
 }
 bool tl_vk_available(void) { return V.have_path && vk_ready(); }
 bool tl_vk_is_metal4(void) { return tl_vk_available() && metal4_backend; }
+bool tl_vk_metal4_extended(void) { return tl_vk_is_metal4() && atomic_load(&metal4_extended_active); }
+bool tl_vk_archive_automatic(void) { return atomic_load(&metal4_extended_active); }
+void tl_vk_metal4_checkpoint(void) {
+    typedef void (*fn)(void);
+    fn checkpoint=metal4_backend&&V.lib?(fn)vk_symbol("vkHuskMetal4Checkpoint"):NULL;
+    if(checkpoint)checkpoint();
+}
 void tl_vk_spatial_snapshot(tl_spatial_stats *out){
     if(!out)return;
     *out=(tl_spatial_stats){.version=1,.size=sizeof(*out)};
@@ -895,6 +905,7 @@ static void pace_efficient_frame(void)
     int host_cap = tl_ue4_host_frame_limit(thermal);
     if (wanted != cap) {
         cap = wanted; deadline = 0;
+        tl_thread_policy_render_target(cap);
         count = late = 0; previous = 0; report_at = now;
         wait_requested_ns = wait_actual_ns = wait_excess_max_ns = wait_samples = 0;
         tl_log_line("ue4 timing: requested cap %d FPS (0 game controlled), host cap %d (0 no extra limiter), thermal %d; selected launch resolution retained", cap, host_cap, thermal);

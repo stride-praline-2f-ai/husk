@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "source": "c1d9df374bb81503716fccf18a05df388608f6a5",
+  "tree": "6eaa84d6bc72eea5ae35fc02e4848fae9e0d7b94",
+  "workflow": "6a604c818f0ed0aaacc20fec24eaa148d7e3e64f",
+  "run": 43673025963,
+  "job": 132687032991,
+  "conclusion": "failure",
+  "executed_tests": 461,
+  "unittest_invocations": 60,
+  "unittest_errors": 1,
+  "unittest_skips": 0,
+  "setup_outcomes": {
+    "platform": "success",
+    "regressions": "failure",
+    "tools": "success",
+    "shaders": "success",
+    "resources": "success",
+    "java_framework": "success",
+    "driver": "success",
+    "metal4_source": "success",
+    "pairing": "success",
+    "project": "success"
+  },
+  "source_driver": "ARM64 imports, GIPA/GDPA, eight bridge exports and source metadata passed",
+  "new_metal4_components": "Passed twice: full regressions and actual source driver build",
+  "failure": "Isolated production lifecycle delivery fixture lacked declaration/stub for newly extracted tl_vk_metal4_checkpoint() call",
+  "fix": "Retain real production call; implement fixture callback and assert owner-thread, pause phase and exactly-once delivery",
+  "ipa_produced": false,
+  "log_artifact": 14144694311,
+  "log_excerpt": [
+    "2026-11-15T03:38:00.4868910Z test_actual_activity_delivery_is_serial_on_owner_and_runs_callbacks_without_mailbox_lock (__main__.NativeTests.test_actual_activity_delivery_is_serial_on_owner_and_runs_callbacks_without_mailbox_lock) ... /var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/tmp82t49uep/test.c:21:13: error: call to undeclared function 'tl_vk_metal4_checkpoint'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]",
+    "2026-11-15T03:38:08.6254370Z Failed suites: ['tests/translation-layer/test_lifecycle_resilience.py']",
+    "2026-11-15T03:48:27.3411190Z Source bridge contract, ARM64 code, eight exports and metadata verified",
+    "2026-11-15T03:48:43.1853110Z regressions: failure",
+    "2026-11-15T03:48:43.1854320Z metal4_source: success"
+  ],
+  "progress_correction": "Actions continue-on-error conclusion was prematurely reported as pass; setup outcome/logs establish failure and strict package gating held.",
+  "local_fixture_order_probe": "Initial added assertion expected the checkpoint after guest pause. Production intentionally checkpoints before guest pause/focus callbacks; corrected assertion tests that real ordering, owner thread and once-only count."
+}

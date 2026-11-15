@@ -42,6 +42,7 @@ bool tl_vk_archive_cancel_prepare(void); /* only a reservation, never interrupts
 int tl_vk_archive_prepare(void);
 bool tl_vk_archive_preparing(void);
 void tl_vk_archive_snapshot(tl_na_stats *out);
+bool tl_vk_archive_automatic(void); /* active source Metal4 backend; no loading */
 /* Host-only inspection contract. Does not change the optional driver ABI or
  * trigger driver loading, pipeline compilation, cache writes or preparation. */
 enum { TL_NA_CONFIG_NOT_ATTEMPTED=0, TL_NA_CONFIG_ACCEPTED=1,

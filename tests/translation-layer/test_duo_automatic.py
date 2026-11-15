@@ -77,6 +77,22 @@ if mode=="geometry" {
  chosen.selectFrameGeneration(true);assert(chosen.frameGeneration && !chosen.metal4Renderer)
  chosen.selectFrameGeneration(false);assert(!chosen.frameGeneration && !chosen.metal4Renderer)
  for m4 in [false,true] {for fg in [false,true] {assert(DuoDisplayPolicy.usesFrameGeneration(metal4:m4,requested:fg)==(fg && !m4))}}
+} else if mode=="metal4-bridge" {
+ var json:[String:Any] = ["schema":2,"husk_bridge_abi":1,"native_archive_abi":2,"mesa":"b39d173ca9369c19fda2635be6655d308067e52d","source":"26620bf5319a0f5a5cca47cfecec797cafe45493","frame_generation":true]
+ func read(_ value:[String:Any],_ binary:Bool=true)->Metal4DriverCapabilities {Metal4DriverCapabilities.read(try! JSONSerialization.data(withJSONObject:value),binaryAvailable:binary)}
+ assert(read(json).frameGeneration && read(json).nativeArchives && read(json,false) == .init())
+ for key in ["schema","husk_bridge_abi","native_archive_abi"] {var invalid=json;invalid[key]=99;assert(read(invalid) == .init())}
+ var invalid=json;invalid["schema"]=true;assert(read(invalid) == .init())
+ invalid=json;invalid["source"]="wrong";assert(read(invalid) == .init())
+ invalid=json;invalid.removeValue(forKey:"frame_generation");assert(read(invalid) == .init())
+ assert(Metal4DriverCapabilities.read(Data("broken".utf8),binaryAvailable:true) == .init())
+ var selected=TLAppSettings();assert(!selected.enhancedMetal4)
+ selected.selectMetal4(true,bridgeAvailable:true);selected.selectFrameGeneration(true,bridgeAvailable:true)
+ assert(selected.metal4Renderer && selected.frameGeneration && selected.enhancedMetal4)
+ assert(DuoDisplayPolicy.usesFrameGeneration(metal4:true,requested:true,metal4Bridge:true))
+ selected.selectEnhancedMetal4(false,bridgeAvailable:true);assert(selected.metal4Renderer && !selected.frameGeneration && !selected.enhancedMetal4)
+ selected.selectEnhancedMetal4(true,bridgeAvailable:false);assert(!selected.enhancedMetal4)
+ selected.selectFrameGeneration(true,bridgeAvailable:false);assert(!selected.metal4Renderer && selected.frameGeneration)
 } else if mode=="rate" {
  var rate=FrameGenerationRate();assert(rate.sample(time:1,real:10,generated:9,resets:0)==nil)
  assert(rate.sample(time:2,real:38,generated:36,resets:0)==55)
@@ -107,7 +123,7 @@ print("PASS",mode)
 }}
 ''')
   subprocess.run(['cc','-c',str(ROOT/'src/translation-layer-next/husk-tl-ue4-graphics.c'),'-o',str(p/'graphics.o')],check=True)
-  cls.exe=p/'test';subprocess.run(['swiftc','-swift-version','5','-parse-as-library',str(ROOT/'src/app/Husk/HuskExecutionOptions.swift'),str(ROOT/'src/app/Husk/DuoDisplayPolicy.swift'),str(ROOT/'src/app/Husk/FrameGenerationRate.swift'),str(p/'Facades.swift'),str(p/'Settings.swift'),str(p/'main.swift'),str(p/'graphics.o'),'-o',str(cls.exe)],check=True)
+  cls.exe=p/'test';subprocess.run(['swiftc','-swift-version','5','-parse-as-library',str(ROOT/'src/app/Husk/HuskExecutionOptions.swift'),str(ROOT/'src/app/Husk/DuoDisplayPolicy.swift'),str(ROOT/'src/app/Husk/FrameGenerationRate.swift'),str(ROOT/'src/app/Husk/Metal4DriverCapabilities.swift'),str(p/'Facades.swift'),str(p/'Settings.swift'),str(p/'main.swift'),str(p/'graphics.o'),'-o',str(cls.exe)],check=True)
  def case(self,name):subprocess.run([str(self.exe),name],check=True)
  def test_two_stage_geometry_uses_physical_panel_and_is_orientation_independent(self):self.case('geometry')
  def test_a20_runtime_match_fallback_and_independent_worker_opt_out(self):self.case('a20')
@@ -116,5 +132,6 @@ print("PASS",mode)
  def test_old_settings_migrate_without_overwriting_manual_values_and_opt_out_roundtrips(self):self.case('decode')
  def test_duo_phone_budget_survives_tablet_ui_idiom_and_manual_native_uses_panel_pixels(self):self.case('duo-settings')
  def test_m4_baseline_and_default_scaler_are_unchanged(self):self.case('m4')
+ def test_verified_source_bridge_admission_and_explicit_combined_selection(self):self.case('metal4-bridge')
  def test_output_rate_uses_actual_callbacks_and_rejects_resets_and_gaps(self):self.case('rate')
 if __name__=='__main__':unittest.main()

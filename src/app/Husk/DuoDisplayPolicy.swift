@@ -42,7 +42,9 @@ enum DuoDisplayPolicy {
     static let submission = 0 // Driver Default.
     /// These are distinct backends. Resolve legacy conflicting flags in favour
     /// of the explicitly requested native Metal 4 renderer, never silent FG fallback.
-    static func usesFrameGeneration(metal4: Bool, requested: Bool) -> Bool { requested && !metal4 }
+    static func usesFrameGeneration(metal4: Bool, requested: Bool, metal4Bridge: Bool = false) -> Bool {
+        requested && (!metal4 || metal4Bridge)
+    }
 
     /// Runtime-matched A20 family. Prefer a validated kernel topology over a model fallback.
     /// A worker allowance is not P-core affinity.

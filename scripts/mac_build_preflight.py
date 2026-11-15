@@ -33,7 +33,7 @@ elif mode=='project':
     run('project generation',['xcodegen','generate','--spec',str(ROOT/'src/app/project.yml'),'--project',str(ROOT/'src/app')])
     run('project and scheme loading',['xcodebuild','-list','-json','-project',str(ROOT/'src/app/Husk.xcodeproj')])
     run('iOS release settings',['xcodebuild','-showBuildSettings','-project',str(ROOT/'src/app/Husk.xcodeproj'),'-scheme','Husk','-sdk','iphoneos','-configuration','Release','CODE_SIGNING_ALLOWED=NO'])
-    for name in ['libhusk_rppairing.a','libqemu-aarch64-softmmu.dylib','libhuskps4.dylib','MoltenVK.framework/MoltenVK','HuskMoltenVK.framework/HuskMoltenVK']:
+    for name in ['libhusk_rppairing.a','libqemu-aarch64-softmmu.dylib','libhuskps4.dylib','MoltenVK.framework/MoltenVK','HuskMoltenVK.framework/HuskMoltenVK','KosmicKrisp.framework/KosmicKrisp','HuskKosmicKrisp.framework/HuskKosmicKrisp']:
         path=ROOT/'build/ios-arm64/lib'/name
         require('staged '+name,path.is_file() and path.stat().st_size>0)
     require('verified release shader library',(ROOT/'build/graphics-base/Payload/Husk.app/default.metallib').is_file())

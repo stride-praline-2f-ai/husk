@@ -135,13 +135,22 @@ struct TLAppSettings: Codable, Equatable {
     var a20EfficiencyWorkers = true
     var frameGeneration = false
     var metal4Renderer = false
-    mutating func selectMetal4(_ enabled: Bool) {
+    var enhancedMetal4 = false
+    mutating func selectMetal4(_ enabled: Bool, bridgeAvailable: Bool = Metal4DriverCapabilities.current.frameGeneration) {
         metal4Renderer = enabled
-        if enabled { frameGeneration = false }
+        if enabled && frameGeneration {
+            if bridgeAvailable { enhancedMetal4 = true } else { frameGeneration = false }
+        }
     }
-    mutating func selectFrameGeneration(_ enabled: Bool) {
+    mutating func selectFrameGeneration(_ enabled: Bool, bridgeAvailable: Bool = Metal4DriverCapabilities.current.frameGeneration) {
         frameGeneration = enabled
-        if enabled { metal4Renderer = false }
+        if enabled && metal4Renderer {
+            if bridgeAvailable { enhancedMetal4 = true } else { metal4Renderer = false }
+        }
+    }
+    mutating func selectEnhancedMetal4(_ enabled: Bool, bridgeAvailable: Bool = Metal4DriverCapabilities.current.nativeArchives) {
+        enhancedMetal4 = enabled && bridgeAvailable
+        if !enhancedMetal4 && metal4Renderer { frameGeneration = false }
     }
     var sharedMemoryReserve = true
     var spatialUpscaling = false
@@ -254,7 +263,9 @@ struct TLAppSettings: Codable, Equatable {
         a20EfficiencyWorkers = try c.decodeIfPresent(Bool.self, forKey: .a20EfficiencyWorkers) ?? true
         frameGeneration = try c.decodeIfPresent(Bool.self, forKey: .frameGeneration) ?? false
         metal4Renderer = try c.decodeIfPresent(Bool.self, forKey: .metal4Renderer) ?? false
-        frameGeneration = DuoDisplayPolicy.usesFrameGeneration(metal4: metal4Renderer, requested: frameGeneration)
+        enhancedMetal4 = try c.decodeIfPresent(Bool.self, forKey: .enhancedMetal4) ?? false
+        frameGeneration = DuoDisplayPolicy.usesFrameGeneration(metal4: metal4Renderer, requested: frameGeneration,
+            metal4Bridge: enhancedMetal4 && Metal4DriverCapabilities.current.frameGeneration)
         sharedMemoryReserve = try c.decodeIfPresent(Bool.self, forKey: .sharedMemoryReserve) ?? true
         spatialUpscaling = try c.decodeIfPresent(Bool.self, forKey: .spatialUpscaling) ?? false
         let inputPercent = try c.decodeIfPresent(Int.self, forKey: .spatialInputPercent) ?? 80
@@ -373,12 +384,17 @@ struct TLAppSettingsView: View {
                     LabeledContent("Active Preset", value: settings.usesEfficientGraphics(for: app) ? "Sharp / Efficient" : (settings.usesSharpGraphics(for: app) ? "Sharp / High Quality" : "Game Default"))
                     if #available(iOS 26.0, *), FileManager.default.fileExists(atPath: (Bundle.main.privateFrameworksPath ?? "") + "/KosmicKrisp.framework/KosmicKrisp") {
                         Toggle("Metal 4 Vulkan (Beta)", isOn: Binding(get: { settings.metal4Renderer }, set: { settings.selectMetal4($0) }))
-                        Text("Separate KosmicKrisp renderer. Spatial upscaling and native pipeline archives are unavailable in this beta; it renders at the selected output resolution. Restart required. Turn off to restore MoltenVK and MetalFX.")
+                        Text("Separate KosmicKrisp renderer at the selected output resolution. Turn off to restore MoltenVK and MetalFX. Restart required.")
                             .font(.footnote).foregroundStyle(.secondary)
+                        if settings.metal4Renderer && Metal4DriverCapabilities.current.nativeArchives {
+                            Toggle("Metal 4 Enhancements (Experimental)", isOn: Binding(get: { settings.enhancedMetal4 }, set: { settings.selectEnhancedMetal4($0) }))
+                            Text("Source-built renderer with bounded shader-library reuse, optional native pipeline archives and frame generation. Archive Enabled is in Optional Experiments. Turn this off to restore the published Metal 4 driver. Restart required.")
+                                .font(.footnote).foregroundStyle(.secondary)
+                        }
                     }
                     if settings.usesEfficientGraphics(for: app) && app.label.lowercased().contains("dungeons") {
                         Toggle("Dungeons Frame Generation (Beta)", isOn: Binding(get: { settings.frameGeneration }, set: { settings.selectFrameGeneration($0) }))
-                        Text("30 rendered → 60 output target, including generated images. May add artifacts and input latency. Enabling this selects MoltenVK and turns Metal 4 off; enabling Metal 4 turns this off. Restart required. Turn off to restore your rendered-FPS setting.")
+                        Text(Metal4DriverCapabilities.current.frameGeneration ? "30 rendered → 60 output target, including generated images. With Metal 4 on, this enables Metal 4 Enhancements. May add artifacts and latency. Turn off to restore your rendered-FPS setting. Restart required." : "30 rendered → 60 output target, including generated images. May add artifacts and input latency. Enabling this selects MoltenVK and turns Metal 4 off. Restart required.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                     Toggle("Shared Game Memory", isOn: $settings.sharedMemoryReserve)
@@ -393,7 +409,7 @@ struct TLAppSettingsView: View {
                                     Text("Uses the runtime performance-core count for the normal-priority worker allowance; extra eligible workers use lower priority only after stable gameplay. Turn off to restore Balanced without changing resolution or MetalFX. Restart required.")
                                         .font(.footnote).foregroundStyle(.secondary)
                                 }
-                                Text(settings.frameGeneration ? "Reduced output with MetalFX 80%. Frame Generation requests 30 rendered FPS and targets 60 presented images; input latency and image quality differ from 60 real FPS. Restart required." : (settings.metal4Renderer ? "Metal 4 beta uses the reduced output target at 60 real FPS without the MoltenVK spatial pass. Detailed profiling stays off. Restart required." : "Reduced inner-screen output, MetalFX 80%, 60 FPS and Driver Default. Supported A20 devices can favour efficiency cores for extra workers with automatic performance rollback; other chips retain Balanced. Detailed profiling stays off. Restart required."))
+                                Text(settings.frameGeneration ? (settings.metal4Renderer ? "Metal 4 uses the selected output target: 30 rendered FPS → 60 presented-image target. Generated images differ from 60 real FPS. Restart required." : "Reduced output with MetalFX 80%. Frame Generation requests 30 rendered FPS and targets 60 presented images; input latency and image quality differ from 60 real FPS. Restart required.") : (settings.metal4Renderer ? "Metal 4 beta uses the reduced output target at 60 real FPS without the MoltenVK spatial pass. Detailed profiling stays off. Restart required." : "Reduced inner-screen output, MetalFX 80%, 60 FPS and Driver Default. Supported A20 devices can favour efficiency cores for extra workers with automatic performance rollback; other chips retain Balanced. Detailed profiling stays off. Restart required."))
                                     .font(.footnote).foregroundStyle(.secondary)
                             }
                         }
@@ -662,7 +678,7 @@ private struct TLGameAdvancedSettingsView: View {
             } header: {
                 Text("Pipeline Cache & Diagnostics")
             } footer: {
-                Text("Archive Enabled stores native pipeline work for later preparation in Efficiency Test. Verify Reuse checks archive misses, while Identification and Feedback log pipeline activity. Diagnostics add overhead; leave off outside a short test.")
+                Text("Archive Enabled stores native pipeline work. Metal 4 Enhancements automatically checkpoints native archives and reuses compatible pipelines; MoltenVK preparation is in Efficiency Test. Verify Reuse reports archive lookups, while Identification and Feedback add diagnostics. Leave detailed diagnostics off outside a short test.")
             }
 
             Section {
