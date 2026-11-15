@@ -1,5 +1,10 @@
 # M9-FG-QUALITY-v1 — build167 real-game quality criterion failed
 
+**Later scoped repair:** [Verified168 candidate](builds/023470100c159eb32ff2777a28658f334229e548.md)
+addresses the mixed-phase mechanism with filtered coherent reconstruction and
+actual GPU negative controls. It does not retroactively pass167's visual result
+or establish phone comfort. No repeated uncomfortable comparison is requested.
+
 **Valid replacement MOV now inspected:** [Decoded visual evidence](62-framegen-visible-switch.md)
 supersedes the earlier unavailable-footage status below.88decoded frames show
 changing clarity/doubled edges during motion; no large global brightness jump

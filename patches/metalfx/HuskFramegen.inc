@@ -39,7 +39,7 @@ static void fgFail(){fgFailed=true;vkHuskFramegenPause(1);}
     id<MTLDevice> _device;
     id<MTLCommandQueue> _queue;
     id<MTLComputePipelineState> _flowPSO,_interpolatePSO,_copyPSO;
-    id<MTLTexture> _textures[4],_forward,_backward;
+    id<MTLTexture> _textures[4],_forward,_backward,_motionPrevious,_motionCurrent;
     std::mutex _poolLock;
     std::condition_variable _poolWake;
     bool _used[4];
@@ -95,8 +95,14 @@ static void fgFail(){fgFailed=true;vkHuskFramegenPause(1);}
 }
 @end
 
-static id<MTLTexture> fgTexture(id<MTLDevice> device,NSUInteger w,NSUInteger h,MTLPixelFormat fmt){
-    MTLTextureDescriptor* d=[MTLTextureDescriptor texture2DDescriptorWithPixelFormat:fmt width:w height:h mipmapped:NO];
+static uint64_t fgStorageBytes(unsigned w,unsigned h){
+    uint64_t sources=uint64_t(w)*h*16,mips=0;
+    uint64_t flow=uint64_t((w+15)/16)*((h+15)/16)*16;
+    for(;;){mips+=uint64_t(w)*h*4;if(w==1&&h==1)break;w=std::max(1u,w/2);h=std::max(1u,h/2);}
+    return sources+2*mips+flow;
+}
+static id<MTLTexture> fgTexture(id<MTLDevice> device,NSUInteger w,NSUInteger h,MTLPixelFormat fmt,bool mipmapped=false){
+    MTLTextureDescriptor* d=[MTLTextureDescriptor texture2DDescriptorWithPixelFormat:fmt width:w height:h mipmapped:mipmapped];
     d.storageMode=MTLStorageModePrivate;d.usage=MTLTextureUsageShaderRead|MTLTextureUsageShaderWrite|MTLTextureUsageRenderTarget;
     return [device newTextureWithDescriptor:d];
 }
@@ -126,9 +132,13 @@ static void fgDispatch(id<MTLComputeCommandEncoder> e,id<MTLComputePipelineState
     }
     _queue=[_device newCommandQueue];
     for(unsigned i=0;i<4;i++)_textures[i]=fgTexture(_device,c.width,c.height,MTLPixelFormatBGRA8Unorm);
+    // Private motion-only scratch leaves guest/WSI texture levels unchanged.
+    // No CPU readback, queue-idle wait or new lease lifetime is introduced.
+    _motionPrevious=fgTexture(_device,c.width,c.height,MTLPixelFormatBGRA8Unorm,true);
+    _motionCurrent=fgTexture(_device,c.width,c.height,MTLPixelFormatBGRA8Unorm,true);
     NSUInteger fw=(c.width+15)/16,fh=(c.height+15)/16;
     _forward=fgTexture(_device,fw,fh,MTLPixelFormatRGBA16Float);_backward=fgTexture(_device,fw,fh,MTLPixelFormatRGBA16Float);
-    if(!_queue||!_flowPSO||!_interpolatePSO||!_copyPSO||!_textures[0]||!_textures[1]||!_textures[2]||!_textures[3]||!_forward||!_backward){[self release];return nil;}
+    if(!_queue||!_flowPSO||!_interpolatePSO||!_copyPSO||!_textures[0]||!_textures[1]||!_textures[2]||!_textures[3]||!_forward||!_backward||!_motionPrevious||!_motionCurrent){[self release];return nil;}
     dispatch_async(dispatch_get_main_queue(),^{
         if(_stopped.load())return;
         _link=[[CADisplayLink displayLinkWithTarget:self selector:@selector(tick:)] retain];
@@ -185,10 +195,19 @@ static void fgDispatch(id<MTLComputeCommandEncoder> e,id<MTLComputePipelineState
     if(output.pixelFormat!=MTLPixelFormatBGRA8Unorm||output.width!=current.texture.width||output.height!=current.texture.height){fgFail();[self resetHistory];return NO;}
     id<MTLCommandBuffer> command=[_queue commandBuffer];if(!command)return NO;
     if(generated){
+        id<MTLBlitCommandEncoder> reduce=[command blitCommandEncoder];if(!reduce)return NO;
+        for(unsigned image=0;image<2;image++){
+            id<MTLTexture> source=image?current.texture:previous.texture;
+            id<MTLTexture> pyramid=image?_motionCurrent:_motionPrevious;
+            [reduce copyFromTexture:source sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0,0,0)
+                sourceSize:MTLSizeMake(source.width,source.height,1) toTexture:pyramid destinationSlice:0 destinationLevel:0 destinationOrigin:MTLOriginMake(0,0,0)];
+            [reduce generateMipmapsForTexture:pyramid];
+        }
+        [reduce endEncoding];
         for(unsigned reverse=0;reverse<2;reverse++){
             id<MTLComputeCommandEncoder> e=[command computeCommandEncoder];
-            [e setTexture:reverse?current.texture:previous.texture atIndex:0];
-            [e setTexture:reverse?previous.texture:current.texture atIndex:1];
+            [e setTexture:reverse?_motionCurrent:_motionPrevious atIndex:0];
+            [e setTexture:reverse?_motionPrevious:_motionCurrent atIndex:1];
             [e setTexture:reverse?_backward:_forward atIndex:2];
             fgDispatch(e,_flowPSO,_forward.width,_forward.height);[e endEncoding];
         }
@@ -220,6 +239,7 @@ static void fgDispatch(id<MTLComputeCommandEncoder> e,id<MTLComputePipelineState
 - (void)dealloc {
     for(unsigned i=0;i<4;i++)[_textures[i] release];
     [_forward release];[_backward release];[_flowPSO release];[_interpolatePSO release];[_copyPSO release];
+    [_motionPrevious release];[_motionCurrent release];
     [_queue release];[_device release];[_layer release];[_ready release];
     [_previous release];[_current release];
 #if OS_OBJECT_USE_OBJC
@@ -234,7 +254,7 @@ static void fgDispatch(id<MTLComputeCommandEncoder> e,id<MTLComputePipelineState
 extern "C" __attribute__((visibility("default"))) int vkHuskFramegenConfigure(const tl_fg_config* c){
     if(!c||c->version!=1||c->size!=sizeof(*c)||c->enabled>1||c->reserved)return 0;
     std::lock_guard<std::mutex> guard(fgManagerLock);if(!fgOwners.empty())return 0;
-    if(c->enabled && (c->width<64||c->height<64||c->width>4096||c->height>4096||uint64_t(c->width)*c->height*16>(96ULL<<20)))return 0;
+    if(c->enabled && (c->width<64||c->height<64||c->width>4096||c->height>4096||fgStorageBytes(c->width,c->height)>(96ULL<<20)))return 0;
     fgConfig=*c;fgFailed=false;fgPaused=false;return 1;
 }
 extern "C" __attribute__((visibility("default"))) int vkHuskFramegenSnapshot(tl_fg_stats* s){

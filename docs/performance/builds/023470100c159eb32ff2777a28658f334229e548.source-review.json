@@ -1,0 +1,52 @@
+{
+  "schema": 1,
+  "source": "023470100c159eb32ff2777a28658f334229e548",
+  "tree": "ab48aaddb5c49148b79b2d27c853491752033e86",
+  "observed_at": "2026-11-15T12:33:33.947630+00:00",
+  "scope": [
+    "Single-source midpoint instead of per-pixel geometric-phase splicing or source averaging",
+    "Clamped cubic reconstruction; exact integer positions and real copies",
+    "Private GPU pyramids with separate optimum per scale and fractional weighted RGB flow",
+    "Logical source+pyramid+flow budget under96MiB at1816 and protected2128",
+    "Axis-supported stationary HUD with true moving-thin-object case retained",
+    "Actual textured flow plus controlled generated/real sequence; frozen167 and unfiltered candidate negative controls",
+    "Presenter scratch owned/released; critical drawable/history/acquire+retirement/C bridge unchanged",
+    "Native compiler, host bridge, resolution, scheduling and Anki contracts unchanged"
+  ],
+  "inputs": {
+    "patches/metalfx/HuskFramegen.metal": "1262252aabf52b65c01467fa58298229ed34f224ebc401e48aa3d9e341bceade",
+    "patches/metalfx/HuskFramegen.inc": "bc518a9237632404185cb28b6bdd7a3f0bf73ea7b179ddac903e3f1f9d0c4665",
+    "patches/metal4/HuskMetal4Framegen.mm": "415ce25da0ca88bd3325aabca1d785f72f129f3ce2ac4032bc571ee05e84f0eb",
+    "tests/translation-layer/framegen_gpu.mm": "3c45ccd95608b9efda3ca9e7d509fa6fdc18214a363b1641bdc41af9c9605cd6",
+    "tests/translation-layer/fixtures/framegen-167.metal": "9a8e058325ca96ebcd68dd07df9ba09b60bc627d78d585c960e72c802121c226",
+    "tests/translation-layer/fixtures/framegen-166.metal": "8c28fc5265bb5e2e75a505dededde113eca5336e82d26103ddd1551bbf103d74",
+    "tests/translation-layer/fixtures/framegen-168-pre-pyramid.metal": "438eff3f71ef04037b7f6ccfd08df91a3524d4565072fc4a404c0c38d1097220"
+  },
+  "limits": [
+    "Phone game image quality/comfort unverified",
+    "Coarse flow/occlusion can still be wrong; no native engine motion/depth/jitter",
+    "Current source illumination retained, not temporally averaged",
+    "GPU pyramid copies/filtering, fractional search and cubic reconstruction add unknown A20 GPU/energy cost"
+  ],
+  "status": "PASS: exact source review, actual host GPU old/new sequence and textured-flow controls, full integration, actual new code/shader in both frameworks and full anonymous raw re-download verified. Phone game quality/comfort and benefit remain unverified.",
+  "logical_texture_bytes": {
+    "1816x1280": 62131376,
+    "2128x1600": 91007040,
+    "budget": 100663296
+  },
+  "pre_delivery_history": {
+    "source": "e059591ef383d4bddb6278c2d28eb6ce87108424",
+    "workflow_run": 43712641855,
+    "outcome": "cancelled/superseded before delivery; original controlled GPU cases passed; missing actual textured-flow case now required"
+  },
+  "gpu_proof": {
+    "device": "Apple Paravirtual device",
+    "repeated_early_and_full_suite": true,
+    "frozen167_error": {
+      "max_code_value": 96,
+      "mean_code_value": 16.345
+    },
+    "unfiltered_control": "QUALITY_REJECT: textured motion was not recovered by actual flow",
+    "physical_A20": "UNVERIFIED"
+  }
+}

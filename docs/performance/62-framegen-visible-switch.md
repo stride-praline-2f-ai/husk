@@ -1,5 +1,10 @@
 # M9-FG-QUALITY-v1 — decoded movement-switch evidence
 
+**Repair follow-up:** [Verified168 candidate](builds/023470100c159eb32ff2777a28658f334229e548.md)
+implements coherent reconstruction/filtered correspondence with actual GPU
+before/after controls; real-game image comfort and net cost remain unverified.
+The clip remains167-context visual failure evidence, not a168device pass.
+
 15 November 2026. Follows [the167 ON/OFF result](61-returned167-framegen-quality.md)
 and the user's discomfort report. This valid replacement MOV supersedes the
 earlier *unavailable footage* status; the incomplete Adobe Express MP4 remains

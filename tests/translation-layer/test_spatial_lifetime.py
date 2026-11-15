@@ -124,6 +124,10 @@ int main(){@autoreleasepool{
  p->_paused=true;@autoreleasepool{assert(huskFramegenDrawable(p,nil));}p->_paused=false;p->_stopped=true;assert(!huskFramegenDrawable(p,nil));
  [p release];
  tl_fg_config c={1,sizeof(c),1,1816,1280,0};assert(vkHuskFramegenConfigure(&c));
+ assert(fgStorageBytes(1816,1280)<(96ULL<<20));
+ assert(fgStorageBytes(2128,1600)<(96ULL<<20));
+ assert(fgStorageBytes(2128,1600)>uint64_t(2128)*1600*16);
+ c.width=c.height=2048;assert(fgStorageBytes(2048,2048)>(96ULL<<20)&&!vkHuskFramegenConfigure(&c));
  c.width=c.height=4096;assert(!vkHuskFramegenConfigure(&c));c.enabled=0;assert(vkHuskFramegenConfigure(&c));
  tl_fg_stats stats={1,sizeof(stats)};assert(vkHuskFramegenSnapshot(&stats)&&!stats.active&&!stats.failed);
 }return 0;}
@@ -147,5 +151,15 @@ int main(){@autoreleasepool{
    self.assertEqual(old.returncode,3,old.stdout)
    self.assertIn('QUALITY_REJECT: stationary HUD changed',old.stdout)
    print('PASS: frozen166 shader rejected for stationary HUD ghosting; repaired shader passes the same GPU cases')
+   prior=subprocess.run([str(exe),str(ROOT/'tests/translation-layer/fixtures/framegen-167.metal')],text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=30)
+   self.assertEqual(prior.returncode,4,prior.stdout)
+   self.assertIn('QUALITY_REJECT: intermediate textured sequence jumps to real-frame phase',prior.stdout)
+   print(prior.stdout)
+   print('PASS: frozen167 rejected for mixed motion phases; current shader passes whole generated/real sequences and fractional motion')
+   unfiltered=subprocess.run([str(exe),str(ROOT/'tests/translation-layer/fixtures/framegen-168-pre-pyramid.metal')],text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=30)
+   self.assertEqual(unfiltered.returncode,4,unfiltered.stdout)
+   self.assertRegex(unfiltered.stdout,r'QUALITY_REJECT: (textured motion was not recovered|estimated textured flow did not preserve)')
+   print(unfiltered.stdout)
+   print('PASS: pre-pyramid candidate rejected by actual textured flow; filtered production search passes')
 
 if __name__=='__main__':unittest.main()
