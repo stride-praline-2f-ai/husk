@@ -40,14 +40,15 @@ static void fgFail(){fgFailed=true;vkHuskFramegenPause(1);}
 @public
     CAMetalLayer* _layer;
     id<MTLDevice> _device;
-    id<MTLCommandQueue> _queue;
+    id<MTLCommandQueue> _queue,_prepareQueue;
     id<MTLComputePipelineState> _flowPSO,_interpolatePSO,_copyPSO,_coarsePSO,_regularizePSO,_qualityPSO;
     id<MTLTexture> _textures[4],_forward,_backward,_motionPrevious,_motionCurrent,_coarseForward,_coarseBackward,_rawForward,_rawBackward,_quality;
     std::mutex _poolLock;
     std::condition_variable _poolWake;
     bool _used[4];
     std::atomic<bool> _stopped,_paused,_tickPending;
-    std::atomic<unsigned> _inFlight;
+    std::atomic<unsigned> _inFlight,_prepareInFlight,_scratchReaders;
+    std::atomic<double> _targetTime;
     std::atomic<uint64_t> _epoch;
     dispatch_queue_t _work;
     CADisplayLink* _link;
@@ -56,6 +57,10 @@ static void fgFail(){fgFailed=true;vkHuskFramegenPause(1);}
     HuskFGDrawable* _current;
     bool _realNext;
     double _lastInput;
+    HuskFGDrawable *_preparedPrevious,*_preparedCurrent;
+    HuskFGCaptureTicket *_preparedCapture;
+    bool _preparedReady;
+    uint64_t _preparationID;
     HuskFGCaptureTicket *_captureAwaitingReal;
 }
 - (instancetype)initWithLayer:(CAMetalLayer*)layer config:(tl_fg_config)c;
@@ -63,6 +68,9 @@ static void fgFail(){fgFailed=true;vkHuskFramegenPause(1);}
 - (void)stop;
 - (void)tick:(CADisplayLink*)link;
 - (void)drawTick;
+- (void)prepareNext;
+- (void)discardPrepared:(NSString*)reason;
+- (BOOL)preparePrevious:(HuskFGDrawable*)previous current:(HuskFGDrawable*)current;
 - (void)enqueue:(HuskFGDrawable*)frame;
 - (BOOL)encodePrevious:(HuskFGDrawable*)previous current:(HuskFGDrawable*)current generated:(BOOL)generated;
 @end
@@ -116,7 +124,7 @@ static void fgDispatch(id<MTLComputeCommandEncoder> e,id<MTLComputePipelineState
 }
 @implementation HuskFGPresenter
 - (instancetype)init {
-    if((self=[super init])){_stopped=false;_paused=false;_tickPending=false;_inFlight=0;_epoch=1;_ready=[NSMutableArray new];}
+    if((self=[super init])){_stopped=false;_paused=false;_tickPending=false;_inFlight=0;_prepareInFlight=0;_scratchReaders=0;_targetTime=0;_epoch=1;_ready=[NSMutableArray new];}
     return self;
 }
 - (instancetype)initWithLayer:(CAMetalLayer*)layer config:(tl_fg_config)c {
@@ -141,6 +149,8 @@ static void fgDispatch(id<MTLComputeCommandEncoder> e,id<MTLComputePipelineState
         [flow release];[interp release];[copy release];[lib release];
     }
     _queue=[_device newCommandQueue];
+    _prepareQueue=[_device newCommandQueue];
+    _queue.label=@"Husk FG display copies";_prepareQueue.label=@"Husk FG reconstruction ahead of display";
     for(unsigned i=0;i<4;i++)_textures[i]=fgTexture(_device,c.width,c.height,MTLPixelFormatBGRA8Unorm);
     // Private motion-only scratch leaves guest/WSI texture levels unchanged.
     // No CPU readback, queue-idle wait or new lease lifetime is introduced.
@@ -152,7 +162,7 @@ static void fgDispatch(id<MTLComputeCommandEncoder> e,id<MTLComputePipelineState
     _coarseForward=fgTexture(_device,(c.width+63)/64,(c.height+63)/64,MTLPixelFormatRGBA16Float);
     _coarseBackward=fgTexture(_device,(c.width+63)/64,(c.height+63)/64,MTLPixelFormatRGBA16Float);
     _quality=fgTexture(_device,1,1,MTLPixelFormatRGBA32Float);
-    if(!_coarsePSO||!_regularizePSO||!_qualityPSO||!_rawForward||!_rawBackward||!_coarseForward||!_coarseBackward||!_quality||!_queue||!_flowPSO||!_interpolatePSO||!_copyPSO||!_textures[0]||!_textures[1]||!_textures[2]||!_textures[3]||!_forward||!_backward||!_motionPrevious||!_motionCurrent){[self release];return nil;}
+    if(!_coarsePSO||!_regularizePSO||!_qualityPSO||!_rawForward||!_rawBackward||!_coarseForward||!_coarseBackward||!_quality||!_queue||!_prepareQueue||!_flowPSO||!_interpolatePSO||!_copyPSO||!_textures[0]||!_textures[1]||!_textures[2]||!_textures[3]||!_forward||!_backward||!_motionPrevious||!_motionCurrent){[self release];return nil;}
     dispatch_async(dispatch_get_main_queue(),^{
         if(_stopped.load())return;
         _link=[[CADisplayLink displayLinkWithTarget:self selector:@selector(tick:)] retain];
@@ -161,7 +171,14 @@ static void fgDispatch(id<MTLComputeCommandEncoder> e,id<MTLComputePipelineState
     });
     return self;
 }
+- (void)discardPrepared:(NSString*)reason {
+    ++_preparationID;_preparedReady=false;
+    if(_preparedCapture){fgCaptureFinish(_preparedCapture,reason);[_preparedCapture release];_preparedCapture=nil;}
+    [_preparedPrevious release];_preparedPrevious=nil;
+    if(_preparedCurrent){++fgDropped;[_preparedCurrent finish:0];[_preparedCurrent release];_preparedCurrent=nil;}
+}
 - (void)resetHistory {
+    [self discardPrepared:@"history reset before prepared output was presented"];_targetTime=0;
     if(_captureAwaitingReal){fgCaptureFinish(_captureAwaitingReal,@"history reset, pause or swapchain replacement before following real output");[_captureAwaitingReal release];_captureAwaitingReal=nil;}
     [_previous finish:0];[_previous release];_previous=nil;
     [_current finish:0];[_current release];_current=nil;
@@ -174,7 +191,10 @@ static void fgDispatch(id<MTLComputeCommandEncoder> e,id<MTLComputePipelineState
     dispatch_async(_work,^{[self resetHistory];});
 }
 - (void)tick:(CADisplayLink*)link {
-    (void)link;
+    // targetTimestamp is in the same CA host clock as present-at-time. Keep
+    // the latest target even when a work block is already pending.
+    double target=link.targetTimestamp,now=CACurrentMediaTime();
+    _targetTime=(std::isfinite(target)&&target>now&&target-now<=0.05)?target:0;
     if(_stopped.load()||_paused.load()||fgFailed.load())return;
     bool expected=false;if(!_tickPending.compare_exchange_strong(expected,true))return;
     dispatch_async(_work,^{@autoreleasepool{[self drawTick];_tickPending=false;}});
@@ -184,33 +204,55 @@ static void fgDispatch(id<MTLComputeCommandEncoder> e,id<MTLComputePipelineState
         if(_stopped.load()||_paused.load()||fgFailed.load()||frame->_epoch!=_epoch.load()){++fgDropped;[frame finish:0];return;}
         while(_ready.count>=2){HuskFGDrawable* old=[[_ready objectAtIndex:0] retain];[_ready removeObjectAtIndex:0];++fgDropped;[old finish:0];[old release];}
         [_ready addObject:frame];
+        [self prepareNext];
     }});
+}
+static bool fgFreshPair(HuskFGDrawable *previous,HuskFGDrawable *current,double now){
+    if(!previous||!current||current->_sequence<=previous->_sequence)return false;
+    double delta=current->_sourceCompletedHost-previous->_sourceCompletedHost,age=now-current->_sourceCompletedHost;
+    return std::isfinite(delta)&&std::isfinite(age)&&delta>0&&delta<=0.15&&age>=0&&age<=0.15;
+}
+- (void)prepareNext {
+    // One shared scratch image, one GPU writer, and no writer while an output
+    // copy is still reading it. GPU completion, never presentation feedback,
+    // releases this dependency. Real copies use the independent display queue.
+    if(_stopped.load()||_paused.load()||fgFailed.load()||_preparedCurrent||
+        _prepareInFlight.load()||_scratchReaders.load()||!_prepareQueue||!_ready.count)return;
+    HuskFGDrawable *previous=_current?:_previous,*next=[_ready objectAtIndex:0];
+    if(!fgFreshPair(previous,next,CACurrentMediaTime()))return;
+    if([self preparePrevious:previous current:next])[_ready removeObjectAtIndex:0];
 }
 - (void)drawTick {
     if(_stopped.load()||_paused.load()||fgFailed.load()||_inFlight.load()>=2)return;
     if(_realNext){
         if(![self encodePrevious:nil current:_current generated:NO])return;
-        [_previous release];_previous=_current;_current=nil;_realNext=false;return;
+        [_previous release];_previous=_current;_current=nil;_realNext=false;
+        [self prepareNext];return;
+    }
+    [self prepareNext];
+    if(_preparedCurrent){
+        if(CACurrentMediaTime()-_preparedCurrent->_sourceCompletedHost>0.15){
+            [self discardPrepared:@"prepared frame became stale before output"];
+        }else{
+            if(!_preparedReady)return; // No wait, real-drawable acquisition or half-written output.
+            if(![self encodePrevious:_preparedPrevious current:_preparedCurrent generated:YES])return;
+            _current=_preparedCurrent;_preparedCurrent=nil;
+            [_preparedPrevious release];_preparedPrevious=nil;_preparedReady=false;_realNext=true;
+            [self prepareNext];return;
+        }
     }
     if(!_ready.count)return;
-    HuskFGDrawable* next=[[_ready objectAtIndex:0] retain];
-    double now=CACurrentMediaTime();bool fresh=(_lastInput>0 && now-_lastInput<0.15);
-    BOOL generated=(_previous && fresh);
-    if(![self encodePrevious:_previous current:next generated:generated]){[next release];return;}
-    [_ready removeObjectAtIndex:0];_lastInput=now;
-    if(generated){_current=next;_realNext=true;}
-    else{[_previous release];_previous=next;}
+    HuskFGDrawable *next=[[_ready objectAtIndex:0] retain];
+    if(![self encodePrevious:nil current:next generated:NO]){[next release];return;}
+    [_ready removeObjectAtIndex:0];_lastInput=CACurrentMediaTime();
+    [_previous release];_previous=next;[self prepareNext];
 }
-- (BOOL)encodePrevious:(HuskFGDrawable*)previous current:(HuskFGDrawable*)current generated:(BOOL)generated {
-    if(!current)return NO;
-    uint64_t epoch=_epoch.load();
-    id<CAMetalDrawable> drawable=[_layer nextDrawable];
-    if(!drawable||_stopped.load()||_paused.load()||epoch!=_epoch.load())return NO;
-    id<MTLTexture> output=drawable.texture;
-    if(output.pixelFormat!=MTLPixelFormatBGRA8Unorm||output.width!=current.texture.width||output.height!=current.texture.height){fgFail();[self resetHistory];return NO;}
-    id<MTLCommandBuffer> command=[_queue commandBuffer];if(!command)return NO;
-    if(generated){
-        id<MTLBlitCommandEncoder> reduce=[command blitCommandEncoder];if(!reduce)return NO;
+- (BOOL)preparePrevious:(HuskFGDrawable*)previous current:(HuskFGDrawable*)current {
+    if(!previous||!current||_preparedCurrent||_prepareInFlight.load()||_scratchReaders.load())return NO;
+    uint64_t epoch=_epoch.load(),token=++_preparationID;
+    id<MTLTexture> output=_motionPrevious;
+    id<MTLCommandBuffer> command=[_prepareQueue commandBuffer];if(!command){fgFail();return NO;}
+        id<MTLBlitCommandEncoder> reduce=[command blitCommandEncoder];if(!reduce){fgFail();return NO;}
         for(unsigned image=0;image<2;image++){
             id<MTLTexture> source=image?current.texture:previous.texture;
             id<MTLTexture> pyramid=image?_motionCurrent:_motionPrevious;
@@ -222,67 +264,96 @@ static void fgDispatch(id<MTLComputeCommandEncoder> e,id<MTLComputePipelineState
         for(unsigned reverse=0;reverse<2;reverse++){
             id<MTLTexture> prior=reverse?_motionCurrent:_motionPrevious,currentMotion=reverse?_motionPrevious:_motionCurrent;
             id<MTLTexture> coarse=reverse?_coarseBackward:_coarseForward,raw=reverse?_rawBackward:_rawForward,final=reverse?_backward:_forward;
-            id<MTLComputeCommandEncoder> e=[command computeCommandEncoder];
+            id<MTLComputeCommandEncoder> e=[command computeCommandEncoder];if(!e){fgFail();return NO;}
             [e setTexture:prior atIndex:0];[e setTexture:currentMotion atIndex:1];[e setTexture:coarse atIndex:2];
             fgDispatch(e,_coarsePSO,coarse.width,coarse.height);[e endEncoding];
-            e=[command computeCommandEncoder];[e setTexture:prior atIndex:0];[e setTexture:currentMotion atIndex:1];[e setTexture:raw atIndex:2];[e setTexture:coarse atIndex:3];
+            e=[command computeCommandEncoder];if(!e){fgFail();return NO;}[e setTexture:prior atIndex:0];[e setTexture:currentMotion atIndex:1];[e setTexture:raw atIndex:2];[e setTexture:coarse atIndex:3];
             fgDispatch(e,_flowPSO,raw.width,raw.height);[e endEncoding];
-            e=[command computeCommandEncoder];[e setTexture:prior atIndex:0];[e setTexture:currentMotion atIndex:1];[e setTexture:raw atIndex:2];[e setTexture:final atIndex:3];
+            e=[command computeCommandEncoder];if(!e){fgFail();return NO;}[e setTexture:prior atIndex:0];[e setTexture:currentMotion atIndex:1];[e setTexture:raw atIndex:2];[e setTexture:final atIndex:3];
             fgDispatch(e,_regularizePSO,final.width,final.height);[e endEncoding];
         }
-        id<MTLComputeCommandEncoder> gate=[command computeCommandEncoder];
+        id<MTLComputeCommandEncoder> gate=[command computeCommandEncoder];if(!gate){fgFail();return NO;}
         [gate setComputePipelineState:_qualityPSO];[gate setTexture:_forward atIndex:0];[gate setTexture:_backward atIndex:1];[gate setTexture:_quality atIndex:2];
         uint32_t extent[2]={(uint32_t)output.width,(uint32_t)output.height};[gate setBytes:extent length:sizeof extent atIndex:0];
         [gate dispatchThreadgroups:MTLSizeMake(1,1,1) threadsPerThreadgroup:MTLSizeMake(256,1,1)];[gate endEncoding];
-        id<MTLComputeCommandEncoder> e=[command computeCommandEncoder];
+        id<MTLComputeCommandEncoder> e=[command computeCommandEncoder];if(!e){fgFail();return NO;}
         [e setTexture:previous.texture atIndex:0];[e setTexture:current.texture atIndex:1];
         [e setTexture:_forward atIndex:2];[e setTexture:_backward atIndex:3];[e setTexture:output atIndex:4];[e setTexture:_quality atIndex:5];
         fgDispatch(e,_interpolatePSO,output.width,output.height);[e endEncoding];
-    }else{
-        id<MTLComputeCommandEncoder> e=[command computeCommandEncoder];[e setTexture:current.texture atIndex:0];[e setTexture:output atIndex:1];
-        fgDispatch(e,_copyPSO,output.width,output.height);[e endEncoding];
+
+    HuskFGCaptureTicket *capture=fgCaptureReserve(_device,(unsigned)output.width,(unsigned)output.height,
+        (unsigned)_forward.width,(unsigned)_forward.height,previous->_sequence,current->_sequence,epoch,
+        previous->_sourceCompletedHost,current->_sourceCompletedHost);
+    if(capture){
+        bool copied=fgCaptureCopy(command,previous.texture,capture->_images[0],capture->_row)&&
+            fgCaptureCopy(command,current.texture,capture->_images[1],capture->_row)&&
+            fgCaptureCopy(command,output,capture->_images[2],capture->_row)&&
+            fgCaptureCopy(command,_forward,capture->_fields[0],capture->_flowRow)&&
+            fgCaptureCopy(command,_backward,capture->_fields[1],capture->_flowRow)&&
+            fgCaptureCopy(command,_rawForward,capture->_fields[2],capture->_flowRow)&&
+            fgCaptureCopy(command,_rawBackward,capture->_fields[3],capture->_flowRow)&&
+            fgCaptureCopy(command,_coarseForward,capture->_fields[4],capture->_coarseRow)&&
+            fgCaptureCopy(command,_coarseBackward,capture->_fields[5],capture->_coarseRow)&&
+            fgCaptureCopy(command,_quality,capture->_quality,256);
+        if(copied)_preparedCapture=[capture retain];else fgCaptureFinish(capture,@"could not encode reconstruction diagnostic copies");
+        [command addCompletedHandler:^(id<MTLCommandBuffer> done){fgCaptureStage(capture,true,done);}];
     }
+    fgCaptureObserve(command,nil,true,capture!=nil,current->_sequence,epoch,0,current->_sourceCompletedHost,true);
+    _preparedPrevious=[previous retain];_preparedCurrent=[current retain];_preparedReady=false;_prepareInFlight.fetch_add(1);
+    [command addCompletedHandler:^(id<MTLCommandBuffer> done){
+        (void)previous.texture;(void)current.texture; // Keep leases until GPU sampling actually retires.
+        _prepareInFlight.fetch_sub(1);
+        bool success=done.status==MTLCommandBufferStatusCompleted;
+        if(!success){++fgErrors;fgFail();}
+        dispatch_async(_work,^{@autoreleasepool{
+            if(success&&epoch==_epoch.load()&&token==_preparationID&&_preparedCurrent==current&&
+                !_stopped.load()&&!_paused.load()&&!fgFailed.load())_preparedReady=true;
+            [self prepareNext];
+        }});
+    }];
+    [capture release];[command commit];return YES;
+}
+- (BOOL)encodePrevious:(HuskFGDrawable*)previous current:(HuskFGDrawable*)current generated:(BOOL)generated {
+    if(!current||(generated&&(!_preparedReady||_preparedCurrent!=current)))return NO;
+    uint64_t epoch=_epoch.load();
+    id<CAMetalDrawable> drawable=[_layer nextDrawable];
+    if(!drawable||_stopped.load()||_paused.load()||epoch!=_epoch.load())return NO;
+    id<MTLTexture> output=drawable.texture;
+    if(output.pixelFormat!=MTLPixelFormatBGRA8Unorm||output.width!=current.texture.width||output.height!=current.texture.height){fgFail();[self resetHistory];return NO;}
+    id<MTLCommandBuffer> command=[_queue commandBuffer];if(!command)return NO;
+    // The display path contains only one cheap copy. Expensive motion/search
+    // reconstruction was submitted as soon as the GPU-completed input arrived.
+    id<MTLComputeCommandEncoder> e=[command computeCommandEncoder];if(!e)return NO;
+    [e setTexture:generated?_motionPrevious:current.texture atIndex:0];[e setTexture:output atIndex:1];
+    fgDispatch(e,_copyPSO,output.width,output.height);[e endEncoding];
     HuskFGCaptureTicket *capture=nil;
-    if(generated){
-        if(_captureAwaitingReal){fgCaptureFinish(_captureAwaitingReal,@"following real output superseded");[_captureAwaitingReal release];_captureAwaitingReal=nil;}
-        capture=fgCaptureReserve(_device,(unsigned)output.width,(unsigned)output.height,(unsigned)_forward.width,(unsigned)_forward.height,
-            previous->_sequence,current->_sequence,epoch,previous->_sourceCompletedHost,current->_sourceCompletedHost);
-        if(capture){
-            bool copied=fgCaptureCopy(command,previous.texture,capture->_images[0],capture->_row)&&
-                fgCaptureCopy(command,current.texture,capture->_images[1],capture->_row)&&
-                fgCaptureCopy(command,output,capture->_images[2],capture->_row)&&
-                fgCaptureCopy(command,_forward,capture->_fields[0],capture->_flowRow)&&
-                fgCaptureCopy(command,_backward,capture->_fields[1],capture->_flowRow)&&
-                fgCaptureCopy(command,_rawForward,capture->_fields[2],capture->_flowRow)&&
-                fgCaptureCopy(command,_rawBackward,capture->_fields[3],capture->_flowRow)&&
-                fgCaptureCopy(command,_coarseForward,capture->_fields[4],capture->_coarseRow)&&
-                fgCaptureCopy(command,_coarseBackward,capture->_fields[5],capture->_coarseRow)&&
-                fgCaptureCopy(command,_quality,capture->_quality,256);
-            if(copied)_captureAwaitingReal=[capture retain];else fgCaptureFinish(capture,@"could not encode generated diagnostic copies");
-        }
-    }else if(_captureAwaitingReal&&_captureAwaitingReal->_currentSequence==current->_sequence){
+    if(generated&&_preparedCapture){
+        // The preceding pair's real output is always submitted before this
+        // generated slot; never supersede it merely because future work starts.
+        if(_captureAwaitingReal){fgCaptureFinish(_captureAwaitingReal,@"following real output superseded");[_captureAwaitingReal release];}
+        _captureAwaitingReal=_preparedCapture;_preparedCapture=nil;capture=[_captureAwaitingReal retain];
+    }else if(!generated&&_captureAwaitingReal&&_captureAwaitingReal->_currentSequence==current->_sequence){
         capture=[_captureAwaitingReal retain];[_captureAwaitingReal release];_captureAwaitingReal=nil;
         if(!fgCaptureCopy(command,output,capture->_images[3],capture->_row))fgCaptureFinish(capture,@"could not encode following-real diagnostic copy");
+        [command addCompletedHandler:^(id<MTLCommandBuffer> done){fgCaptureStage(capture,false,done);}];
     }
-    if(capture){[command addCompletedHandler:^(id<MTLCommandBuffer> completed){fgCaptureStage(capture,generated,completed);}];}
-    fgCaptureObserve(command,drawable,generated,capture!=nil,current->_sequence,epoch);
-    [capture release];
-    _inFlight.fetch_add(1);
-    [drawable addPresentedHandler:^(id<MTLDrawable> displayed){
-        (void)displayed;if(generated)++fgGenerated;else ++fgReal;
-    }];
-    // Capture both leases until the GPU has finished sampling them; MRC heap
-    // blocks retain captured Objective-C objects independently of history reset.
+    double target=_targetTime.load(),now=CACurrentMediaTime();
+    if(!std::isfinite(target)||target<=now||target-now>0.05)target=0;
+    fgCaptureObserve(command,drawable,generated,capture!=nil,current->_sequence,epoch,target,current->_sourceCompletedHost,false);
+    [capture release];_inFlight.fetch_add(1);if(generated)_scratchReaders.fetch_add(1);
+    [drawable addPresentedHandler:^(id<MTLDrawable> displayed){(void)displayed;if(generated)++fgGenerated;else ++fgReal;}];
     [command addCompletedHandler:^(id<MTLCommandBuffer> completed){
         (void)previous.texture;(void)current.texture;
         if(completed.status==MTLCommandBufferStatusError){++fgErrors;fgFail();}
-        // WSI leases retire on GPU completion even if an OS presentation
-        // callback stalls. A zero timestamp explicitly means unavailable;
-        // actual output counts come from the real drawable callback above.
-        if(!generated || completed.status==MTLCommandBufferStatusError)[current finish:0];
+        if(!generated||completed.status==MTLCommandBufferStatusError)[current finish:0];
         _inFlight.fetch_sub(1);
+        if(generated){
+            _scratchReaders.fetch_sub(1);
+            dispatch_async(_work,^{@autoreleasepool{[self prepareNext];}});
+        }
     }];
-    [command presentDrawable:drawable];[command commit];return YES;
+    if(target>0)[command presentDrawable:drawable atTime:target];else [command presentDrawable:drawable];
+    [command commit];return YES;
 }
 - (void)dealloc {
     for(unsigned i=0;i<4;i++)[_textures[i] release];
@@ -290,8 +361,10 @@ static void fgDispatch(id<MTLComputeCommandEncoder> e,id<MTLComputePipelineState
     [_motionPrevious release];[_motionCurrent release];
     [_coarseForward release];[_coarseBackward release];[_rawForward release];[_rawBackward release];[_quality release];
     [_coarsePSO release];[_regularizePSO release];[_qualityPSO release];
-    [_queue release];[_device release];[_layer release];[_ready release];
+    [_prepareQueue release];[_queue release];[_device release];[_layer release];[_ready release];
     [_previous release];[_current release];
+    [_preparedPrevious release];[_preparedCurrent release];
+    if(_preparedCapture){fgCaptureFinish(_preparedCapture,@"presenter destroyed before prepared output");[_preparedCapture release];}
     if(_captureAwaitingReal){fgCaptureFinish(_captureAwaitingReal,@"presenter destroyed before capture completed");[_captureAwaitingReal release];}
 #if OS_OBJECT_USE_OBJC
     [(id)_work release];
@@ -307,7 +380,7 @@ extern "C" __attribute__((visibility("default"))) int vkHuskFramegenConfigure(co
     std::lock_guard<std::mutex> guard(fgManagerLock);if(!fgOwners.empty())return 0;
     if(c->enabled && (c->width<64||c->height<64||c->width>4096||c->height>4096||fgStorageBytes(c->width,c->height)>(96ULL<<20)))return 0;
     fgConfig=*c;fgFailed=false;fgPaused=false;
-    if(c->enabled)fprintf(stderr,"[M9-FRAMEGEN] model hierarchical-coherent-quality-v2; capture ABI1/schema2; consecutive opt-in output timestamps; whole-frame real fallback below80%% coherent tiles; slots are not unique generated images; capture ABI1, opt-in only; logical textures %llu bytes; actual engine postprocessing is not observed\n",(unsigned long long)fgStorageBytes(c->width,c->height));return 1;
+    if(c->enabled)fprintf(stderr,"[M9-FRAMEGEN] model hierarchical-coherent-quality-v2; prepared-presentation-v1: GPU reconstruction ahead of tick, independent display-copy queue, bounded CA-clock targets; capture ABI1/schema2; consecutive opt-in output timestamps; whole-frame real fallback below80%% coherent tiles; slots are not unique generated images; capture ABI1, opt-in only; logical textures %llu bytes; actual engine postprocessing is not observed\n",(unsigned long long)fgStorageBytes(c->width,c->height));return 1;
 }
 extern "C" __attribute__((visibility("default"))) int vkHuskFramegenSnapshot(tl_fg_stats* s){
     if(!s||s->version!=1||s->size!=sizeof(*s))return 0;
@@ -350,7 +423,7 @@ void huskFramegenSubmitted(id<CAMetalDrawable> drawable,id<MTLCommandBuffer> com
     if(![drawable isKindOfClass:[HuskFGDrawable class]])return;
     HuskFGDrawable* frame=(HuskFGDrawable*)drawable;
     [command addCompletedHandler:^(id<MTLCommandBuffer> completed){
-        if(completed.status==MTLCommandBufferStatusCompleted){frame->_sequence=fgRendered.fetch_add(1)+1;frame->_sourceCompletedHost=fgCaptureEnabled.load(std::memory_order_relaxed)?CACurrentMediaTime():0;[frame->_owner enqueue:frame];}
+        if(completed.status==MTLCommandBufferStatusCompleted){frame->_sequence=fgRendered.fetch_add(1)+1;frame->_sourceCompletedHost=CACurrentMediaTime();[frame->_owner enqueue:frame];}
         else{++fgErrors;fgFail();[frame finish:0];}
     }];
 }

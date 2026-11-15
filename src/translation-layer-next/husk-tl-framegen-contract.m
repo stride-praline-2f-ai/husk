@@ -47,7 +47,7 @@ bool tl_fg_contract_verify(void *entrypoint,const char *contract_path,const char
         NSDictionary *contract=parsed;NSString *source=[NSString stringWithUTF8String:app_source];
         if([source hasSuffix:@"-dirty"])source=[source substringToIndex:source.length-6];
         if(![contract[@"schema"] isKindOfClass:NSNumber.class]||![contract[@"model"] isKindOfClass:NSNumber.class]||![contract[@"app_source"] isKindOfClass:NSString.class])return false;
-        if([contract[@"schema"] intValue]!=1||[contract[@"model"] intValue]!=2||![contract[@"app_source"] isEqual:source])return false;
+        if([contract[@"schema"] intValue]!=1||[contract[@"model"] intValue]!=3||![contract[@"app_source"] isEqual:source])return false;
         Dl_info info={0};if(!dladdr(entrypoint,&info)||!info.dli_fname)return false;
         NSString *path=[NSString stringWithUTF8String:info.dli_fname],*name=path.lastPathComponent;
         id libraries=contract[@"libraries"];if(![libraries isKindOfClass:NSDictionary.class])return false;
@@ -57,7 +57,7 @@ bool tl_fg_contract_verify(void *entrypoint,const char *contract_path,const char
         if(!attrs||[attrs[NSFileSize] unsignedLongLongValue]>(128ULL<<20))return false;
         NSData *image=[NSData dataWithContentsOfFile:path options:NSDataReadingMappedIfSafe error:nil];NSString *actual=fg_code_digest(image);
         if(!actual||![actual isEqual:expected])return false;
-        fprintf(stderr,"[M9-FG-CONTRACT] enforced model2 for %s; actual loaded entrypoint code SHA256 %s verified; no game-CVar/environment bypass\n",name.UTF8String,actual.UTF8String);
+        fprintf(stderr,"[M9-FG-CONTRACT] enforced model3 for %s; actual loaded entrypoint code SHA256 %s verified; no game-CVar/environment bypass\n",name.UTF8String,actual.UTF8String);
         return true;
     }
 }

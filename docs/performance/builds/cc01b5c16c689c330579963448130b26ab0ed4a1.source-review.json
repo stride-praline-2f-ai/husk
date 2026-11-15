@@ -1,0 +1,22 @@
+{
+  "source": "cc01b5c16c689c330579963448130b26ab0ed4a1",
+  "tree": "d677ad14ea2ec4138a17fb7f197d4d9c1fa2c21d",
+  "byte_exact": true,
+  "paths": [
+    ".github/workflows/build-husk-ipa.yml",
+    "AGENTS.md",
+    "PROJECT_PLAN.md",
+    "docs/performance/66-framegen-prepared-presentation.md",
+    "patches/metal4/HuskMetal4Framegen.mm",
+    "patches/metalfx/HuskFGCapture.inc",
+    "patches/metalfx/HuskFramegen.inc",
+    "scripts/stage_framegen_contract.py",
+    "src/app/Husk/Info.plist",
+    "src/translation-layer-next/husk-tl-framegen-contract.m",
+    "tests/translation-layer/fixtures/framegen-presenter-170.inc",
+    "tests/translation-layer/framegen_presenter_contract.mm",
+    "tests/translation-layer/test_framegen_enforcement.py",
+    "tests/translation-layer/test_spatial_lifetime.py"
+  ],
+  "scope": "Actual source and regression readback; no user images/captures uploaded."
+}

@@ -3,7 +3,7 @@
 from pathlib import Path
 import argparse,hashlib,importlib.util,json,struct,subprocess
 ROOT=Path(__file__).resolve().parents[1]
-REQUIRED=[b'_coarsePSO',b'_regularizePSO',b'_qualityPSO',b'hierarchical-coherent-quality-v2']
+REQUIRED=[b'_coarsePSO',b'_regularizePSO',b'_qualityPSO',b'hierarchical-coherent-quality-v2',b'prepared-presentation-v1']
 def code_digest(raw):
     if len(raw)<32 or struct.unpack_from('<I',raw)[0]!=0xfeedfacf:raise ValueError('Expected thin64-bit Mach-O')
     commands,bytes_=struct.unpack_from('<II',raw,16)
@@ -46,10 +46,10 @@ def stage(libroot,output,source):
             if code!=meta['code_sha256']:raise ValueError('Source Metal4 code digest mismatch')
         if digest!=actual:raise ValueError('Stale FG source/patch contract: '+driver)
         entries[driver]={'code_sha256':code,'patch_sha256':digest,'shader_sha256':hashlib.sha256(shader).hexdigest(),'driver_compile_source':meta.get('husk_source_at_compile','UNAVAILABLE')}
-    record={'schema':1,'model':2,'app_source':source,'required_pipeline':'hierarchical-coherent-quality-v2','libraries':entries,'scope':'Mandatory when FG is enabled; loaded entrypoint image code is checked before enabling the30FPS source cap. No environment bypass. Game CVars cannot replace these host kernels.'}
+    record={'schema':1,'model':3,'app_source':source,'required_pipeline':'hierarchical-coherent-quality-v2 + prepared-presentation-v1','libraries':entries,'scope':'Mandatory when FG is enabled; loaded entrypoint image code is checked before enabling the30FPS source cap. No environment bypass. Game CVars cannot replace these host kernels.'}
     output.parent.mkdir(parents=True,exist_ok=True);output.write_text(json.dumps(record,indent=2)+'\n')
     return record
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('libroot',type=Path);p.add_argument('output',type=Path);a=p.parse_args()
     source=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
-    r=stage(a.libroot,a.output,source);print('Staged mandatory FG model2 contract for:',','.join(r['libraries'])or'no optional FG drivers (FG refuses safely)')
+    r=stage(a.libroot,a.output,source);print('Staged mandatory FG model3 contract for:',','.join(r['libraries'])or'no optional FG drivers (FG refuses safely)')

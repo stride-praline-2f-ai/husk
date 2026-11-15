@@ -1,0 +1,9 @@
+{
+  "source": "6626ad71e0e86dba4fb57ce8b770c852b8156a2e",
+  "run_id": 43742107298,
+  "job_id": 132897312577,
+  "status": "failure",
+  "log_bytes": 33071,
+  "log_sha256": "e0e1a82d1af2010d32bf1c12b0bd38b187edcee30c74fe0ffefa64fc2c9fd950",
+  "cause": "Final diagnostics assertion found missed schema literal: schema2 instead of3. Earlier actual GPU queue/scratch/ownership/target/11-stage checks reached it. Frozen170 rejects tick-time reconstruction. Corrected schema and reran; no intermediate IPA delivered."
+}

@@ -17,8 +17,8 @@ static std::mutex fgCaptureLock;
 static unsigned fgCaptureBusy;
 struct FGCaptureTiming {
     uint64_t sequence,epoch,recordID;
-    bool generated,diagnostic,gpuValid,presentValid;
-    double submitHost,gpuStart,gpuEnd,completionHost,presented,presentObserved;
+    bool generated,diagnostic,gpuValid,presentValid,preparation;
+    double submitHost,gpuStart,gpuEnd,completionHost,presented,presentObserved,targetHost,sourceCompletedHost;
 };
 @interface HuskFGCaptureSession:NSObject {
 @public
@@ -82,18 +82,19 @@ static void fgCaptureFlushTimings(HuskFGCaptureSession *s){
     std::sort(rows,rows+count,[](const FGCaptureTiming&a,const FGCaptureTiming&b){return a.recordID<b.recordID;});
     NSMutableArray *items=[NSMutableArray array];
     for(unsigned i=0;i<count;i++){
-        auto &r=rows[i];[items addObject:@{@"source_sequence":@(r.sequence),@"epoch":@(r.epoch),@"kind":r.generated?@"generated":@"real",
+        auto &r=rows[i];[items addObject:@{@"source_sequence":@(r.sequence),@"epoch":@(r.epoch),@"kind":r.preparation?@"reconstruction":(r.generated?@"generated":@"real"),
+            @"target_presentation_host_seconds":fgCaptureTime(r.targetHost),@"source_completed_host_seconds":fgCaptureTime(r.sourceCompletedHost),
             @"includes_diagnostic_readback":@(r.diagnostic),@"submit_host_monotonic_seconds":@(r.submitHost),
             @"completion_host_monotonic_seconds":fgCaptureTime(r.completionHost),@"gpu_timestamp_valid":@(r.gpuValid),
             @"gpu_start_seconds":r.gpuValid?@(r.gpuStart):(id)[NSNull null],@"gpu_end_seconds":r.gpuValid?@(r.gpuEnd):(id)[NSNull null],
             @"gpu_duration_ms":r.gpuValid?@((r.gpuEnd-r.gpuStart)*1000):(id)[NSNull null],@"presented_timestamp_valid":@(r.presentValid),
             @"presented_time_seconds":r.presentValid?@(r.presented):(id)[NSNull null],@"presentation_callback_host_seconds":fgCaptureTime(r.presentObserved)}];
     }
-    fgCaptureJSON(s,"consumer-timing.json",@{@"schema":@2,@"plan_ids":@[@"M3",@"M4",@"M9"],@"subsystem":@"framegen_consumer",
+    fgCaptureJSON(s,"consumer-timing.json",@{@"schema":@3,@"plan_ids":@[@"M3",@"M4",@"M9"],@"subsystem":@"framegen_consumer",
         @"records":items,@"capacity":@130,@"omitted_records":@(lost),@"late_callbacks_after_slot_reuse":@(late),@"sampling":@"every output in a rolling128-command ring plus2 pinned capture outputs; ends500ms after file completion",
         @"host_clock":@"CACurrentMediaTime seconds",@"gpu_clock":@"MTLCommandBuffer GPUStartTime/GPUEndTime seconds; no inferred cross-clock latency",
         @"presentation_clock":@"CAMetalDrawable presentedTime; absent callbacks stay unavailable",
-        @"limitations":@"Not unique pixels, input latency, panel scanout or power. Exclude diagnostic-copy commands from normal GPU comparisons."});
+        @"limitations":@"Reconstruction commands are separate from generated/real display copies; compare the full work, not copy-only cost. Targets and source completion are CA host times, not engine sampling times. Not unique pixels, input latency, panel scanout or power. Exclude diagnostic readback commands from normal GPU comparisons."});
 }
 extern "C" __attribute__((visibility("default"))) int vkHuskFramegenCaptureConfigure(const tl_fg_capture_config *c){
     if(!c||c->version!=1||c->size!=sizeof(*c)||c->enabled>1)return 0;
@@ -133,6 +134,7 @@ static void fgCaptureFinish(HuskFGCaptureTicket *t,NSString *failure){
             @"error":error?: (id)[NSNull null],@"previous_source_sequence":@(t->_previousSequence),@"current_source_sequence":@(t->_currentSequence),@"epoch":@(t->_epoch),
             @"capture_encode_host_monotonic_seconds":@(t->_created),@"previous_source_gpu_completion_callback_host_seconds":fgCaptureTime(t->_sourcePrevious),
             @"current_source_gpu_completion_callback_host_seconds":fgCaptureTime(t->_sourceCurrent),@"source_gpu_execution_timestamps":@"UNAVAILABLE for source Metal4 feedback; callback time is not GPU duration",
+            @"generated_gpu_stage":@"reconstruction before display tick; separate output-copy/presentation timestamps are in consumer-timing.json",
             @"generated_gpu_start_seconds":fgCaptureTime(gpuStart[0]),@"generated_gpu_end_seconds":fgCaptureTime(gpuEnd[0]),
             @"real_gpu_start_seconds":fgCaptureTime(gpuStart[1]),@"real_gpu_end_seconds":fgCaptureTime(gpuEnd[1]),@"files":files,
             @"input_stage":@"colour handed to framegen after engine postprocessing and any upstream spatial pass; source Metal4 has no spatial pass",
@@ -189,13 +191,13 @@ static void fgCaptureStage(HuskFGCaptureTicket *t,bool generated,id<MTLCommandBu
     {std::lock_guard<std::mutex> lock(t->_stageLock);t->_done[i]=true;t->_gpuStart[i]=command.GPUStartTime;t->_gpuEnd[i]=command.GPUEndTime;ready=t->_done[0]&&t->_done[1];}
     if(ready)fgCaptureFinish(t,nil);
 }
-static void fgCaptureObserve(id<MTLCommandBuffer> command,id<CAMetalDrawable> drawable,bool generated,bool diagnostic,uint64_t sequence,uint64_t epoch){
+static void fgCaptureObserve(id<MTLCommandBuffer> command,id<CAMetalDrawable> drawable,bool generated,bool diagnostic,uint64_t sequence,uint64_t epoch,double targetHost=0,double sourceCompletedHost=0,bool preparation=false){
     if(!fgCaptureTimingEnabled.load(std::memory_order_relaxed))return;
     HuskFGCaptureSession *s;unsigned index;uint64_t recordID;
     {std::lock_guard<std::mutex> lock(fgCaptureLock);s=fgCaptureSession;if(!s||s->_cancelled.load())return;[s retain];}
-    {std::lock_guard<std::mutex> lock(s->_timingLock);index=diagnostic?(generated?128:129):s->_timingCount++%128;recordID=++s->_commands;
-     if(!diagnostic&&s->_timingCount>128)++s->_timingLost;
-     auto &r=index>=128?s->_pinned[index-128]:s->_timings[index];r={};r.recordID=recordID;r.sequence=sequence;r.epoch=epoch;r.generated=generated;r.diagnostic=diagnostic;r.submitHost=CACurrentMediaTime();}
+    {std::lock_guard<std::mutex> lock(s->_timingLock);index=(diagnostic&&!preparation)?(generated?128:129):s->_timingCount++%128;recordID=++s->_commands;
+     if(index<128&&s->_timingCount>128)++s->_timingLost;
+     auto &r=index>=128?s->_pinned[index-128]:s->_timings[index];r={};r.recordID=recordID;r.sequence=sequence;r.epoch=epoch;r.generated=generated;r.diagnostic=diagnostic;r.preparation=preparation;r.targetHost=targetHost;r.sourceCompletedHost=sourceCompletedHost;r.submitHost=CACurrentMediaTime();}
     [command addCompletedHandler:^(id<MTLCommandBuffer> done){std::lock_guard<std::mutex> lock(s->_timingLock);auto &r=index>=128?s->_pinned[index-128]:s->_timings[index];
         if(r.recordID!=recordID){++s->_lateCallbacks;return;}
         r.completionHost=CACurrentMediaTime();r.gpuStart=done.GPUStartTime;r.gpuEnd=done.GPUEndTime;
