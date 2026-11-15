@@ -153,7 +153,10 @@ int main(int argc,char **argv){assert(argc==3);d.library=dlopen(argv[1],RTLD_NOW
 
 class FramegenAdmissionTests(unittest.TestCase):
  def test_real_framegen_admission_changes_rendered_cap_only_after_driver_accepts(self):
-  vk=(TL/'husk-tl-vulkan.m').read_text();part=vk[vk.index('static bool framegen_requested;'):vk.index('static bool spatial_requested;')]
+  vk=(TL/'husk-tl-vulkan.m').read_text()
+  # This is the pure C admission contract. Objective-C session identity and
+  # file export live outside this slice and are checked by the app/codec gates.
+  part='static bool framegen_requested;\nstatic char framegen_capture_directory[768];\n'+vk[vk.index('static atomic_bool framegen_paused;'):vk.index('static bool spatial_requested;')]
   with tempfile.TemporaryDirectory() as d:
    p=Path(d);f=p/'fg.c';f.write_text(r"""
 #include <assert.h>
@@ -163,7 +166,8 @@ class FramegenAdmissionTests(unittest.TestCase):
 #include <string.h>
 #include "husk-tl-framegen.h"
 static struct{void*lib;}V={(void*)1};
-static bool efficient=true,available=true,accept=true;static int fps=60,paused=-1,calls;
+static bool efficient=true,available=true,accept=true;static int fps=60,paused=-1,calls,captures;
+int tl_vk_framegen_capture_arm(const char *directory,uint32_t first,uint32_t stride,uint32_t pairs){assert(directory&&first==180&&stride==90&&pairs==1);captures++;return 1;}
 static bool tl_ue4_efficiency_enabled(void){return efficient;}
 static void husk_ue4_set_efficiency(bool e,int f){assert(e);fps=f;}
 static void tl_log_line(const char*fmt,...){(void)fmt;}
@@ -177,8 +181,11 @@ int main(void){
  husk_ue4_set_frame_generation(true);assert(!tl_vk_framegen_prepare(0,1816,1280));assert(!tl_vk_framegen_prepare("Other",1816,1280));
  efficient=false;assert(!tl_vk_framegen_prepare("Dungeons",1816,1280));efficient=true;
  available=false;assert(!tl_vk_framegen_prepare("Dungeons",1816,1280)&&fps==60&&!calls);available=true;
+ strcpy(framegen_capture_directory,"/pending-evidence");
  accept=false;assert(!tl_vk_framegen_prepare("Dungeons",1816,1280)&&fps==60&&calls==1);
+ assert(!captures&&framegen_capture_directory[0]);
  tl_vk_framegen_pause(true);accept=true;assert(tl_vk_framegen_prepare("Dungeons",1816,1280)&&fps==30&&paused==1&&calls==2);
+ assert(captures==1&&!framegen_capture_directory[0]);
  tl_vk_framegen_pause(false);assert(paused==0);
  tl_fg_stats stats;assert(!tl_vk_framegen_snapshot(&stats)&&stats.version==1&&stats.size==sizeof(stats)&&!stats.active);
  return 0;
