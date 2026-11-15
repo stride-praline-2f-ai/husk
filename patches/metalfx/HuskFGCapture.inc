@@ -90,7 +90,7 @@ static void fgCaptureFlushTimings(HuskFGCaptureSession *s){
             @"gpu_duration_ms":r.gpuValid?@((r.gpuEnd-r.gpuStart)*1000):(id)[NSNull null],@"presented_timestamp_valid":@(r.presentValid),
             @"presented_time_seconds":r.presentValid?@(r.presented):(id)[NSNull null],@"presentation_callback_host_seconds":fgCaptureTime(r.presentObserved)}];
     }
-    fgCaptureJSON(s,"consumer-timing.json",@{@"schema":@2,@"plan_ids":@[@"M3",@"M4",@"M9"],@"subsystem":@"framegen_consumer",
+    fgCaptureJSON(s,"consumer-timing.json",@{@"schema":@3,@"plan_ids":@[@"M3",@"M4",@"M9"],@"subsystem":@"framegen_consumer",
         @"records":items,@"capacity":@130,@"omitted_records":@(lost),@"late_callbacks_after_slot_reuse":@(late),@"sampling":@"every output in a rolling128-command ring plus2 pinned capture outputs; ends500ms after file completion",
         @"host_clock":@"CACurrentMediaTime seconds",@"gpu_clock":@"MTLCommandBuffer GPUStartTime/GPUEndTime seconds; no inferred cross-clock latency",
         @"presentation_clock":@"CAMetalDrawable presentedTime; absent callbacks stay unavailable",
