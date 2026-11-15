@@ -23,6 +23,8 @@ for name,repo,pin in [('playport','playportdev/playport','26620bf5319a0f5a5cca47
     if not archive.exists():
         with urllib.request.urlopen('https://codeload.github.com/'+repo+'/tar.gz/'+pin,timeout=240)as r,archive.open('wb')as f:shutil.copyfileobj(r,f)
     records[name]={'source':pin,'archive_sha256':hashlib.sha256(archive.read_bytes()).hexdigest()}
+    expected={'playport':'5db214ebd14585f716b16a80428fd5baf6fc5a8f2fd222b18cb4d992718102ef','mesa':'f5e54d4cfdd3e63e975d1e8779d572711f9c6257a36f24f9b4033ba8ff77274c'}
+    if records[name]['archive_sha256']!=expected[name]:raise ValueError('Pinned source archive checksum mismatch: '+name)
     if not target.exists():
         with tarfile.open(archive)as t:
             prefix=t.getmembers()[0].name.split('/')[0];t.extractall(root,filter='data')
@@ -35,6 +37,13 @@ if not marker.exists():
         if name:subprocess.run(['git','apply',str(patches/name)],cwd=root/'mesa',check=True);count+=bool(name)
     marker.write_text(str(count))
 (root/'source-inputs.json').write_text(json.dumps(records,indent=2)+'\n')
+# Upstream's Linux cross compiler does not reject this macOS-only property.
+# Apple's iOS SDK does: retain its platform semantics with an explicit guard.
+p=root/'mesa/src/vulkan/wsi/wsi_common_metal_layer.m';s=p.read_text()
+if '#if !TARGET_OS_IPHONE /* Husk SDK guard */' not in s:
+    needle='metal_layer.displaySyncEnabled = !enable_immediate;'
+    if s.count(needle)!=2:raise ValueError('Unexpected WSI display-sync anchors')
+    p.write_text(s.replace(needle,'\n#if !TARGET_OS_IPHONE /* Husk SDK guard */\n      '+needle+'\n#endif'))
 PY
 if [ "${HUSK_METAL4_UPSTREAM_ONLY:-0}" != 1 ]; then
     python3 "$ROOT/scripts/prepare_metal4_source.py" "$WORK/mesa"
