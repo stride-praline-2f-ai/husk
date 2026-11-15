@@ -32,10 +32,15 @@ for name,repo,pin in [('playport','playportdev/playport','26620bf5319a0f5a5cca47
 marker=root/'mesa/.playport-series-applied'
 if not marker.exists():
     patches=root/'playport/patches/mesa';count=0
+    # git apply inside a subdirectory of the outer Husk checkout silently
+    # skips paths outside that prefix. Give the dedicated source its own root.
+    subprocess.run(['git','init','-q',str(root/'mesa')],check=True)
     for line in (patches/'series').read_text().splitlines():
         name=line.split('#')[0].strip()
         if name:subprocess.run(['git','apply',str(patches/name)],cwd=root/'mesa',check=True);count+=bool(name)
     marker.write_text(str(count))
+if 'KK_EXPERIMENTAL(CMD_RETIRE)' not in (root/'mesa/src/kosmickrisp/vulkan/kk_queue.c').read_text():raise ValueError('Pinned upstream series was not applied')
+if 'playportReadableSource' not in (root/'mesa/src/kosmickrisp/bridge/mtl_bridge.m').read_text():raise ValueError('Pinned Metal WSI patch missing')
 (root/'source-inputs.json').write_text(json.dumps(records,indent=2)+'\n')
 # Upstream's Linux cross compiler does not reject this macOS-only property.
 # Apple's iOS SDK does: retain its platform semantics with an explicit guard.
