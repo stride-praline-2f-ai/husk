@@ -163,3 +163,4 @@ void tl_ld_set_aot_dir(const char *dir);
 #include "husk-tl-crash-signal.h"
 
 #include "../../translation-layer-next/husk-tl-framegen.h"
+#include "../../translation-layer-next/husk-tl-vulkan.h"

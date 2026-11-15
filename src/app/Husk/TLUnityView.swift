@@ -572,19 +572,20 @@ final class TLUnityUIView: UIView, UIKeyInput {
             }
             husk_crash_stage("ue4_native_runtime_launch_enter")
             started = husk_ue4_launch(apk, dataDir, layerPtr, Int32(width), Int32(height), angle, ca)
+            let activeMetal4 = started && tl_vk_is_metal4()
             let effective: [String: Any] = ["host_session_id": HuskLog.sessionID,
                 "host_monotonic_seconds": ProcessInfo.processInfo.systemUptime,
                 "started": started, "launch_width": width, "launch_height": height,
-                "selected_driver_path": selectedDriverPath, "metal4_active": tl_vk_is_metal4(),
+                "selected_driver_path": selectedDriverPath, "metal4_active": activeMetal4,
                 "frame_generation_requested": frameGeneration, "requested_rendered_fps": frameGeneration ? 30 : efficientFrameLimit,
                 "requested_output_fps": frameGeneration ? 60 : efficientFrameLimit,
                 "worker_policy": threadPolicy, "automatic_fast_worker_budget": automaticFastWorkerBudget,
                 "submission_mode": submissionMode, "prefill": execution.prefill, "command_buffer_limit": execution.commandBufferLimit,
                 "swapchain_images": execution.swapchainImages, "initialization_parking": execution.initializationParking,
-                "spatial_requested_after_renderer_selection": spatialUpscaling && !tl_vk_is_metal4(), "spatial_input_percent": spatialInputPercent,
-                "clock_presentation_requested_after_overrides": clockPresentation && !frameGeneration && !tl_vk_is_metal4(),
-                "clock_feedback_requested_after_overrides": feedbackClockCorrection && !frameGeneration && !tl_vk_is_metal4(),
-                "archive_mode_requested_after_overrides": tl_vk_is_metal4() && !enhancedMetal4 ? 0 : nativePipelineArchiveMode,
+                "spatial_requested_after_renderer_selection": spatialUpscaling && !activeMetal4, "spatial_input_percent": spatialInputPercent,
+                "clock_presentation_requested_after_overrides": clockPresentation && !frameGeneration && !activeMetal4,
+                "clock_feedback_requested_after_overrides": feedbackClockCorrection && !frameGeneration && !activeMetal4,
+                "archive_mode_requested_after_overrides": activeMetal4 && !enhancedMetal4 ? 0 : nativePipelineArchiveMode,
                 "scope": "Host launch after device/renderer overrides. Native FG active/failure counters are separate. Engine runtime CVars and actual worker core placement remain unavailable."]
             FramegenDiagnostics.recordLaunch(apk: apk, values: effective)
             if let bytes = try? JSONSerialization.data(withJSONObject: effective, options: [.sortedKeys]), let line = String(data: bytes, encoding: .utf8) {
