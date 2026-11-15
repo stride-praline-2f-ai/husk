@@ -1,0 +1,245 @@
+{
+  "zip_sha256": "a743a4ee5633000697afedcaa51571a2d0d74e0019924e2ff300d65331564cd0",
+  "zip_bytes": 154338695,
+  "ipa_sha256": "9e425ced5092fbf922aa6ab08976144f10f1c0e2c55b4b5886004621a92b6f4a",
+  "ipa_bytes": 154338557,
+  "info": {
+    "CFBundleIdentifier": "com.husk.app",
+    "CFBundleShortVersionString": "3.4",
+    "CFBundleVersion": "169",
+    "MinimumOSVersion": "15.5",
+    "HuskBuildCommit": "db8d07008cbce6f22819522d403b41806eb2f861-dirty",
+    "HuskBuildDate": "2026-11-15 14:05 UTC"
+  },
+  "new_host_evidence_ui_native_session_and_export_present": true,
+  "retained_native_components": {
+    "typed_pending_class_present": true,
+    "coalesced_notification_symbol_present": true,
+    "streaming_download_class_present": true
+  },
+  "socket_close_signal_mapping": {
+    "actual_compiled_table_present": true,
+    "guest_signal": 34,
+    "darwin_signal": 7,
+    "ordinary_signal_mapping_preserved": true
+  },
+  "retained163_native_markers": {
+    "virtual_android_assets": true,
+    "render_output_readout": true,
+    "bounded_pacing_wait_report": true
+  },
+  "retained162_native_components": {
+    "topology_function": true,
+    "metal4_admission_function": true,
+    "runtime_sysctl_keys": true,
+    "real_metal4_object_calls": true,
+    "source": "503f5cbef4d48e64828043fe057fd976928e0dc0"
+  },
+  "candidate164_cache_native_symbols_and_markers": true,
+  "extensions": {
+    "HuskDownloadsWidget.appex": {
+      "display_name": "Husk Downloads",
+      "identifier": "com.husk.app.Downloads",
+      "arm64": true,
+      "signature_present": true,
+      "extension_point": "com.apple.widgetkit-extension"
+    },
+    "HuskJITHelper.appex": {
+      "display_name": "Husk JIT Helper",
+      "identifier": "com.husk.app.JITHelper",
+      "arm64": true,
+      "signature_present": true,
+      "extension_point": "com.apple.ar.viewer"
+    },
+    "HuskMemoryDonor.appex": {
+      "display_name": "Husk Memory Donor",
+      "identifier": "com.husk.app.MemoryDonor",
+      "arm64": true,
+      "signature_present": true,
+      "extension_point": "com.apple.ar.viewer"
+    }
+  },
+  "shared_memory_helper": {
+    "embedded": true,
+    "arm64": true,
+    "signature_present": true,
+    "principal_class": "HuskMemoryDonorHandler"
+  },
+  "donor_checks": {
+    "libqemu-aarch64-softmmu.dylib": "matching protected donor",
+    "libANGLE-shared.dylib": "matching3.4 donor",
+    "MoltenVK.framework/MoltenVK": "matching3.4 donor",
+    "libhuskps4.dylib": "matching3.4 donor",
+    "libFilePickerFix.dylib": "matching3.4 donor"
+  },
+  "driver_manifest": {
+    "schema": 1,
+    "upstream_commit": "db66022459ffb663aa2b50f6b018bc2e124f5edf",
+    "upstream_version": "1.4.2",
+    "husk_spatial_patch_sha256": "c9a7d0b26eaa55ad42357c3b977af1423c0825d17cd5f0d7caf608f5a7f908c6",
+    "husk_native_pipeline_patch_sha256": "c9a7d0b26eaa55ad42357c3b977af1423c0825d17cd5f0d7caf608f5a7f908c6",
+    "native_archive_abi": 2,
+    "native_archive_cache_schema": 2,
+    "native_archive_compatibility_id": "a734100aa2a773b1e782c33b541593c02e7bba35aa28a5524ea30f2025202c50",
+    "native_archive_compatibility_inputs": {
+      "schema": 2,
+      "upstream_commit": "db66022459ffb663aa2b50f6b018bc2e124f5edf",
+      "spirv_cross_revision": "6c09849fe88c48eaed08413aa022aaa136a3a057",
+      "compiler_contract": "husk-native-default-mvk-compiler-contract-v1",
+      "archive_format_owner": "Metal binary archive"
+    },
+    "feature": "M9-SPATIAL-v3+M5-NATIVE-ARCHIVE-v1+M4-DISPLAY-v1+M9-FLOW-FRAMEGEN-v1",
+    "default_enabled": false,
+    "framegen_capture_abi": 1
+  },
+  "driver_exports": [
+    "_vkHuskArchiveConfigure",
+    "_vkHuskArchiveForget",
+    "_vkHuskArchivePrepare",
+    "_vkHuskArchivePriority",
+    "_vkHuskArchiveSnapshot",
+    "_vkHuskDisplayConfigure",
+    "_vkHuskDisplaySnapshot",
+    "_vkHuskFramegenCaptureConfigure",
+    "_vkHuskFramegenConfigure",
+    "_vkHuskFramegenPause",
+    "_vkHuskFramegenSnapshot",
+    "_vkHuskSpatialBindings",
+    "_vkHuskSpatialConfigure",
+    "_vkHuskSpatialObservations",
+    "_vkHuskSpatialSnapshot"
+  ],
+  "metal4_driver": {
+    "sections_and_uuid_match_pinned_donor": true,
+    "arm64": true,
+    "signature_present": true,
+    "minimum_ios": "26.0",
+    "full_notices_present": true,
+    "manifest": {
+      "schema": 1,
+      "backend": "KosmicKrisp",
+      "api": "Metal 4",
+      "release": "https://github.com/playportdev/playport/releases/tag/v0.5.0",
+      "source": "26620bf5319a0f5a5cca47cfecec797cafe45493",
+      "mesa": "b39d173ca9369c19fda2635be6655d308067e52d",
+      "ipa_sha256": "2620958cb60a0b452351976ec5d43fd179d1a2ada9d1cc4adef5b7b89beca04a",
+      "binary_sha256": "17bba1df31d4c8eb757ce2f56fdc1f8c6af92bc5427585e33673b0c60e8ba7de",
+      "minimum_ios": "26.0",
+      "metalfx_spatial": false,
+      "frame_generation": false,
+      "husk_device_validation": "pending",
+      "source_archive": "https://github.com/playportdev/playport/releases/download/v0.5.0/Playport-0.5.0-source.tar"
+    }
+  },
+  "exact_framegen_shader_embedded": true,
+  "source_driver_compile_provenance": "618bb48f8b80f3e6efd44b3a54c3337a04132ec1; reused only if exact driver inputs and code digest match",
+  "candidate169_actual_capture_host_code_and_exact_continuous_shader_in_both_drivers": true,
+  "candidate169_new_shader_and_retained168_java_verified": true,
+  "source_metal4_driver": {
+    "manifest": {
+      "schema": 2,
+      "backend": "KosmicKrisp",
+      "api": "Metal 4",
+      "source": "26620bf5319a0f5a5cca47cfecec797cafe45493",
+      "mesa": "b39d173ca9369c19fda2635be6655d308067e52d",
+      "husk_bridge_abi": 1,
+      "native_archive_abi": 2,
+      "frame_generation": true,
+      "framegen_capture_abi": 1,
+      "metalfx_spatial": false,
+      "minimum_ios": "26.0",
+      "compiler_contract": "husk-kk-native-v1",
+      "patch_sha256": "c4606e75b81c59e1ba75da722ecce29e1ca405f2cd404be0c2eb696a0973bc68",
+      "code_sha256": "dfdada3e0c08ec7edc648e594523c2a65b4ab5a9fb07cc9319517ce4f3a36c14",
+      "binary_sha256_before_signing": "ed37b9e9189d07c5a9b2a54993ab1de7db613e4bf4408bdb6ce23451251713d5",
+      "sdk_build": "24A94232",
+      "xcode": "Xcode 27.1\nBuild version 27A9275",
+      "host_llvm": "23.1.4",
+      "husk_source_at_compile": "618bb48f8b80f3e6efd44b3a54c3337a04132ec1"
+    },
+    "arm64": true,
+    "signature_present": true,
+    "code_section_hash_verified": true,
+    "bridge_exports": [
+      "_vkHuskArchiveConfigure",
+      "_vkHuskArchiveForget",
+      "_vkHuskArchivePrepare",
+      "_vkHuskArchiveSnapshot",
+      "_vkHuskFramegenCaptureConfigure",
+      "_vkHuskFramegenConfigure",
+      "_vkHuskFramegenPause",
+      "_vkHuskFramegenSnapshot",
+      "_vkHuskMetal4Checkpoint"
+    ],
+    "shader_exact": true,
+    "notices_files": 773,
+    "notices_match_complete_original_set": true,
+    "notices_manifest_sha256": "5d5b142495d5cb0e2e68827764d6cbec56c15e670dc5643f588c8f4c7e1e2f06",
+    "native_compiler_and_framegen_markers": true
+  },
+  "storage_sources_verified": true,
+  "anki_page_download_dialog_markers": true,
+  "retained159_contracts_new_activity_dex_and_font_verified": true,
+  "java_unchanged_from_verified163": true,
+  "java_framework": {
+    "schema": 1,
+    "r8": "8.5.35",
+    "min_api": 26,
+    "regression": "ProgressBarContract:10 checks",
+    "storage_regression": "StoragePathContract",
+    "anki_interactions": "AnkiInteractionContract:14 checks",
+    "download_manager": "DownloadManagerContract:16 checks",
+    "files": {
+      "husk-framework.dex": {
+        "bytes": 7900676,
+        "sha256": "e6558fe64e8337d405dcc6cfad5dd27670f6dcb2853ef5b601fa2d2cac507fd3",
+        "getter_bytecode": {
+          "method": "getIndeterminateDrawable",
+          "nullable_actual_drawable_only": true,
+          "code_units": 10,
+          "fields": [
+            "mIndeterminateDrawable",
+            "mIndeterminateDrawable",
+            "mThemeIndeterminate"
+          ]
+        },
+        "unique_activity_bytecode": {
+          "class": "husk/AppRunner",
+          "method": "reuseUniqueActivity",
+          "static": true,
+          "code_units": 142,
+          "code_sha256": "1f4382b36c27183121275b421e81746213bb5c4280f46a8a89fb5054fe442901"
+        }
+      },
+      "husk-framework-core.dex": {
+        "bytes": 4226472,
+        "sha256": "359eb8dd2284f090b6bf3a60e4a28efa35b5ed09e6f0cda98ef6ec6d6aa0106c",
+        "getter_bytecode": {
+          "method": "getIndeterminateDrawable",
+          "nullable_actual_drawable_only": true,
+          "code_units": 10,
+          "fields": [
+            "mIndeterminateDrawable",
+            "mIndeterminateDrawable",
+            "mThemeIndeterminate"
+          ]
+        },
+        "unique_activity_bytecode": {
+          "class": "husk/AppRunner",
+          "method": "reuseUniqueActivity",
+          "static": true,
+          "code_units": 142,
+          "code_sha256": "4ce55a541a5a4da5bd3f70a40bbecad029871327c9683832aa091002ccb40946"
+        }
+      }
+    },
+    "progressbar_source_sha256": "a8fc213d9333fd3c0c58f3b66e7b76304677243d38fc0eff00fbf72a57f3dc7c",
+    "storage_sources": {
+      "src/java-framework/src/husk/StoragePaths.java": "447787131a41eba70482c96d1c84a8ec2123d6b678e82d98ffd070a3c60d68df",
+      "src/java-framework/src/android/content/HuskSharedPreferences.java": "47bbf4836cdcf7f625a9b2f6160101215841ecd4e2e39f065b5c4f33557b99de",
+      "src/java-framework/src/android/os/Environment.java": "d2d673c2488b1b5f677f87c4dcb5e0499fe17b6757c767f67e251d5e41aad96e"
+    }
+  },
+  "ipa_crc": "pass",
+  "source": "db8d07008cbce6f22819522d403b41806eb2f861"
+}

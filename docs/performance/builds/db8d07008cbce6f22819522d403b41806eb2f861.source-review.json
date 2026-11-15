@@ -1,0 +1,94 @@
+{
+  "schema": 1,
+  "plan_ids": [
+    "M1",
+    "M3",
+    "M9"
+  ],
+  "source": "db8d07008cbce6f22819522d403b41806eb2f861",
+  "tree": "cc7d0254f6010f318ca5e5f0fe96e01a76d6450b",
+  "review_scope": [
+    "returned168 actual image criterion failed despite passing GPU/build checks",
+    "continuous two-axis refinement only accepted on improved actual RGB residual",
+    "retain166 C autorelease bridge, four-slot lease pool, GPU completion and epoch retirement",
+    "default-off one-pair capture with64MiB staging,128MiB additional process headroom and independent cross-session busy guard",
+    "no gameplay queue waits; both capture GPU stages complete before Utility write; failure paths write metadata only",
+    "zeroed raw row padding; raw original images retained locally; full-size opaque RGB PNG conversion",
+    "bounded64 timing rows, absent presentation/GPU clocks remain unavailable; readback samples explicitly intrusive",
+    "raw/current/generated/following-real source IDs and epoch, full source/driver/session/settings identities",
+    "32MiB streaming ZIP with CRC/SHA256, metadata/path/symlink/row-layout guards, bounded log header/tail truncation",
+    "local manual Share only, default capture off, previous/active capture protected",
+    "archive compiler contract/native game semantics/published renderer/Anki/data/font/helper preserved",
+    "freeze volatile JSON before index and ZIP read so late native callback refreshes cannot invalidate member hashes",
+    "actual C admission regression tests deferred capture survives rejection and arms only after successful driver configuration"
+  ],
+  "known_limits": [
+    "continuous flow is not guaranteed sole scenery-blur cause",
+    "actual engine effects/internal3Dresolution unknown; dump contains requests",
+    "colour-only flow lacks depth/motion/jitter and occlusion inputs",
+    "GPU fixture runs on Apple Paravirtual host, not physical A20",
+    "capture staging/reads/PNG/ZIP add intrusive work; no baseline energy/cost claim",
+    "phone169 capture and image comfort pending; FG OFF remains usable"
+  ],
+  "readback": {
+    "changed_source_files": 37,
+    "build_repository_files": 3,
+    "byte_exact": true
+  },
+  "portable_checks": {
+    "test_ipa_build_cache": "9 passed",
+    "test_ue4_graphics": "18 passed",
+    "test_spatial": "4 passed,1 Apple-only skip locally; Apple gate pending",
+    "test_metal4_components": "2 Apple-only skips locally; Apple gate pending",
+    "python_compile": "passed",
+    "git_diff_check": "passed",
+    "test_runtime_input_vulkan": "11 passed after narrowing C admission fixture; deferred capture additionally verified"
+  },
+  "apple_checks": "Final464test executions/62invocations/zero skips; actual host-GPU/current+all four frozen controls and capture/PNG/concurrent-metadata checks twice; full50suites/font/SDK31-96/all10strict outcomes; source-matched both drivers from fresh618builds and fresh app/three extensions/IPA passed. Independent package verification passed; full anonymous raw re-download verification passed.",
+  "observed_at": "2026-11-15T13:48:16.263404+00:00",
+  "inputs": {
+    "patches/metalfx/HuskFramegen.metal": "1aad5266d0a205c37021a977e4ef07644e4e059d706f06d36921917d20258cc7",
+    "patches/metalfx/HuskFramegen.inc": "8457c1e43022b8162b0fcbf4a783e2f9ae8a291030724d403b58accd5bded2b3",
+    "patches/metalfx/HuskFGCapture.inc": "67f8ee3425eaf0ae0c038a8e25aad2a5f60702e663102c744ddb81461773c72a",
+    "patches/metal4/HuskMetal4Framegen.mm": "d43c74fdbea72d31467febd301eb61e45475fbd0e5cc08aa501b8fdfe2cc1169",
+    "src/app/Husk/FrameEvidenceFiles.swift": "1778d11bbd99a812746a311310a523855edf0089da26347f88b17fd3de1e9be7",
+    "src/app/Husk/DiagnosticArchive.swift": "268ed5c61f7ae20277dcfe5ccf04f788ae6e3ae104fe2dc548c78edf7d723b6f",
+    "src/app/Husk/FramegenDiagnostics.swift": "ab696ae7d17fdc152be93d00de102821ab0262a0bb30364c3e0f89d8f37e8a12",
+    "tests/translation-layer/framegen_gpu.mm": "41590cad17639f0891f7b8f278dd56f123532e4581b85856dfa835077fc49619",
+    "tests/translation-layer/framegen_capture_contract.mm": "34bc38d7650c7c91917cefe9872b62a8419ffe5d28c46a591bcec01e954830c1",
+    "tests/translation-layer/test_frame_evidence.py": "2e4a5a99c375afe40c3a3467c48165569892a41ac7c8b32cdc46113e77d50bc6",
+    "tests/translation-layer/fixtures/framegen-168.metal": "1262252aabf52b65c01467fa58298229ed34f224ebc401e48aa3d9e341bceade",
+    "tests/translation-layer/test_runtime_input_vulkan.py": "62377f5750835785b914123387d7c430748dd4f3288d98e168ab9513f9c5690e"
+  },
+  "pre_delivery_failure": {
+    "source": "618bb48f8b80f3e6efd44b3a54c3337a04132ec1",
+    "run": 43720599710,
+    "job": 132831544902,
+    "workflow": "8ff62a821b51b1e8e08c9ee24fb9eb87dee11a21",
+    "status": "failure",
+    "reason": "C admission test extraction accidentally included adjacent new Objective-C logging/export functions; strict setup correctly blocked app build; both actual driver builds succeeded",
+    "test_executions": 466,
+    "test_invocations": 63,
+    "test_skips": 0,
+    "failures": 1,
+    "delivered": false,
+    "full_job_log_bytes": 759166,
+    "full_job_log_sha256": "5cb12607a008012ddce75859c7a19896274720b02338c9acf54c36587a3c45d0",
+    "driver_compile_source": "618bb48f8b80f3e6efd44b3a54c3337a04132ec1",
+    "setup_outcomes": {
+      "platform": "success",
+      "regressions": "failure",
+      "tools": "success",
+      "shaders": "success",
+      "resources": "success",
+      "java_framework": "success",
+      "driver": "success",
+      "metal4_source": "success",
+      "pairing": "success",
+      "project": "success"
+    }
+  },
+  "package_sha256": "9e425ced5092fbf922aa6ab08976144f10f1c0e2c55b4b5886004621a92b6f4a",
+  "delivery_sha256": "9e425ced5092fbf922aa6ab08976144f10f1c0e2c55b4b5886004621a92b6f4a",
+  "delivery_verified": true
+}

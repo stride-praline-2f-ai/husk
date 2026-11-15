@@ -1,0 +1,35 @@
+{
+  "download_url": "https://filebin.net/b3fd62aeafdb69348d095547/Husk-3.4-build169-Framegen-Evidence.ipa",
+  "file": {
+    "filename": "Husk-3.4-build169-Framegen-Evidence.ipa",
+    "content-type": "application/zip",
+    "bytes": 154338557,
+    "bytes_readable": "154 MB",
+    "md5": "+6mBpCSlnbCJ2wIWdsrTZg==",
+    "sha1": "462fd977f0ec10b4c79cb4cb63acea36492595a8",
+    "sha256": "9e425ced5092fbf922aa6ab08976144f10f1c0e2c55b4b5886004621a92b6f4a",
+    "updated_at": "2026-11-15T14:08:22.323432Z",
+    "updated_at_relative": "now",
+    "created_at": "2026-11-15T14:08:22.323432Z",
+    "created_at_relative": "now"
+  },
+  "bin": {
+    "id": "b3fd62aeafdb69348d095547",
+    "readonly": false,
+    "bytes": 0,
+    "bytes_readable": "0 B",
+    "files": 0,
+    "updated_at": "2026-11-15T14:08:22.822851Z",
+    "updated_at_relative": "now",
+    "created_at": "2026-11-15T14:07:58.371496Z",
+    "created_at_relative": "now",
+    "expired_at": "2026-11-22T14:08:22.82285Z",
+    "expired_at_relative": "6 days from now"
+  },
+  "anonymous_full_download_verified": true,
+  "downloaded_bytes": 154338557,
+  "downloaded_sha256": "9e425ced5092fbf922aa6ab08976144f10f1c0e2c55b4b5886004621a92b6f4a",
+  "magic": "504b0304",
+  "source": "db8d07008cbce6f22819522d403b41806eb2f861",
+  "candidate_build": "169"
+}

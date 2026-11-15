@@ -1,0 +1,28 @@
+{
+  "source": "618bb48f8b80f3e6efd44b3a54c3337a04132ec1",
+  "run": 43720599710,
+  "job": 132831544902,
+  "workflow": "8ff62a821b51b1e8e08c9ee24fb9eb87dee11a21",
+  "status": "failure",
+  "reason": "C admission test extraction accidentally included adjacent new Objective-C logging/export functions; strict setup correctly blocked app build; both actual driver builds succeeded",
+  "test_executions": 466,
+  "test_invocations": 63,
+  "test_skips": 0,
+  "failures": 1,
+  "delivered": false,
+  "full_job_log_bytes": 759166,
+  "full_job_log_sha256": "5cb12607a008012ddce75859c7a19896274720b02338c9acf54c36587a3c45d0",
+  "driver_compile_source": "618bb48f8b80f3e6efd44b3a54c3337a04132ec1",
+  "setup_outcomes": {
+    "platform": "success",
+    "regressions": "failure",
+    "tools": "success",
+    "shaders": "success",
+    "resources": "success",
+    "java_framework": "success",
+    "driver": "success",
+    "metal4_source": "success",
+    "pairing": "success",
+    "project": "success"
+  }
+}

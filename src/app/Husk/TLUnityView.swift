@@ -512,6 +512,10 @@ final class TLUnityUIView: UIView, UIKeyInput {
         case .nativeactivity: started = husk_ue4_launch(apk, dataDir, layerPtr, Int32(width), Int32(height), angle, ca)       // the NativeActivity driver; with no Unreal in the APK it runs the plain game
         case .ue4:
             // Unreal draws with Vulkan, which on this device is MoltenVK, a framework of the app's own.
+            husk_ue4_set_diagnostic_session(HuskLog.sessionID)
+            if let capture = FramegenDiagnostics.consume(apk: apk) {
+                husk_ue4_set_framegen_capture_directory(capture)
+            } else { husk_ue4_set_framegen_capture_directory(nil) }
             husk_ue4_set_frame_generation(frameGeneration)
             husk_ue4_set_clock_presentation(frameGeneration ? false : clockPresentation)
             husk_ue4_set_feedback_clock(frameGeneration ? false : feedbackClockCorrection)

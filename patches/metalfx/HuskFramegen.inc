@@ -17,6 +17,7 @@ static std::mutex fgManagerLock;
 static tl_fg_config fgConfig={};
 static std::atomic<bool> fgPaused{false},fgFailed{false};
 static std::atomic<uint64_t> fgRendered{0},fgGenerated{0},fgReal{0},fgDropped{0},fgResets{0},fgErrors{0};
+#include "HuskFGCapture.inc"
 @class HuskFGPresenter;
 static std::vector<HuskFGPresenter*> fgOwners;
 extern "C" void vkHuskFramegenPause(int);
@@ -30,6 +31,8 @@ static void fgFail(){fgFailed=true;vkHuskFramegenPause(1);}
     NSMutableArray* _handlers;
     bool _finished;
     CFTimeInterval _presented;
+    uint64_t _sequence;
+    double _sourceCompletedHost;
 }
 - (void)finish:(CFTimeInterval)time;
 @end
@@ -53,6 +56,7 @@ static void fgFail(){fgFailed=true;vkHuskFramegenPause(1);}
     HuskFGDrawable* _current;
     bool _realNext;
     double _lastInput;
+    HuskFGCaptureTicket *_captureAwaitingReal;
 }
 - (instancetype)initWithLayer:(CAMetalLayer*)layer config:(tl_fg_config)c;
 - (void)resetHistory;
@@ -148,6 +152,7 @@ static void fgDispatch(id<MTLComputeCommandEncoder> e,id<MTLComputePipelineState
     return self;
 }
 - (void)resetHistory {
+    if(_captureAwaitingReal){fgCaptureFinish(_captureAwaitingReal,@"history reset, pause or swapchain replacement before following real output");[_captureAwaitingReal release];_captureAwaitingReal=nil;}
     [_previous finish:0];[_previous release];_previous=nil;
     [_current finish:0];[_current release];_current=nil;
     for(HuskFGDrawable* f in _ready){++fgDropped;[f finish:0];}
@@ -219,6 +224,26 @@ static void fgDispatch(id<MTLComputeCommandEncoder> e,id<MTLComputePipelineState
         id<MTLComputeCommandEncoder> e=[command computeCommandEncoder];[e setTexture:current.texture atIndex:0];[e setTexture:output atIndex:1];
         fgDispatch(e,_copyPSO,output.width,output.height);[e endEncoding];
     }
+    HuskFGCaptureTicket *capture=nil;
+    if(generated){
+        if(_captureAwaitingReal){fgCaptureFinish(_captureAwaitingReal,@"following real output superseded");[_captureAwaitingReal release];_captureAwaitingReal=nil;}
+        capture=fgCaptureReserve(_device,(unsigned)output.width,(unsigned)output.height,(unsigned)_forward.width,(unsigned)_forward.height,
+            previous->_sequence,current->_sequence,epoch,previous->_sourceCompletedHost,current->_sourceCompletedHost);
+        if(capture){
+            bool copied=fgCaptureCopy(command,previous.texture,capture->_images[0],capture->_row)&&
+                fgCaptureCopy(command,current.texture,capture->_images[1],capture->_row)&&
+                fgCaptureCopy(command,output,capture->_images[2],capture->_row)&&
+                fgCaptureCopy(command,_forward,capture->_fields[0],capture->_flowRow)&&
+                fgCaptureCopy(command,_backward,capture->_fields[1],capture->_flowRow);
+            if(copied)_captureAwaitingReal=[capture retain];else fgCaptureFinish(capture,@"could not encode generated diagnostic copies");
+        }
+    }else if(_captureAwaitingReal&&_captureAwaitingReal->_currentSequence==current->_sequence){
+        capture=[_captureAwaitingReal retain];[_captureAwaitingReal release];_captureAwaitingReal=nil;
+        if(!fgCaptureCopy(command,output,capture->_images[3],capture->_row))fgCaptureFinish(capture,@"could not encode following-real diagnostic copy");
+    }
+    if(capture){[command addCompletedHandler:^(id<MTLCommandBuffer> completed){fgCaptureStage(capture,generated,completed);}];}
+    fgCaptureObserve(command,drawable,generated,capture!=nil,current->_sequence,epoch);
+    [capture release];
     _inFlight.fetch_add(1);
     [drawable addPresentedHandler:^(id<MTLDrawable> displayed){
         (void)displayed;if(generated)++fgGenerated;else ++fgReal;
@@ -242,6 +267,7 @@ static void fgDispatch(id<MTLComputeCommandEncoder> e,id<MTLComputePipelineState
     [_motionPrevious release];[_motionCurrent release];
     [_queue release];[_device release];[_layer release];[_ready release];
     [_previous release];[_current release];
+    if(_captureAwaitingReal){fgCaptureFinish(_captureAwaitingReal,@"presenter destroyed before capture completed");[_captureAwaitingReal release];}
 #if OS_OBJECT_USE_OBJC
     [(id)_work release];
 #else
@@ -255,7 +281,8 @@ extern "C" __attribute__((visibility("default"))) int vkHuskFramegenConfigure(co
     if(!c||c->version!=1||c->size!=sizeof(*c)||c->enabled>1||c->reserved)return 0;
     std::lock_guard<std::mutex> guard(fgManagerLock);if(!fgOwners.empty())return 0;
     if(c->enabled && (c->width<64||c->height<64||c->width>4096||c->height>4096||fgStorageBytes(c->width,c->height)>(96ULL<<20)))return 0;
-    fgConfig=*c;fgFailed=false;fgPaused=false;return 1;
+    fgConfig=*c;fgFailed=false;fgPaused=false;
+    if(c->enabled)fprintf(stderr,"[M9-FRAMEGEN] model coherent-pyramid-continuous-v1; capture ABI1, opt-in only; logical textures %llu bytes; actual engine postprocessing is not observed\n",(unsigned long long)fgStorageBytes(c->width,c->height));return 1;
 }
 extern "C" __attribute__((visibility("default"))) int vkHuskFramegenSnapshot(tl_fg_stats* s){
     if(!s||s->version!=1||s->size!=sizeof(*s))return 0;
@@ -298,7 +325,7 @@ void huskFramegenSubmitted(id<CAMetalDrawable> drawable,id<MTLCommandBuffer> com
     if(![drawable isKindOfClass:[HuskFGDrawable class]])return;
     HuskFGDrawable* frame=(HuskFGDrawable*)drawable;
     [command addCompletedHandler:^(id<MTLCommandBuffer> completed){
-        if(completed.status==MTLCommandBufferStatusCompleted){++fgRendered;[frame->_owner enqueue:frame];}
+        if(completed.status==MTLCommandBufferStatusCompleted){frame->_sequence=fgRendered.fetch_add(1)+1;frame->_sourceCompletedHost=fgCaptureEnabled.load(std::memory_order_relaxed)?CACurrentMediaTime():0;[frame->_owner enqueue:frame];}
         else{++fgErrors;fgFail();[frame finish:0];}
     }];
 }
@@ -311,4 +338,5 @@ void huskFramegenSubmitted(id<CAMetalDrawable>,id<MTLCommandBuffer>){}
 extern "C" __attribute__((visibility("default"))) int vkHuskFramegenConfigure(const tl_fg_config*){return 0;}
 extern "C" __attribute__((visibility("default"))) int vkHuskFramegenSnapshot(tl_fg_stats*){return 0;}
 extern "C" __attribute__((visibility("default"))) void vkHuskFramegenPause(int){}
+extern "C" __attribute__((visibility("default"))) int vkHuskFramegenCaptureConfigure(const tl_fg_capture_config*){return 0;}
 #endif

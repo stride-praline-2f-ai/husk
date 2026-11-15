@@ -245,6 +245,33 @@ int main(int argc,char**argv){@autoreleasepool{
     [b getBytes:currentPixels bytesPerRow:256 fromRegion:MTLRegionMake2D(0,0,64,64) mipmapLevel:0];
     interpolateOnly();assert(!memcmp(pixels,currentPixels,sizeof pixels));
     puts("PASS: textured generated/real sequence has one motion phase; real frames exact; odd/fractional flow and unreliable-field fallback verified");
+    // Continuous two-axis camera motion over several texture frequencies.
+    //168's independently rounded half-pixel vectors cannot represent this
+    // smooth pan, even though the character may remain almost stationary.
+    const float cameraX=4.25f,cameraY=2.25f;
+    for(unsigned image=0;image<2;image++){
+        for(unsigned y=0;y<64;y++)for(unsigned x=0;x<64;x++){
+            float u=x-image*cameraX,v=y-image*cameraY;unsigned q=(y*64+x)*4;
+            pixels[q]=(uint8_t)lround(110+36*sin(0.31*u+0.11*v)+17*cos(0.13*u-0.27*v));
+            pixels[q+1]=(uint8_t)lround(100+28*sin(0.17*u-0.23*v)+21*cos(0.37*u+0.19*v));
+            pixels[q+2]=(uint8_t)lround(120+30*sin(0.11*u+0.29*v)+19*cos(0.23*u-0.17*v));pixels[q+3]=255;
+        }
+        [(image?b:a) replaceRegion:MTLRegionMake2D(0,0,64,64) mipmapLevel:0 withBytes:pixels bytesPerRow:256];
+    }
+    {
+        auto command=[queue commandBuffer];prepareMotion(command);
+        for(unsigned reverse=0;reverse<2;reverse++){
+            auto e=[command computeCommandEncoder];[e setTexture:reverse?b:a atIndex:0];[e setTexture:reverse?a:b atIndex:1];
+            [e setTexture:reverse?backward:forward atIndex:2];dispatch(e,flow,4,4);[e endEncoding];
+        }
+        [command commit];[command waitUntilCompleted];assert(command.status==MTLCommandBufferStatusCompleted);
+        __fp16 vectors[64];[forward getBytes:vectors bytesPerRow:32 fromRegion:MTLRegionMake2D(0,0,4,4) mipmapLevel:0];
+        for(unsigned y=1;y<3;y++)for(unsigned x=1;x<3;x++){
+            float dx=(float)vectors[(y*4+x)*4]+cameraX,dy=(float)vectors[(y*4+x)*4+1]+cameraY;
+            if(hypot(dx,dy)>0.18){fprintf(stderr,"QUALITY_REJECT: camera pan quantized between independent tiles (error %.4f)\n",hypot(dx,dy));return 5;}
+        }
+    }
+    puts("PASS: continuous two-axis textured camera pan is refined beyond half-pixel tile quantization");
     printf("PASS: real GPU shader compilation, bidirectional translation, intermediate image and real-frame copy on %s\n",device.name.UTF8String);
     [queue release];[a release];[b release];[forward release];[backward release];[out release];
     [flow release];[interpolate release];[copy release];[f release];[i release];[c release];[library release];[options release];[device release];

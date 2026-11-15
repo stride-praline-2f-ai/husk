@@ -45,7 +45,7 @@ static const char *const values[] = {
     "r.Streaming.MipBias=0", "r.ViewDistanceScale=1", "r.DetailMode=2",
     "r.PostProcessAAQuality=4", "r.ShadowQuality=5",
     "r.Shadow.MaxResolution=2048", "r.Shadow.CSM.MaxCascades=4",
-    "r.MotionBlurQuality=0", "r.DepthOfFieldQuality=0",
+    "r.MotionBlurQuality=0", "r.DefaultFeature.MotionBlur=0", "r.DepthOfFieldQuality=0",
     "r.SceneColorFringeQuality=0"
 };
 
@@ -60,7 +60,7 @@ static const char *const efficient_values[] = {
     "r.Streaming.MipBias=0", "r.ViewDistanceScale=1", "r.DetailMode=2",
     "r.PostProcessAAQuality=4", "r.ShadowQuality=3",
     "r.Shadow.MaxResolution=1024", "r.Shadow.CSM.MaxCascades=2",
-    "r.MotionBlurQuality=0", "r.DepthOfFieldQuality=0",
+    "r.MotionBlurQuality=0", "r.DefaultFeature.MotionBlur=0", "r.DepthOfFieldQuality=0",
     "r.SceneColorFringeQuality=0"
 };
 _Static_assert(sizeof(values) == sizeof(efficient_values), "preset size mismatch");
@@ -71,6 +71,15 @@ static const char *value_at(size_t i)
     if (efficient && i == BASE_VALUE_COUNT)
         return frame_limit == 30 ? "t.MaxFPS=30" : "t.MaxFPS=60";
     return efficient ? efficient_values[i] : values[i];
+}
+char *tl_ue4_graphics_request_dump(void)
+{
+    size_t capacity=256;
+    for(size_t i=0;i<VALUE_COUNT;i++)capacity+=strlen(value_at(i))+1;
+    char *text=malloc(capacity);if(!text)return NULL;
+    size_t used=(size_t)snprintf(text,capacity,"UE4 SystemSettings requests ONLY; actual runtime CVar values UNAVAILABLE\nsharp=%d efficient=%d configured_frame_limit=%d\n",sharp,efficient,frame_limit);
+    if(sharp)for(size_t i=0;i<VALUE_COUNT;i++)used+=(size_t)snprintf(text+used,capacity-used,"%s\n",value_at(i));
+    return text;
 }
 
 void husk_ue4_set_efficiency(bool enabled, int fps)

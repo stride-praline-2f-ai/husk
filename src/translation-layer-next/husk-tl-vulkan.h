@@ -21,6 +21,7 @@ extern "C" {
 
 /* Use the MoltenVK at `path`; NULL means the one already linked into the process. With `frame_dir` set, every `frame_every`th presented frame is written there as a BMP. */
 void tl_vk_configure(const char *path, const char *frame_dir, int frame_every);
+void tl_vk_log_identity(void);
 
 /* The address of a Vulkan function by name (what the guest's dlsym on libvulkan.so, and vkGetInstanceProcAddr, return), or NULL. */
 void *tl_vk_resolve(const char *name);

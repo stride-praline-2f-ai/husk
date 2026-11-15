@@ -18,6 +18,7 @@ class Metal4Components(unittest.TestCase):
             spec=importlib.util.spec_from_file_location('metal4patch',ROOT/'scripts/prepare_metal4_source.py')
             module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
             (root/'HuskFramegen.inc').write_text(module.framegen_include())
+            (root/'HuskFGCapture.inc').write_bytes((ROOT/'patches/metalfx/HuskFGCapture.inc').read_bytes())
             (root/'HuskFramegenABI.h').write_bytes((ROOT/'src/translation-layer-next/husk-tl-framegen.h').read_bytes())
             shader=(ROOT/'patches/metalfx/HuskFramegen.metal').read_text()
             (root/'HuskFramegenShader.inc').write_text('static const char *huskFramegenShader=R"HUSKFG('+shader+')HUSKFG";')

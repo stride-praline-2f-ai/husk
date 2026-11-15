@@ -2,6 +2,8 @@
 #ifndef HUSK_TL_UE4_GRAPHICS_H
 #define HUSK_TL_UE4_GRAPHICS_H
 #include <stdbool.h>
+/* Owned request dump, not runtime CVar readback. Caller frees the result. */
+char *tl_ue4_graphics_request_dump(void);
 #include <stddef.h>
 #include <stdint.h>
 
