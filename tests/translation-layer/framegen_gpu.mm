@@ -59,6 +59,62 @@ int main(int argc,char**argv){@autoreleasepool{
     [command commit];[command waitUntilCompleted];assert(command.status==MTLCommandBufferStatusCompleted);
     [out getBytes:pixels bytesPerRow:256 fromRegion:MTLRegionMake2D(0,0,64,64) mipmapLevel:0];assert(pixels[centre]==(32-motion)*4&&pixels[centre+3]==255);
     }
+    // Deliberately confident but locally wrong tile vectors model the missing
+    // per-pixel confidence at HUD/depth boundaries. Forward/backward consistency
+    // alone passes these cases; the original shader destroys the white glyph
+    // or blends two incompatible colours.
+    __fp16 controlled[4*4*4];
+    for(unsigned reverse=0;reverse<2;reverse++){
+        for(unsigned v=0;v<16;v++){
+            controlled[v*4]=reverse?8:-8;controlled[v*4+1]=0;
+            controlled[v*4+2]=0;controlled[v*4+3]=1;
+        }
+        [(reverse?backward:forward) replaceRegion:MTLRegionMake2D(0,0,4,4) mipmapLevel:0 withBytes:controlled bytesPerRow:32];
+    }
+    auto interpolateOnly=[&]{
+        auto command=[queue commandBuffer];auto e=[command computeCommandEncoder];
+        [e setTexture:a atIndex:0];[e setTexture:b atIndex:1];[e setTexture:forward atIndex:2];
+        [e setTexture:backward atIndex:3];[e setTexture:out atIndex:4];dispatch(e,interpolate,64,64);[e endEncoding];
+        [command commit];[command waitUntilCompleted];assert(command.status==MTLCommandBufferStatusCompleted);
+        [out getBytes:pixels bytesPerRow:256 fromRegion:MTLRegionMake2D(0,0,64,64) mipmapLevel:0];
+    };
+    for(unsigned image=0;image<2;image++){
+        for(unsigned y=0;y<64;y++)for(unsigned x=0;x<64;x++){
+            unsigned q=(y*64+x)*4;uint8_t bg=((x+image*8)%16)<8?32:80;
+            pixels[q]=pixels[q+1]=pixels[q+2]=(x==32||x==33)?255:bg;pixels[q+3]=255;
+        }
+        [(image?b:a) replaceRegion:MTLRegionMake2D(0,0,64,64) mipmapLevel:0 withBytes:pixels bytesPerRow:256];
+    }
+    interpolateOnly();unsigned centre=(32*64+32)*4;
+    if(pixels[centre]!=255||pixels[centre+1]!=255||pixels[centre+2]!=255){
+        fprintf(stderr,"QUALITY_REJECT: stationary HUD changed under background motion\n");return 3;
+    }
+    for(unsigned scenario=0;scenario<2;scenario++){
+        for(unsigned image=0;image<2;image++){
+            for(unsigned q=0;q<64*64;q++){
+                pixels[q*4]=(image?0:255);
+                pixels[q*4+1]=scenario?(image?76:0):(image?0:255);
+                pixels[q*4+2]=scenario?0:(image?0:255);pixels[q*4+3]=255;
+            }
+            [(image?b:a) replaceRegion:MTLRegionMake2D(0,0,64,64) mipmapLevel:0 withBytes:pixels bytesPerRow:256];
+        }
+        interpolateOnly();
+        if(pixels[centre]!=0||pixels[centre+1]!=(scenario?76:0)||pixels[centre+2]!=0){
+            fprintf(stderr,"QUALITY_REJECT: inconsistent warped colours were blended\n");return 3;
+        }
+    }
+    for(unsigned image=0;image<2;image++){
+        for(unsigned y=0;y<64;y++)for(unsigned x=0;x<64;x++){
+            unsigned q=(y*64+x)*4;uint8_t value=image&&x<2?0:255;
+            pixels[q]=pixels[q+1]=pixels[q+2]=value;pixels[q+3]=255;
+        }
+        [(image?b:a) replaceRegion:MTLRegionMake2D(0,0,64,64) mipmapLevel:0 withBytes:pixels bytesPerRow:256];
+    }
+    interpolateOnly();unsigned edge=(32*64)*4;
+    if(pixels[edge]!=0||pixels[edge+1]!=0||pixels[edge+2]!=0){
+        fprintf(stderr,"QUALITY_REJECT: out-of-frame warp stretched the edge\n");return 3;
+    }
+    puts("PASS: stationary HUD and locally inconsistent/equal-luminance colours preserve the real pixel without ghost blending");
     printf("PASS: real GPU shader compilation, bidirectional translation, intermediate image and real-frame copy on %s\n",device.name.UTF8String);
     [queue release];[a release];[b release];[forward release];[backward release];[out release];
     [flow release];[interpolate release];[copy release];[f release];[i release];[c release];[library release];[options release];[device release];

@@ -140,5 +140,12 @@ int main(){@autoreleasepool{
    print(result.stdout)
    if result.returncode==77:self.skipTest('runner exposes no Metal GPU; shader execution unavailable')
    self.assertEqual(result.returncode,0,result.stdout)
+   # The same real GPU quality cases must reject the frozen166 shader. This
+   # demonstrates the concrete former HUD blend defect, not just a new shader
+   # passing expectations written only around its own implementation.
+   old=subprocess.run([str(exe),str(ROOT/'tests/translation-layer/fixtures/framegen-166.metal')],text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=30)
+   self.assertEqual(old.returncode,3,old.stdout)
+   self.assertIn('QUALITY_REJECT: stationary HUD changed',old.stdout)
+   print('PASS: frozen166 shader rejected for stationary HUD ghosting; repaired shader passes the same GPU cases')
 
 if __name__=='__main__':unittest.main()

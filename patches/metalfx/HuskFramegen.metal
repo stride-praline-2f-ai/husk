@@ -39,14 +39,34 @@ kernel void huskInterpolate(texture2d<float,access::sample> previous [[texture(0
                             uint2 p [[thread_position_in_grid]]) {
     uint2 size=uint2(output.get_width(),output.get_height());if(any(p>=size))return;
     float2 uv=(float2(p)+0.5f)/float2(size);
-    float4 f=forward.sample(fgSampler,uv);
-    float4 b=backward.sample(fgSampler,uv+f.xy/float2(size));
     float4 result=current.sample(fgSampler,uv);
-    // Low confidence, occlusion and large cuts use the real frame locally;
-    // suppressing a bad warp is preferable to inventing object correspondence.
-    if(f.z<0.08f && b.z<0.08f && length(f.xy+b.xy)<2.5f){
-        result=mix(previous.sample(fgSampler,uv+0.5f*f.xy/float2(size)),
-                   current.sample(fgSampler,uv-0.5f*f.xy/float2(size)),0.5f);
+    float3 directDifference=abs(previous.sample(fgSampler,uv).rgb-result.rgb);
+    // A coarse background vector must not move stationary HUD/text pixels.
+    // This also skips the flow/warp reads when the actual pixel is unchanged.
+    if(max(directDifference.r,max(directDifference.g,directDifference.b))>1.0f/255.0f){
+        float4 f=forward.sample(fgSampler,uv);
+        float2 previousUV=uv+0.5f*f.xy/float2(size);
+        float2 currentUV=uv-0.5f*f.xy/float2(size);
+        float2 margin=0.5f/float2(size);
+        bool inside=all(previousUV>=margin)&&all(previousUV<=1.0f-margin)&&
+                    all(currentUV>=margin)&&all(currentUV<=1.0f-margin);
+        // Zero/ambiguous motion cannot justify a temporal cross-fade. Outside
+        // the image, clamped sampling would stretch an edge into a false warp.
+        if(inside && length(f.xy)>=0.5f && f.z<0.08f){
+            float4 b=backward.sample(fgSampler,uv+f.xy/float2(size));
+            if(b.z<0.08f && length(f.xy+b.xy)<2.5f){
+                float4 a=previous.sample(fgSampler,previousUV);
+                float4 c=current.sample(fgSampler,currentUV);
+                float3 difference=abs(a.rgb-c.rgb);
+                // Flow confidence describes a tile, not this pixel. Reject
+                // locally disagreeing colours/edges instead of averaging two
+                // misregistered pictures into blur. RGB also catches colours
+                // that have equal luminance. At most ~5/255 of blend deviation
+                // is admitted per channel relative to either warped sample.
+                if(max(difference.r,max(difference.g,difference.b))<=0.04f)
+                    result=mix(a,c,0.5f);
+            }
+        }
     }
     output.write(half4(result),p);
 }

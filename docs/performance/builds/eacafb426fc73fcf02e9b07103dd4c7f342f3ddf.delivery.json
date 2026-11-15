@@ -1,0 +1,35 @@
+{
+  "download_url": "https://filebin.net/86352422456da1e6e6f76533/Husk-3.4-build166-Metal4-FG-Fix.ipa",
+  "file": {
+    "filename": "Husk-3.4-build166-Metal4-FG-Fix.ipa",
+    "content-type": "application/zip",
+    "bytes": 154255997,
+    "bytes_readable": "154 MB",
+    "md5": "9UCNdFWHvlfjE4ZqmO2RIQ==",
+    "sha1": "fcae858ad0f6918f9541636dcc3f1f4f8b04da2a",
+    "sha256": "19fa2fbcb3779929ec5db13341e4d7251b5c98f1d0dfb6bb629f39546183dbe1",
+    "updated_at": "2026-11-15T10:22:34.632387Z",
+    "updated_at_relative": "now",
+    "created_at": "2026-11-15T10:22:34.632387Z",
+    "created_at_relative": "now"
+  },
+  "bin": {
+    "id": "86352422456da1e6e6f76533",
+    "readonly": false,
+    "bytes": 0,
+    "bytes_readable": "0 B",
+    "files": 0,
+    "updated_at": "2026-11-15T10:22:34.675591Z",
+    "updated_at_relative": "now",
+    "created_at": "2026-11-15T10:22:27.421771Z",
+    "created_at_relative": "now",
+    "expired_at": "2026-11-22T10:22:34.675591Z",
+    "expired_at_relative": "6 days from now"
+  },
+  "anonymous_full_download_verified": true,
+  "downloaded_bytes": 154255997,
+  "downloaded_sha256": "19fa2fbcb3779929ec5db13341e4d7251b5c98f1d0dfb6bb629f39546183dbe1",
+  "magic": "504b0304",
+  "source": "eacafb426fc73fcf02e9b07103dd4c7f342f3ddf",
+  "candidate_build": "166"
+}
