@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "source": "eacafb426fc73fcf02e9b07103dd4c7f342f3ddf",
+  "tree": "d4a0bd8c36c39b799e5668d428d515bf8742ac68",
+  "plan_ids": [
+    "M1",
+    "M9"
+  ],
+  "subsystem": "metal4_framegen_acquire_ownership",
+  "observation_time_utc": "2026-11-15T10:18:03.697142+00:00",
+  "scope": [
+    "C/ObjC factory return convention and caller autorelease lifetime",
+    "Exactly one retained WSI reference after scoped pool drains",
+    "GPU feedback, consumer/history ownership, no early slot reuse",
+    "Four-slot bound preserved",
+    "Legacy four-slot starvation and 32 repaired production-bridge cycles",
+    "Existing CPU-present prohibition, exact-once callbacks, errors and stale epochs",
+    "Data/cache/compiler contract/selected output/defaults preserved"
+  ],
+  "outcome": "Scoped source defect repaired; actual Apple control and complete IPA gates running. Physical FG-on confirmation pending.",
+  "returned_control": "Same165/source Metal4 enhancements runs to1529frames when only framegen is OFF; see returned evidence manifest.",
+  "actual_inputs": {
+    "patches/metal4/HuskMetal4Framegen.mm": "415ce25da0ca88bd3325aabca1d785f72f129f3ce2ac4032bc571ee05e84f0eb",
+    "tests/translation-layer/metal4_framegen_contract.mm": "9fbd68eeda21d0791eafb7ef388397c5f17948710c5502e4293de1c0598edaa1"
+  },
+  "limitations": [
+    "No supplied thread backtrace",
+    "Controlled Metal completion objects do not prove physical GPU behavior",
+    "No energy or native60FPS claim"
+  ]
+}

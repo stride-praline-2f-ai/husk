@@ -65,7 +65,13 @@ extern "C" void *husk_metal4_framegen_new(void *raw){
 }
 extern "C" void husk_metal4_framegen_delete(void *p){huskFramegenDelete(p);}
 extern "C" void *husk_metal4_framegen_drawable(void *p,void *layer){
-    return (void *)[huskFramegenDrawable(p,(CAMetalLayer *)layer) retain];
+    // Vulkan callers may have no autorelease pool, or one spanning the entire
+    // game loop. Balance the presenter's autoreleased lease here while keeping
+    // exactly one owned reference for WSI. Otherwise four finished leases can
+    // remain retained until thread exit and permanently exhaust the pool.
+    @autoreleasepool {
+        return (void *)[huskFramegenDrawable(p,(CAMetalLayer *)layer) retain];
+    }
 }
 extern "C" bool husk_metal4_framegen_wait(void *rawQueue,void *raw){
     id d=(id)raw;if(![d isKindOfClass:[HuskFGDrawable class]])return false;

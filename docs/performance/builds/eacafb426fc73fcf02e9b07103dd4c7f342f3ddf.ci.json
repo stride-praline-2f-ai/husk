@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "source": "eacafb426fc73fcf02e9b07103dd4c7f342f3ddf",
+  "tree": "d4a0bd8c36c39b799e5668d428d515bf8742ac68",
+  "workflow": "2119d63ddd0b570acd51f505368d1dabb9a6c8d2",
+  "run": 43702777875,
+  "job": 132777309996,
+  "conclusion": "success",
+  "run_metadata": {
+    "created_at": "2026-11-15T10:10:26Z",
+    "updated_at": "2026-11-15T10:21:06Z",
+    "run_attempt": 1,
+    "head_sha": "2119d63ddd0b570acd51f505368d1dabb9a6c8d2"
+  },
+  "checks": {
+    "tests": 461,
+    "invocations": 60,
+    "unittest_skips": 0,
+    "original_suite_inventory": 49,
+    "font_path": "pass",
+    "vulkan_sdk_structures": 31,
+    "vulkan_sdk_offsets": 96,
+    "strict_setup_groups": 10,
+    "legacy_four_slot_starvation_and_32_repaired_cycles": "pass; real bridge fixture executed twice on Apple",
+    "source_metal4_driver": "fresh ARM64 build, imports/eight exports/metadata validated",
+    "java_component": "verified unchanged source-matched component",
+    "custom_moltenvk_component": "verified unchanged source-matched component",
+    "fresh_application_extensions_signing_packaging": "pass"
+  },
+  "artifact": {
+    "id": 14156459960,
+    "name": "Husk-Duo-IPA",
+    "size_in_bytes": 154256135,
+    "url": "https://api.github.com/repos/stride-praline-2f-ai/husk/actions/artifacts/14156459960",
+    "archive_download_url": "https://api.github.com/repos/stride-praline-2f-ai/husk/actions/artifacts/14156459960/zip",
+    "expired": false,
+    "created_at": "2026-11-15T10:21:00Z",
+    "expires_at": "2026-11-22T10:20:58Z",
+    "updated_at": "2026-11-15T10:21:00Z",
+    "digest": "sha256:15ceaf59e23fd67098c0fcbeefb4bcc781c495604780d487dd65d1fa85bef38d",
+    "workflow_run": {
+      "id": 43702777875,
+      "repository_id": 1451482305,
+      "head_repository_id": 1451482305,
+      "head_branch": "main",
+      "head_sha": "2119d63ddd0b570acd51f505368d1dabb9a6c8d2"
+    }
+  },
+  "evidence": [
+    "2026-11-15T10:12:00.0119100Z PASS: production Metal4 compiler control contracts; mock GPU/archive objects, no physical hit/energy claim",
+    "2026-11-15T10:12:01.7989320Z PASS: production Metal4 feedback/lease/error/epoch contracts; controlled feedback, physical GPU output unverified",
+    "2026-11-15T10:12:52.4780330Z M2 actual Vulkan SDK observer ABI: 31 structures / 96 field offsets passed",
+    "2026-11-15T10:14:19.8886520Z test_production_compiler_cache_epoch_and_persistence_contract (__main__.Metal4Components.test_production_compiler_cache_epoch_and_persistence_contract) ... PASS: production Metal4 compiler control contracts; mock GPU/archive objects, no physical hit/energy claim",
+    "2026-11-15T10:14:21.9294200Z PASS: production Metal4 feedback/lease/error/epoch contracts; controlled feedback, physical GPU output unverified",
+    "2026-11-15T10:17:10.9072060Z Source bridge contract, ARM64 code, eight exports and metadata verified",
+    "2026-11-15T10:17:37.5949370Z regressions: success",
+    "2026-11-15T10:17:37.5951890Z metal4_source: success",
+    "2026-11-15T10:20:40.3295740Z ** BUILD SUCCEEDED **"
+  ],
+  "scope": "Source/control/full app/package correctness; repaired physical FG-on launch/lifecycle and energy still pending."
+}

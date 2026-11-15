@@ -1,0 +1,39 @@
+# Husk 3.4 /166 — fix Metal4 frame-generation launch freeze
+
+Source `eacafb426fc73fcf02e9b07103dd4c7f342f3ddf`, tree `d4a0bd8c36c39b799e5668d428d515bf8742ac68`, canonical branch `build/metal4-fg-lease166`; reviewed local2198ed81a6e3c39096db2adffc04cc22b33ddd21 has the identical tree. Final documentation publication does not change the packaged source.
+
+## Observed problem and resulting behavior
+
+M9-FG-LEASE-v1 depends on165's source Metal4 compiler/WSI bridge and advances M9 ownership/lifecycle correctness before latency/quality/energy acceptance. [Returned paired evidence and full source diagnosis](../59-metal4-framegen-launch-freeze.md), [lossless log hashes/selected facts](../runs/METAL4-FG-LEASE-v1.returned.json). Explicit165FGon freezes at4frames; FGoff on the same source renderer reaches1529frames and completes pause/resume, with Vulkan-cache restore/save. First freeze predates backgrounding. Successful JIT and ample reported memory are logged; there is no supplied fatal/OOM. Host55.9/56.6FPS summaries do not establish displayed60FPS or native archive hits.
+
+The acquire bridge now drains its own autorelease pool before returning the one owned WSI reference. Previously, the autoreleased lease could survive until game-thread exit even after WSI/GPU/history released their references, exhausting the four-slot texture pool. The repair preserves producer completion/consumer GPU ownership and pool size. Regression reproduces old four-slot starvation under a long-lived caller pool and requires32repaired real-bridge producer-feedback/history/WSI-release cycles with all slots returned. Existing error/epoch/exact-once checks remain. The1819trace width is bounds×scale, not actual drawable dimensions; no resolution or quality workaround.
+
+Original/publishedMetal4 and MoltenVK, shader/native archives/compiler contract, worker/thermal guards, all Anki165fonts/DEX/download/UI fixes, memory helper/extensions and user settings remain. Only the source Metal4 acquire ownership boundary, its regression and app build number changed. Native shader/PSO compilation semantics are unchanged; compatible archives/data are retained.
+
+## Verification and progress
+
+461Apple test executions/60invocations, zero test skips plus font-path check; all49original suites, SDK31structures/96offsets and all10strict setup groups passed. The actual bridge regression (legacy four-slot starvation,32fixed cycles and existing feedback/error/epoch contracts) passed twice, in full regressions and before the fresh sourceMetal4 build. New ARM64framework/import/eight-export/source metadata validation, fresh app/three extensions/sign/package all passed. [Run43702777875](https://github.com/stride-praline-2f-ai/husk/actions/runs/43702777875), job132777309996, workflow2119d63ddd0b570acd51f505368d1dabb9a6c8d2. [CI receipt](eacafb426fc73fcf02e9b07103dd4c7f342f3ddf.ci.json) includes exact timestamps. Java/customMoltenVK were verified matching component-cache hits; the modified sourceMetal4 framework and app were freshly rebuilt.
+
+Independent [package inspection](eacafb426fc73fcf02e9b07103dd4c7f342f3ddf.package-verification.json), [verifier](eacafb426fc73fcf02e9b07103dd4c7f342f3ddf.verify.py) and [source review](eacafb426fc73fcf02e9b07103dd4c7f342f3ddf.source-review.json) confirm the166stamp, newly changed code/patch hashes, exact current source compilation, eight bridge exports, unchanged native compiler compatibility contract, actual shader,773regular upstream license files equal to the companion set, retained original/custom drivers and all helper extensions. Anki full/core DEX/build receipt are byte-identical to165/163, with5995/2132classes, unique activity method, fonts and virtual-asset/download/signal fixes retained. ZIP CRC and full anonymous raw download hash pass. This is build/control/package evidence; no repaired phone result has been assumed.
+
+M9-FG-LEASE-v1 checklist1: I1 scoped ownership repair/review; I2 Apple reproduction of old failure and32repaired cycles; I3 full source-driver/app/extensions/sign/package plus independent raw delivery. Final I3/3=100%. Physical D1 FG-on launch/image/input/audio, D2 pause/resume/progress:0/2=0%, pending166. Benefit E1 sustained latency/quality/energy acceptance:0/1=0%,UNKNOWN. Controlled feedback objects establish ownership; they are not fabricated actual GPU/display completion measurements. The supplied FG-OFF positive control does not pass repaired FG-ON gates.
+
+Fixed HUSK-ROADMAP-v1/whole-milestones-1 remains overall31.11%(Δ0), existing weighted implementation79.795918%(32/39,Δ0), M4 accepted scope34.5667%, futureDuo whole-milestone0%. Largest remaining contributions include M3 GPU/energy and M10 actual baseline; native MetalFX temporal generation still needs real engine motion/depth/jitter. This bug-fix checklist does not mean whole-plan100%or maximum efficiency.
+
+## Minimal launch-only confirmation
+
+1. Your165FG-OFF path works and remains the immediate workaround. Update the existing Husk entry to166 through the same install/LiveContainer workflow, preserving all extensions, game data and caches. Keep165 for rollback. Close the old game and fully restart Husk; no APK reimport/cache deletion.
+2. Dungeons settings→GameGraphics: Metal4Vulkan(Beta)ON, Metal4Enhancements(Experimental)ON, DungeonsFrameGeneration(Beta)ON. Keep your existing Sharp/Efficient,1816×1280output/AutomaticDuo, selected60FPS setting, A20worker setting and DriverDefault submission exactly as in the supplied comparison; do not add an archive/clock/worker treatment. Other experimental/profiling choices remain at their prior values. Combined FG deliberately requests30rendered→60output; generated/fallback outputs are not60realFPS.
+3. With LowPowerModeOFF and the same controller/orientation/window mode/brightness/charging state and comparable warmth, launch and play for30–60seconds. Confirm it advances past the former four-frame launch stop, displays the game and responds to camera/controller input with audio. Perform one normal brief background/return after gameplay starts. This is a correctness check, not an energy test; first loading is included and should be named.
+4. If successful, report launch/resume/input/audio/image status and share just the short app report/log via the same sharing route, containing the166build/source header, sourceMetal4/FG activation/counters/errors and completed pause/resume lines. Note any log/background interruption. Existing report.md/diagnostics.json are optional if already recording; no new sustained capture/archive benchmark is requested. Persistent progress plus FGactive/noerrors is positive mechanism evidence, not proof of unique interpolation pixels/latency/energy benefit.
+5. If it stalls, corrupts images, crashes or breaks controls/audio, switch only DungeonsFrameGenerationOFF and fully restart, retaining the proven sourceMetal4 route. EnhancementsOFF+restart restores publishedMetal4; Metal4OFF+restart restoresMoltenVK if required. Preserve normal OS thermal safeguards. The returned short result decides this launch/lease/lifecycle repair before any separate performance work.
+
+## Exact package and download
+
+Packaged stamp `eacafb426fc73fcf02e9b07103dd4c7f342f3ddf-dirty` (normal resource staging), version3.4/166; rawIPA154255997bytes, SHA256`19fa2fbcb3779929ec5db13341e4d7251b5c98f1d0dfb6bb629f39546183dbe1`. Artifact14156459960, outerZIPSHA256`15ceaf59e23fd67098c0fcbeefb4bcc781c495604780d487dd65d1fa85bef38d`; thatZIP is only the Actions wrapper. [Delivery receipt](eacafb426fc73fcf02e9b07103dd4c7f342f3ddf.delivery.json), [fixed score](eacafb426fc73fcf02e9b07103dd4c7f342f3ddf.score.json).
+
+```
+https://filebin.net/86352422456da1e6e6f76533/Husk-3.4-build166-Metal4-FG-Fix.ipa
+```
+
+Direct rawIPA, full anonymous re-download verified. Temporary hosting expires22November2026 10:22UTC.165FG-OFF remains a working rollback; its historical source/artifacts and returned results are retained.

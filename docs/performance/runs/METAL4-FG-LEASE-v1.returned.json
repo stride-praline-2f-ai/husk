@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "plan_ids": [
+    "M1",
+    "M3",
+    "M6",
+    "M9",
+    "M10"
+  ],
+  "subsystem": "metal4_framegen_lease_ownership",
+  "status": "EXTERNAL",
+  "observation_time_utc": "2026-11-15T10:08:55.666717+00:00",
+  "source": "62689726af641a121d72a17346cabcdb9eb10507-dirty",
+  "build": 165,
+  "files": [
+    {
+      "session": "A61CEEED-7719-484C-885D-EFFC8E6C824D",
+      "file": "1-husk.log",
+      "bytes": 38041,
+      "sha256": "14bb71c9e2bed95e128f7bed37d865f1e28086c7b4e25312109d3c931151caec"
+    },
+    {
+      "session": "A61CEEED-7719-484C-885D-EFFC8E6C824D",
+      "file": "2-husk-native.log",
+      "bytes": 26981,
+      "sha256": "262358294580f8160cc9976e06649208b80674bcfc5231eac3e79d943517f32f"
+    },
+    {
+      "session": "478CC7CE-CC11-4558-BF95-BF06BD873A1D",
+      "file": "1-husk-native.log",
+      "bytes": 32702,
+      "sha256": "2696dfeb4b66532b826051d51b598ffce64787f92581400fe800d002099d97e0"
+    },
+    {
+      "session": "478CC7CE-CC11-4558-BF95-BF06BD873A1D",
+      "file": "2-husk.log",
+      "bytes": 46172,
+      "sha256": "420cd23044545b232571042490e8273e78570ff4754b8c0776db3c4751375fa5"
+    }
+  ],
+  "fg_on": {
+    "output": [
+      1816,
+      1280
+    ],
+    "real_fps_request": 30,
+    "rendered_terminal_count": 4,
+    "heartbeat_tail_seconds": 73.5,
+    "resume2_complete": false
+  },
+  "fg_off": {
+    "output": [
+      1816,
+      1280
+    ],
+    "real_fps_request": 60,
+    "rendered_terminal_count": 1529,
+    "user_confirms_runs": true,
+    "cache_restored_bytes": 5047656,
+    "cache_saved_bytes": [
+      5740672,
+      13600458
+    ],
+    "host_fps_windows": [
+      55.9,
+      56.6
+    ],
+    "pause_resume_complete": true
+  },
+  "limits": [
+    "No thread backtrace supplied",
+    "Host cadence is not displayed-frame timing",
+    "No physical FG-on repair or energy evidence yet",
+    "Native archive hits not established"
+  ]
+}
