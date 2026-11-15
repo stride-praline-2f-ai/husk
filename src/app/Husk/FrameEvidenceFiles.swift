@@ -7,7 +7,18 @@ import CryptoKit
 /// File-only codec/exporter, shared with real Apple component tests. No UIKit,
 /// render queues or live GPU waits run during export.
 enum FrameEvidenceFiles {
-    enum Failure: Error { case unsafeFile, invalidImage, invalidMetadata, storageLimit, pngFailed }
+    enum Failure: LocalizedError {
+        case unsafeFile, invalidImage, invalidMetadata, storageLimit, pngFailed
+        var errorDescription: String? {
+            switch self {
+            case .unsafeFile: return "A diagnostic file has an unsupported path, type or size. Existing evidence is kept."
+            case .invalidImage: return "A captured image is incomplete or has an unsupported pixel layout. Raw evidence is kept."
+            case .invalidMetadata: return "Capture metadata is incomplete or unsupported. Raw evidence and logs are kept."
+            case .storageLimit: return "The capture exceeds the bounded export limits. Raw evidence and logs are kept."
+            case .pngFailed: return "A captured image could not be converted to PNG. Raw evidence is kept."
+            }
+        }
+    }
     static func regular(_ url: URL, limit: Int) throws -> Int {
         let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
         guard values.isRegularFile == true, values.isSymbolicLink != true, let size = values.fileSize,
@@ -46,12 +57,22 @@ enum FrameEvidenceFiles {
             let size = try regular(source, limit: 24 * 1024 * 1024)
             entries.append(.init(name: name, url: source)); index.append(["file": name, "bytes": size, "sha256": try digest(source)])
         }
+        // Native timing metadata is atomically refreshed after late callbacks.
+        // Freeze it once so bundle-index hashes and ZIP members describe the
+        // SAME bytes even if that refresh overlaps the manual share action.
+        func snapshot(_ source: URL, _ name: String) throws {
+            _ = try regular(source, limit: 128 * 1024)
+            let data = try Data(contentsOf: source)
+            guard data.count <= 128 * 1024 else { throw Failure.storageLimit }
+            let copy = work.appendingPathComponent(UUID().uuidString + ".json")
+            try data.write(to: copy); try add(copy, name)
+        }
         let contextURL = work.appendingPathComponent("export-context.json"); try context.write(to: contextURL); try add(contextURL, "export-context.json")
         if let capture {
             let parent = try capture.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
             guard parent.isDirectory == true, parent.isSymbolicLink != true else { throw Failure.unsafeFile }
             let session = capture.appendingPathComponent("host-session.json")
-            if fm.fileExists(atPath: session.path) { try add(session, "capture/host-session.json") }
+            if fm.fileExists(atPath: session.path) { try snapshot(session, "capture/host-session.json") }
             let native = capture.appendingPathComponent("frames", isDirectory: true)
             if fm.fileExists(atPath: native.path) {
                 let v = try native.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
@@ -61,7 +82,7 @@ enum FrameEvidenceFiles {
                 for name in names.sorted() where name.hasSuffix(".json") || name == "engine-requests.txt" {
                     guard safeName(name) else { throw Failure.unsafeFile }
                     let url = native.appendingPathComponent(name); _ = try regular(url, limit: 128 * 1024)
-                    try add(url, "capture/" + name)
+                    try snapshot(url, "capture/" + name)
                     guard name.hasPrefix("pair-"), name.hasSuffix(".json") else { continue }
                     guard let record = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any],
                           let files = record["files"] as? [[String: Any]], files.count <= 6 else { throw Failure.invalidMetadata }

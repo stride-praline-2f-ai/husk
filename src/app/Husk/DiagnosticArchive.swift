@@ -5,7 +5,17 @@ import Foundation
 /// avoid another compressor dependency and keep CRC/size verification explicit.
 enum DiagnosticArchive {
     struct Entry { let name: String; let url: URL }
-    enum Failure: Error { case unsafeEntry, changedFile, tooLarge, duplicate }
+    enum Failure: LocalizedError {
+        case unsafeEntry, changedFile, tooLarge, duplicate
+        var errorDescription: String? {
+            switch self {
+            case .unsafeEntry: return "A diagnostic file has an unsupported path or file type. Existing evidence is kept."
+            case .changedFile: return "A file changed during export. Try sharing again after capture finishes."
+            case .tooLarge: return "The diagnostic bundle exceeds the 32 MiB export limit. Raw logs and captured files remain in Files."
+            case .duplicate: return "The diagnostic bundle contains a duplicate filename. Existing evidence is kept."
+            }
+        }
+    }
     private static let crcTable: [UInt32] = (0..<256).map { value in
         var c = UInt32(value)
         for _ in 0..<8 { c = (c & 1) == 1 ? 0xedb88320 ^ (c >> 1) : c >> 1 }
