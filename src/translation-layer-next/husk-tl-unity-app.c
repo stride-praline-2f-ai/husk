@@ -362,6 +362,7 @@ static void *launch_thread(void *arg)
         };
         if (A.vulkan[0]) tl_vk_configure(A.vulkan, NULL, 0);
         tl_log_line("ue4: starting %s as %s, %dx%d (Vulkan: %s)", A.apk, A.package, A.width, A.height, A.vulkan[0] ? A.vulkan : "none");
+        tl_vk_log_identity();
 #if TARGET_OS_IPHONE
         husk_memory_donor_prepare(A.data);
 #endif

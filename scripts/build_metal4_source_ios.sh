@@ -100,7 +100,7 @@ cp "$WORK/source-inputs.json" "$OUT/HuskMetal4Source.json"
 python3 "$WORK/playport/build/check-macho-imports.py" --sdk "$SDK" --platform ios --minos 26.0 --exports vkGetInstanceProcAddr,vkGetDeviceProcAddr "$OUT/HuskKosmicKrisp"
 if [ "${HUSK_METAL4_UPSTREAM_ONLY:-0}" != 1 ]; then
     xcrun nm -gU "$OUT/HuskKosmicKrisp" > "$ROOT/build/logs/metal4-source-exports.txt"
-    for symbol in ArchiveConfigure ArchiveSnapshot ArchivePrepare ArchiveForget FramegenConfigure FramegenSnapshot FramegenPause Metal4Checkpoint; do
+    for symbol in ArchiveConfigure ArchiveSnapshot ArchivePrepare ArchiveForget FramegenConfigure FramegenSnapshot FramegenPause FramegenCaptureConfigure Metal4Checkpoint; do
         grep -E "_vkHusk${symbol}$" "$ROOT/build/logs/metal4-source-exports.txt"
     done
     python3 - "$ROOT" "$WORK" "$OUT" <<'PY'
@@ -118,7 +118,7 @@ for _ in range(struct.unpack_from('<I',b,16)[0]):
                 size=struct.unpack_from('<Q',b,q+40)[0];offset=struct.unpack_from('<I',b,q+48)[0];code=hashlib.sha256(b[offset:offset+size]).hexdigest()
     p+=n
 assert code
-meta={'schema':2,'backend':'KosmicKrisp','api':'Metal 4','source':patch['playport'],'mesa':patch['mesa'],'husk_bridge_abi':1,'native_archive_abi':2,'frame_generation':True,'metalfx_spatial':False,'minimum_ios':'26.0','compiler_contract':'husk-kk-native-v1','patch_sha256':patch['patch_sha256'],'code_sha256':code,'binary_sha256_before_signing':hashlib.sha256(b).hexdigest(),'sdk_build':subprocess.check_output(['xcrun','--sdk','iphoneos','--show-sdk-build-version'],text=True).strip(),'xcode':subprocess.check_output(['xcodebuild','-version'],text=True).strip(),'host_llvm':subprocess.check_output(['llvm-config','--version'],text=True).strip(),'husk_source_at_compile':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip()}
+meta={'schema':2,'backend':'KosmicKrisp','api':'Metal 4','source':patch['playport'],'mesa':patch['mesa'],'husk_bridge_abi':1,'native_archive_abi':2,'frame_generation':True,'framegen_capture_abi':1,'metalfx_spatial':False,'minimum_ios':'26.0','compiler_contract':'husk-kk-native-v1','patch_sha256':patch['patch_sha256'],'code_sha256':code,'binary_sha256_before_signing':hashlib.sha256(b).hexdigest(),'sdk_build':subprocess.check_output(['xcrun','--sdk','iphoneos','--show-sdk-build-version'],text=True).strip(),'xcode':subprocess.check_output(['xcodebuild','-version'],text=True).strip(),'host_llvm':subprocess.check_output(['llvm-config','--version'],text=True).strip(),'husk_source_at_compile':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip()}
 (out/'HuskMetal4Build.json').write_text(json.dumps(meta,indent=2)+'\n')
 info={'CFBundleExecutable':'HuskKosmicKrisp','CFBundleName':'HuskKosmicKrisp','CFBundleIdentifier':'com.husk.experimental.KosmicKrisp','CFBundlePackageType':'FMWK','CFBundleShortVersionString':'1.0','CFBundleVersion':'1','CFBundleInfoDictionaryVersion':'6.0','CFBundleSupportedPlatforms':['iPhoneOS'],'MinimumOSVersion':'26.0'}
 (out/'Info.plist').write_bytes(plistlib.dumps(info))
@@ -132,7 +132,7 @@ if project.exists():
         anchor='      # The PS4 layer: Bachata-S4'
         if text.count(anchor)!=1:raise ValueError('Unexpected source driver embedding layout')
         project.write_text(text.replace(anchor,dependency+anchor))
-print('Source bridge contract, ARM64 code, eight exports and metadata verified')
+print('Source bridge contract, ARM64 code, nine exports and metadata verified')
 PY
 fi
 echo 'Pinned source-built iOS Metal4 driver passed import/export validation'

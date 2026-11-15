@@ -17,6 +17,8 @@
 #include "HuskMetal4Bridge.h"
 #define HuskFGDrawable HuskMetal4FGDrawable
 #define HuskFGPresenter HuskMetal4FGPresenter
+#define HuskFGCaptureSession HuskMetal4FGCaptureSession
+#define HuskFGCaptureTicket HuskMetal4FGCaptureTicket
 #define HUSK_FG_METAL4 1
 #include "HuskFramegen.inc"
 
@@ -88,6 +90,6 @@ extern "C" void husk_metal4_framegen_feedback(void *rawOptions,void *raw){
         // Captured frame is retained by the copied MRC block. Producer success
         // means GPU writes finished before another queue samples this lease.
         if(feedback.error){++fgErrors;fgFail();[frame finish:0];}
-        else{++fgRendered;[frame->_owner enqueue:frame];}
+        else{frame->_sequence=fgRendered.fetch_add(1)+1;frame->_sourceCompletedHost=fgCaptureEnabled.load(std::memory_order_relaxed)?CACurrentMediaTime():0;[frame->_owner enqueue:frame];}
     }}];
 }

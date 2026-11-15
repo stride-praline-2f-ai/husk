@@ -554,6 +554,10 @@ struct LogView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var lines: [String] = []
     @State private var showShare = false
+    @State private var shareItems: [URL] = []
+    @State private var exportBusy = false
+    @State private var exportError = ""
+    @State private var showExportError = false
     private let tick = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -588,21 +592,38 @@ struct LogView: View {
                     }
                 }
                 ToolbarItem(placement: .primaryAction) {
-                    Button { showShare = true } label: { Image(systemName: "square.and.arrow.up") }
+                    Menu {
+                        Button(exportBusy ? "Preparing bundle…" : "Share diagnostic bundle") { exportBundle() }.disabled(exportBusy)
+                        Button("Share raw logs") {
+                            shareItems = [HuskLog.logFileURL, HuskLog.logFileURL.deletingLastPathComponent().appendingPathComponent("husk-prev.log"), HuskLog.nativeLogURL, HuskLog.previousNativeLogURL, URL(fileURLWithPath: QemuRunner.shared.guestSerialLogPath)]
+                                .filter { FileManager.default.fileExists(atPath: $0.path) }
+                            showShare = true
+                        }
+                    } label: { Image(systemName: "square.and.arrow.up") }
                 }
             }
-            .sheet(isPresented: $showShare) {
-                ShareSheet(items: [
-                    HuskLog.logFileURL,
-                    URL(fileURLWithPath: QemuRunner.shared.guestSerialLogPath),
-                    // QEMU's own output. Missing from this list until now, which
-                    // is precisely why a crash could not be diagnosed from a
-                    // shared log.
-                    HuskLog.nativeLogURL,
-                    HuskLog.previousNativeLogURL,
-                ])
-            }
+            .sheet(isPresented: $showShare) { ShareSheet(items: shareItems.map { $0 as Any }) }
+            .alert("Diagnostic export", isPresented: $showExportError) { Button("OK", role: .cancel) { } } message: { Text(exportError) }
         }
+    }
+
+    private func exportBundle() {
+        do {
+            let (capture, logs, context, output) = try FramegenDiagnostics.exportContext()
+            exportBusy = true
+            DispatchQueue.global(qos: .utility).async {
+                do {
+                    try FrameEvidenceFiles.bundle(capture: capture, logs: logs, context: context, output: output)
+                    DispatchQueue.main.async {
+                        exportBusy = false; shareItems = [output]; showShare = true
+                        FramegenDiagnostics.pruneExports(keeping: output)
+                    }
+                } catch {
+                    let message = error.localizedDescription
+                    DispatchQueue.main.async { exportBusy = false; exportError = message; showExportError = true }
+                }
+            }
+        } catch { exportError = error.localizedDescription; showExportError = true }
     }
 
     /// Colour by source so the JIT path stands out from QEMU's own chatter.

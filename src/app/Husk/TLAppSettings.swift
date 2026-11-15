@@ -319,6 +319,10 @@ struct TLAppSettingsView: View {
     @State private var name: String
     @State private var dataSize: String = "…"
     @State private var confirmReset = false
+    @State private var frameEvidenceMessage = ""
+    @State private var frameEvidenceBusy = false
+    @State private var frameEvidenceFiles: [URL] = []
+    @State private var showFrameEvidenceShare = false
     @FocusState private var nameFocused: Bool
 
     init(app: TLApp) {
@@ -395,6 +399,17 @@ struct TLAppSettingsView: View {
                     if settings.usesEfficientGraphics(for: app) && app.label.lowercased().contains("dungeons") {
                         Toggle("Dungeons Frame Generation (Beta)", isOn: Binding(get: { settings.frameGeneration }, set: { settings.selectFrameGeneration($0) }))
                         Text(Metal4DriverCapabilities.current.frameGeneration ? "30 rendered → 60 output target, including generated images. With Metal 4 on, this enables Metal 4 Enhancements. May add artifacts and latency. Turn off to restore your rendered-FPS setting. Restart required." : "30 rendered → 60 output target, including generated images. May add artifacts and input latency. Enabling this selects MoltenVK and turns Metal 4 off. Restart required.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                        Button("Capture FG evidence") {
+                            do { frameEvidenceMessage = try FramegenDiagnostics.arm(app: app, inUse: inUse) }
+                            catch { frameEvidenceMessage = error.localizedDescription }
+                        }.disabled(frameEvidenceBusy || !settings.frameGeneration)
+                        Button(frameEvidenceBusy ? "Preparing diagnostic bundle…" : "Share diagnostic bundle") { exportFrameEvidence() }
+                            .disabled(frameEvidenceBusy)
+                        Button("Cancel queued capture") { FramegenDiagnostics.cancelPending(); frameEvidenceMessage = "Capture cancelled. Existing files are kept." }
+                        Text(frameEvidenceMessage.isEmpty ? FramegenDiagnostics.status : frameEvidenceMessage)
+                            .font(.footnote).foregroundStyle(.secondary)
+                        Text("Optional: saves one matched image set locally. Capture adds temporary GPU and file work. Share combines images and logs in one ZIP; nothing uploads automatically. Stop viewing if uncomfortable.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                     Toggle("Shared Game Memory", isOn: $settings.sharedMemoryReserve)
@@ -545,6 +560,7 @@ struct TLAppSettingsView: View {
         .onChange(of: nameFocused) { focused in if !focused { rename() } }
         .onDisappear { rename() }
         .task { dataSize = await Self.measure(dataDirs) }
+        .sheet(isPresented: $showFrameEvidenceShare) { ShareSheet(items: frameEvidenceFiles.map { $0 as Any }) }
         .confirmationDialog("Reset the data of \(app.label)?", isPresented: $confirmReset, titleVisibility: .visible) {
             Button("Reset Game Data", role: .destructive) {
                 for dir in dataDirs { try? FileManager.default.removeItem(at: dir) }
@@ -555,6 +571,26 @@ struct TLAppSettingsView: View {
         } message: {
             Text("Saves, settings and caches the game made here are deleted.")
         }
+    }
+
+    private func exportFrameEvidence() {
+        do {
+            let (capture, logs, context, output) = try FramegenDiagnostics.exportContext()
+            frameEvidenceBusy = true
+            DispatchQueue.global(qos: .utility).async {
+                do {
+                    try FrameEvidenceFiles.bundle(capture: capture, logs: logs, context: context, output: output)
+                    DispatchQueue.main.async {
+                        frameEvidenceBusy = false; frameEvidenceFiles = [output]; showFrameEvidenceShare = true
+                        frameEvidenceMessage = "Bundle ready. Missing or incomplete capture stages are listed inside."
+                        FramegenDiagnostics.pruneExports(keeping: output)
+                    }
+                } catch {
+                    let message = error.localizedDescription
+                    DispatchQueue.main.async { frameEvidenceBusy = false; frameEvidenceMessage = "Export failed: " + message }
+                }
+            }
+        } catch { frameEvidenceMessage = error.localizedDescription }
     }
 
     @ViewBuilder

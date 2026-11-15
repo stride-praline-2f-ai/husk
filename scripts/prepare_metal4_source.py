@@ -10,7 +10,7 @@ ROOT=Path(__file__).resolve().parents[1]
 INPUTS=['patches/metal4/HuskMetal4Bridge.h','patches/metal4/HuskMetal4Framegen.mm',
         'patches/metal4/HuskMetal4Compiler.mm','patches/metalfx/HuskFramegen.inc',
         'patches/metalfx/HuskFramegen.metal','src/translation-layer-next/husk-tl-framegen.h',
-        'src/translation-layer-next/husk-tl-native-archive.h','scripts/prepare_metal4_source.py']
+        'src/translation-layer-next/husk-tl-native-archive.h','scripts/prepare_metal4_source.py','patches/metalfx/HuskFGCapture.inc']
 def framegen_include():
     inc=(ROOT/'patches/metalfx/HuskFramegen.inc').read_text().replace('#if TARGET_OS_IOS','#if TARGET_OS_IOS || defined(HUSK_FG_METAL4)',1)
     # The same real GPU algorithm can be exercised by native Mac regression
@@ -75,6 +75,7 @@ mtl_new_compiler(mtl_device *device)
     shutil.copy2(ROOT/'src/translation-layer-next/husk-tl-native-archive.h',out/'HuskNativeArchiveABI.h')
     inc=framegen_include()
     (out/'HuskFramegen.inc').write_text(inc)
+    shutil.copy2(ROOT/'patches/metalfx/HuskFGCapture.inc',out/'HuskFGCapture.inc')
     shader=(ROOT/'patches/metalfx/HuskFramegen.metal').read_text()
     (out/'HuskFramegenShader.inc').write_text('static const char *huskFramegenShader=R"HUSKFG('+shader+')HUSKFG";\n')
     (out/'stubs/HuskMetal4Bridge.c').write_text('''#include "../HuskMetal4Bridge.h"
@@ -86,7 +87,7 @@ bool husk_metal4_framegen_wait(void *q,void *d){(void)q;(void)d;return false;}
 bool husk_metal4_framegen_signal(void *d){(void)d;return false;}
 void husk_metal4_framegen_feedback(void *o,void *d){(void)o;(void)d;}
 ''')
-    outputs=list(changed)+[out/n for n in ['HuskMetal4Bridge.h','HuskMetal4Framegen.mm','HuskMetal4Compiler.mm','HuskFramegenABI.h','HuskNativeArchiveABI.h','HuskFramegen.inc','HuskFramegenShader.inc','stubs/HuskMetal4Bridge.c']]
+    outputs=list(changed)+[out/n for n in ['HuskMetal4Bridge.h','HuskMetal4Framegen.mm','HuskMetal4Compiler.mm','HuskFramegenABI.h','HuskNativeArchiveABI.h','HuskFramegen.inc','HuskFGCapture.inc','HuskFramegenShader.inc','stubs/HuskMetal4Bridge.c']]
     generated={str(p.relative_to(mesa)):hashlib.sha256(p.read_bytes()).hexdigest()for p in outputs}
     marker.write_text(json.dumps({'schema':1,'patch_sha256':contract,'native_archive_abi':2,'framegen_abi':1,'mesa':'b39d173ca9369c19fda2635be6655d308067e52d','playport':'26620bf5319a0f5a5cca47cfecec797cafe45493','generated_files':generated},indent=2)+'\n')
 if __name__=='__main__':prepare(Path(sys.argv[1]))

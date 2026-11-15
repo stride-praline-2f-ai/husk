@@ -1,5 +1,20 @@
 # M9-FG-COHERENCE-v1 — coherent intermediate reconstruction candidate168
 
+**Final168 build/package verified:** source023470100c159eb32ff2777a28658f334229e548,
+treeab48aaddb5c49148b79b2d27c853491752033e86;
+[complete handover/receipts](builds/023470100c159eb32ff2777a28658f334229e548.md).
+Apple43713800367/job132810981028 passes462test executions/61invocations with
+zero test skips, SDK31structures/96offsets and all10strict setup outcomes.
+Actual Apple Paravirtual GPU current shader passes both early/full invocations;
+frozen167 fails the same sequence with max96/mean16.345code-value phase error,
+frozen166 fails its HUD case, and the first unfiltered168 shader fails actual
+textured motion. Fresh both frameworks/app/threeextensions/package, actual new
+pyramid code/exact shaders, retained resources and full anonymous raw download
+are independently verified. I3/3=100%, new phoneD0/2, benefitE0/1UNKNOWN.
+No physical-game image/comfort, GPU-cost or energy acceptance is assumed.
+Earlier pending entries below retain pre-build history; no further uncomfortable
+comparison or recording is requested.
+
 15 November 2026. User explicitly requests a fix after
 [the decoded switch evidence](62-framegen-visible-switch.md) and
 [paired167 visual failure](61-returned167-framegen-quality.md). Preserve167's

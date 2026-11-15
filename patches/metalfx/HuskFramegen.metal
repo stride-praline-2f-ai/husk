@@ -64,6 +64,38 @@ kernel void huskFlow(texture2d<float,access::sample> previous [[texture(0)]],
             if(score<best){best=score;residual=error;displacement=candidate;}
         }
     }
+    // Resolve continuous motion after the half-pixel search. Quantizing every
+    // tile independently to0.5px makes a smooth camera pan vary across scenery.
+    // A centred RGB least-squares step rejects constant illumination offsets;
+    // retain a step only when it improves the actual photometric residual.
+    for(uint iteration=0;iteration<2;iteration++){
+        float3 sx=0,sy=0,se=0;float xx=0,xy=0,yy=0,bx=0,by=0;
+        constexpr float3 weight=float3(0.2126f,0.7152f,0.0722f);
+        for(int v=-1;v<=1;v++)for(int u=-1;u<=1;u++){
+            float2 p=centre+float2(u,v)*3.0f,q=p+displacement;
+            float3 a=previous.sample(fgSampler,q/size).rgb;
+            float3 e=a-current.sample(fgSampler,p/size).rgb;
+            float3 gx=previous.sample(fgSampler,(q+float2(0.5f,0))/size).rgb-previous.sample(fgSampler,(q-float2(0.5f,0))/size).rgb;
+            float3 gy=previous.sample(fgSampler,(q+float2(0,0.5f))/size).rgb-previous.sample(fgSampler,(q-float2(0,0.5f))/size).rgb;
+            sx+=gx;sy+=gy;se+=e;
+            xx+=dot(gx*gx,weight);xy+=dot(gx*gy,weight);yy+=dot(gy*gy,weight);
+            bx+=dot(gx*e,weight);by+=dot(gy*e,weight);
+        }
+        xx=max(0.0f,xx-dot(sx*sx,weight)/9.0f);yy=max(0.0f,yy-dot(sy*sy,weight)/9.0f);
+        xy-=dot(sx*sy,weight)/9.0f;bx-=dot(sx*se,weight)/9.0f;by-=dot(sy*se,weight)/9.0f;
+        if(xx+yy<0.0001f)break;
+        xx+=0.00001f;yy+=0.00001f;float determinant=xx*yy-xy*xy;
+        if(determinant<=0.0000000001f)break;
+        float2 delta=clamp(float2(xy*by-yy*bx,xy*bx-xx*by)/determinant,float2(-0.5f),float2(0.5f));
+        float2 candidate=displacement+delta;float error=0;
+        for(int v=-1;v<=1;v++)for(int u=-1;u<=1;u++){
+            float2 p=centre+float2(u,v)*3.0f;
+            error+=dot(abs(previous.sample(fgSampler,(p+candidate)/size).rgb-current.sample(fgSampler,p/size).rgb),weight);
+        }
+        error/=9.0f;
+        if(!isfinite(error)||error>=residual)break;
+        residual=error;displacement=candidate;
+    }
     flow.write(half4(half2(displacement),half(residual),1),tid);
 }
 kernel void huskInterpolate(texture2d<float,access::sample> previous [[texture(0)]],

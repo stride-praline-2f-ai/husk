@@ -6,7 +6,7 @@ ROOT=Path(__file__).resolve().parents[1]
 ZIP_SHA256='c47037417ac9b9a08b643cc0df97e7666fcb188435f90df9c95710796a6c8ccc'
 COMPAT='a734100aa2a773b1e782c33b541593c02e7bba35aa28a5524ea30f2025202c50'
 PIN='db66022459ffb663aa2b50f6b018bc2e124f5edf'
-INPUTS=['patches/metalfx/HuskDisplay.inc','src/translation-layer-next/husk-tl-display.h','scripts/prepare_spatial_driver.py','patches/metalfx/HuskSpatial.inc','patches/metalfx/HuskSpatialDriver.h','src/translation-layer-next/husk-tl-spatial.h','patches/metalfx/HuskArchive.inc','src/translation-layer-next/husk-tl-native-archive.h','patches/metalfx/HuskFramegen.inc','patches/metalfx/HuskFramegen.metal','src/translation-layer-next/husk-tl-framegen.h']
+INPUTS=['patches/metalfx/HuskDisplay.inc','src/translation-layer-next/husk-tl-display.h','scripts/prepare_spatial_driver.py','patches/metalfx/HuskSpatial.inc','patches/metalfx/HuskSpatialDriver.h','src/translation-layer-next/husk-tl-spatial.h','patches/metalfx/HuskArchive.inc','src/translation-layer-next/husk-tl-native-archive.h','patches/metalfx/HuskFramegen.inc','patches/metalfx/HuskFramegen.metal','src/translation-layer-next/husk-tl-framegen.h','patches/metalfx/HuskFGCapture.inc']
 def stage(archive):
     if hashlib.sha256(archive.read_bytes()).hexdigest()!=ZIP_SHA256:raise SystemExit('Verified driver archive checksum mismatch')
     digest=hashlib.sha256()

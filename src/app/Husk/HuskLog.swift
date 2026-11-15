@@ -20,6 +20,7 @@ import os
 /// translating" is preserved, which is exactly the ordering that matters when
 /// something goes wrong.
 enum HuskLog {
+    static let sessionID = UUID().uuidString
     private static let osLog = Logger(subsystem: "com.husk.app", category: "husk")
 
     private static var crashSignalFD: Int32 = -1
@@ -307,6 +308,7 @@ enum HuskLog {
         let built   = info["HuskBuildDate"] as? String ?? "?"
         log("boot", "build       : \(version) (\(build)) \(commit) built \(built)")
         log("boot", "pid         : \(getpid())")
+        log("boot", "session     : \(sessionID)")
         log("boot", "log file    : \(logFileURL.path)")
         // Every iOS 27 device except iPad8,11/8,12 enforces TXM, which is what makes
         // the debugger-assisted JIT path mandatory rather than optional.

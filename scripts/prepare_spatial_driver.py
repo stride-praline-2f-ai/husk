@@ -138,7 +138,7 @@ def prepare(src):
     changed[project]=original.replace('"-all_load",','"-all_load",\\n\\t\\t\\t\\t\\t"-weak_framework",\\n\\t\\t\\t\\t\\t"MetalFX",'.replace("\\n","\n").replace("\\t","\t"))
     # All anchors are checked before mutation.
     for path,content in changed.items():path.write_text(content)
-    for name in ["HuskSpatial.inc","HuskSpatialDriver.h","HuskFramegen.inc"]:shutil.copy2(ROOT/"patches/metalfx"/name,gpu/name)
+    for name in ["HuskSpatial.inc","HuskSpatialDriver.h","HuskFramegen.inc","HuskFGCapture.inc"]:shutil.copy2(ROOT/"patches/metalfx"/name,gpu/name)
     shutil.copy2(ROOT/"src/translation-layer-next/husk-tl-spatial.h",gpu/"HuskSpatialABI.h")
     shutil.copy2(ROOT/"patches/metalfx/HuskDisplay.inc",gpu/"HuskDisplay.inc")
     shutil.copy2(ROOT/"src/translation-layer-next/husk-tl-display.h",gpu/"HuskDisplayABI.h")
@@ -146,13 +146,13 @@ def prepare(src):
     shader=(ROOT/"patches/metalfx/HuskFramegen.metal").read_text()
     (gpu/"HuskFramegenShader.inc").write_text('static const char* huskFramegenShader=R"HUSKFG('+shader+')HUSKFG";\n')
     inputs=[ROOT/"patches/metalfx/HuskDisplay.inc",ROOT/"src/translation-layer-next/husk-tl-display.h",Path(__file__),ROOT/"patches/metalfx/HuskSpatial.inc",ROOT/"patches/metalfx/HuskSpatialDriver.h",ROOT/"src/translation-layer-next/husk-tl-spatial.h",ROOT/"patches/metalfx/HuskArchive.inc",ROOT/"src/translation-layer-next/husk-tl-native-archive.h"]
-    inputs += [ROOT/"patches/metalfx/HuskFramegen.inc",ROOT/"patches/metalfx/HuskFramegen.metal",ROOT/"src/translation-layer-next/husk-tl-framegen.h"]
+    inputs += [ROOT/"patches/metalfx/HuskFramegen.inc",ROOT/"patches/metalfx/HuskFramegen.metal",ROOT/"src/translation-layer-next/husk-tl-framegen.h",ROOT/"patches/metalfx/HuskFGCapture.inc"]
     digest=hashlib.sha256()
     for path in inputs:digest.update(path.read_bytes())
     archive=(ROOT/"patches/metalfx/HuskArchive.inc").read_text()
     (gpu/"HuskArchive.inc").write_text('#define HUSK_ARCHIVE_PATCH_ID "'+digest.hexdigest()+'"\n#define HUSK_ARCHIVE_COMPAT_ID "'+compatibility+'"\n'+archive)
     shutil.copy2(ROOT/"src/translation-layer-next/husk-tl-native-archive.h",gpu/"HuskArchiveABI.h")
-    manifest={"schema":1,"upstream_commit":PIN,"upstream_version":"1.4.2","husk_spatial_patch_sha256":digest.hexdigest(),"husk_native_pipeline_patch_sha256":digest.hexdigest(),"native_archive_abi":2,"native_archive_cache_schema":2,"native_archive_compatibility_id":compatibility,"native_archive_compatibility_inputs":compatibility_inputs,"feature":"M9-SPATIAL-v3+M5-NATIVE-ARCHIVE-v1+M4-DISPLAY-v1+M9-FLOW-FRAMEGEN-v1","default_enabled":False}
+    manifest={"schema":1,"upstream_commit":PIN,"upstream_version":"1.4.2","husk_spatial_patch_sha256":digest.hexdigest(),"husk_native_pipeline_patch_sha256":digest.hexdigest(),"native_archive_abi":2,"native_archive_cache_schema":2,"native_archive_compatibility_id":compatibility,"native_archive_compatibility_inputs":compatibility_inputs,"feature":"M9-SPATIAL-v3+M5-NATIVE-ARCHIVE-v1+M4-DISPLAY-v1+M9-FLOW-FRAMEGEN-v1","default_enabled":False,"framegen_capture_abi":1}
     (src/"HuskSpatialBuild.json").write_text(json.dumps(manifest,indent=2)+"\n")
     print(json.dumps(manifest))
 if __name__=="__main__":prepare(Path(sys.argv[1]).resolve())

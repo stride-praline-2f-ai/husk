@@ -1,0 +1,88 @@
+{
+  "scope": "M9 returned168 background blur plus requested diagnostic expansion",
+  "provenance": "User pasted native log and explicitly confirmed build168 after full restart with FG ON; no build/source header in the excerpt.",
+  "source_stamp_in_excerpt": false,
+  "reported_build": "168",
+  "expected_delivered_source": "023470100c159eb32ff2777a28658f334229e548",
+  "visual_result": "FAIL: scenery still becomes fuzzy while character stays clearer",
+  "renderer": "HuskKosmicKrisp source Metal4",
+  "swapchain_and_drawable": [
+    1816,
+    1280
+  ],
+  "requested_real_fps": 30,
+  "lpm_observed": [
+    0
+  ],
+  "thermal_observed": [
+    0
+  ],
+  "windows": [
+    {
+      "real_fps": 28.5,
+      "p95_ms": 37.73,
+      "max_ms": 372.81,
+      "intervals": 286,
+      "slow_intervals": 5,
+      "pipeline_total_ms": 717.338,
+      "pipeline_max_ms": 33.355,
+      "fg_rendered": 288,
+      "presented_real": 286,
+      "presented_generated": 283,
+      "fg_dropped": 0,
+      "fg_resets": 0,
+      "gpu_errors": 0
+    },
+    {
+      "real_fps": 30.0,
+      "p95_ms": 37.57,
+      "max_ms": 46.62,
+      "intervals": 301,
+      "slow_intervals": 3,
+      "pipeline_total_ms": 41.099,
+      "pipeline_max_ms": 21.123,
+      "fg_rendered": 589,
+      "presented_real": 587,
+      "presented_generated": 584,
+      "fg_dropped": 0,
+      "fg_resets": 0,
+      "gpu_errors": 0
+    }
+  ],
+  "steady_counter_deltas": {
+    "rendered": 301,
+    "real_callbacks": 301,
+    "generated_callbacks": 301,
+    "unique_interpolated_images": "UNAVAILABLE"
+  },
+  "lifecycle_completed_sequences": [
+    {
+      "sequence": 1,
+      "paused": true
+    },
+    {
+      "sequence": 2,
+      "paused": false
+    },
+    {
+      "sequence": 3,
+      "paused": true
+    }
+  ],
+  "heartbeat_final": 909,
+  "final_state": "intentional completed pause, not demonstrated launch freeze",
+  "cache_restored_bytes": 0,
+  "cache_checkpoints_bytes": [
+    12957762,
+    13453623
+  ],
+  "exact_engine_postprocess_values": "UNAVAILABLE; current logs describe requests only",
+  "missing_decision_inputs": [
+    "real guest colour before FG",
+    "generated and following-real output from the same source pair",
+    "forward/backward field and validity/reconstruction model",
+    "actual consumer GPU and presentation timings with explicit capture overhead",
+    "source/build/session identity in native logs and one coherent export"
+  ],
+  "decision": "168 physical visual criterion failed. Preserve FG OFF/native60; no uncomfortable repeat test. Add bounded opt-in stage evidence plus feasible fractional precision repair; no guessed engine-CVar cause."
+}

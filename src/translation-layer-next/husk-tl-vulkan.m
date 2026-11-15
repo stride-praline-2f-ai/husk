@@ -103,6 +103,31 @@ void tl_vk_configure(const char *path, const char *frame_dir, int frame_every)
 }
 
 static bool framegen_requested;
+static char diagnostic_session[64]="UNAVAILABLE";
+static char framegen_capture_directory[768];
+void husk_ue4_set_diagnostic_session(const char *session){snprintf(diagnostic_session,sizeof diagnostic_session,"%s",session?session:"UNAVAILABLE");}
+void husk_ue4_set_framegen_capture_directory(const char *directory){snprintf(framegen_capture_directory,sizeof framegen_capture_directory,"%s",directory?directory:"");}
+void tl_vk_log_identity(void){
+    NSDictionary *info=NSBundle.mainBundle.infoDictionary;
+    tl_log_line("runtime identity: Husk %s (%s), source %s, built %s, host-session %s",
+        [(info[@"CFBundleShortVersionString"]?:@"UNAVAILABLE") UTF8String],[(info[@"CFBundleVersion"]?:@"UNAVAILABLE") UTF8String],
+        [(info[@"HuskBuildCommit"]?:@"UNAVAILABLE") UTF8String],[(info[@"HuskBuildDate"]?:@"UNAVAILABLE") UTF8String],diagnostic_session);
+}
+int tl_vk_framegen_capture_arm(const char *directory,uint32_t first,uint32_t stride,uint32_t pairs){
+    if(!V.lib||!framegen_requested)return -1;
+    typedef int(*fn)(const tl_fg_capture_config*);fn configure=(fn)vk_symbol("vkHuskFramegenCaptureConfigure");
+    if(!configure){tl_log_line("[M3/M9-FG-CAPTURE] unavailable in selected driver; no readback enabled");return 0;}
+    tl_fg_capture_config c={.version=1,.size=sizeof(c),.enabled=directory!=NULL,.pair_limit=pairs,.first_frame=first,.frame_stride=stride};
+    if(directory){if(strlen(directory)>=sizeof c.directory)return 0;snprintf(c.directory,sizeof c.directory,"%s",directory);}
+    int accepted=configure(&c);
+    if(accepted&&directory){
+        char *requests=tl_ue4_graphics_request_dump();
+        if(requests){NSString *path=[[NSString stringWithUTF8String:directory] stringByAppendingPathComponent:@"engine-requests.txt"];
+            NSError *error=nil;BOOL saved=[[NSData dataWithBytes:requests length:strlen(requests)] writeToFile:path options:NSDataWritingAtomic error:&error];
+            if(!saved)tl_log_line("[M3/M9-FG-CAPTURE] request dump write failed; actual engine values remain unavailable");free(requests);}
+    }
+    tl_log_line("[M3/M9-FG-CAPTURE] %s (ABI1); image readbacks only for explicit bounded capture",accepted?"request accepted":"request declined");return accepted;
+}
 static atomic_bool framegen_paused;
 void husk_ue4_set_frame_generation(bool enabled){framegen_requested=enabled;}
 void tl_vk_framegen_pause(bool paused){
@@ -124,6 +149,7 @@ bool tl_vk_framegen_prepare(const char* project,int width,int height){
     if(!configure||!configure(&c)){tl_log_line("[M9-FRAMEGEN] unavailable; original rendered FPS retained");return false;}
     tl_vk_framegen_pause(atomic_load(&framegen_paused));
     husk_ue4_set_efficiency(true,30);
+    if(framegen_capture_directory[0]){tl_vk_framegen_capture_arm(framegen_capture_directory,180,90,1);framegen_capture_directory[0]=0;}
     tl_log_line("[M9-FRAMEGEN] explicit colour-flow beta: 30 rendered FPS, 60 Hz presentation target; generated images add latency/work; actual display/quality/energy pending");
     return true;
 }

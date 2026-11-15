@@ -5,6 +5,13 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 @unittest.skipUnless(sys.platform=='darwin','Apple Objective-C/MetalFX SDK required; IPA CI runs this check')
 class SpatialLifetimeTests(unittest.TestCase):
+ def test_bounded_framegen_capture_real_gpu_blits_and_cancellation(self):
+  with tempfile.TemporaryDirectory() as d:
+   p=Path(d);(p/'HuskFramegenABI.h').write_bytes((ROOT/'src/translation-layer-next/husk-tl-framegen.h').read_bytes())
+   binary=p/'capture';frames=p/'frames';frames.mkdir()
+   subprocess.run(['clang++','-std=c++17','-fno-objc-arc','-fblocks','-I',str(p),'-I',str(ROOT/'patches/metalfx'),str(ROOT/'tests/translation-layer/framegen_capture_contract.mm'),'-framework','Foundation','-framework','Metal','-framework','QuartzCore','-o',str(binary)],check=True)
+   subprocess.run([str(binary),str(frames)],check=True)
+
  def test_ownership_preparation_reuse_failure_serialization_and_reconfiguration(self):
   with tempfile.TemporaryDirectory() as d:
    p=Path(d);tl=ROOT/'src/translation-layer-next';inc=ROOT/'patches/metalfx'
@@ -96,6 +103,7 @@ int main(){@autoreleasepool{
   with tempfile.TemporaryDirectory() as d:
    p=Path(d);tl=ROOT/'src/translation-layer-next'
    (p/'HuskFramegenABI.h').write_text((tl/'husk-tl-framegen.h').read_text())
+   (p/'HuskFGCapture.inc').write_bytes((ROOT/'patches/metalfx/HuskFGCapture.inc').read_bytes())
    (p/'HuskFramegenShader.inc').write_text('static const char* huskFramegenShader="";')
    # Only platform/headroom/unused iOS clock-factory facades differ; execute the actual drawable,
    # completion and bounded pool implementation without allocating a GPU.
@@ -161,5 +169,9 @@ int main(){@autoreleasepool{
    self.assertRegex(unfiltered.stdout,r'QUALITY_REJECT: (textured motion was not recovered|estimated textured flow did not preserve)')
    print(unfiltered.stdout)
    print('PASS: pre-pyramid candidate rejected by actual textured flow; filtered production search passes')
+   half_pixel=subprocess.run([str(exe),str(ROOT/'tests/translation-layer/fixtures/framegen-168.metal')],text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=30)
+   self.assertEqual(half_pixel.returncode,5,half_pixel.stdout)
+   self.assertIn('QUALITY_REJECT: camera pan quantized between independent tiles',half_pixel.stdout)
+   print(half_pixel.stdout)
 
 if __name__=='__main__':unittest.main()
