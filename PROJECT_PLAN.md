@@ -1,5 +1,30 @@
 # Husk master development plan
 
+## 19 November 2026: APPLE-FX-DUO-60 native spatial profile (source branch; build/device pending)
+
+Supersedes Metal4/KosmicKrisp and old colour-only framegen in gameplay for the current request.
+Implemented on `feature/apple-native-metalfx-rebuild`: pinned MoltenVK-only launch,
+legacy FG forcibly OFF, native Apple `MTLFXSpatialScaler` 50/60/67/80% Duo input
+presets with nearest-8 pixel alignment, persistent Balanced 60% selection,
+requested 60 **real** engine FPS, estimated input/output UI, and a separate
+native Apple `MTLFXFrameInterpolator` adapter gated on genuine engine buffers.
+The physical panel is not a 10:7 target; current fullscreen output remains
+~1816×1280. Portable C11 geometry checks passed locally; full Xcode/MetalFX
+build, 52 regression suites, signed IPA, actual phone frame cadence, UI quality,
+energy, and live fold/unfold remain UNVERIFIED. The prior Apple native
+interpolation engine feed and present bridge are STILL BLOCKED: Vulkan final
+colour swapchain provides neither validated depth/motion vectors nor full
+presentation timing. Do not fabricate them or display interpolation as active.
+For safe fold behaviour, preserve old Vulkan swapchain until an ordered
+swapchain rebuild can be implemented; restart the game upon display transition.
+Keep data/caches and fallback unchanged. See
+[69 Apple native MetalFX Duo](docs/performance/69-apple-native-metalfx-duo.md).
+Next milestone: verify Apple SDK compile + full regressions; acquire Vulkan
+renderpass colour/depth/velocity evidence, design render-thread transition,
+then separate device and energy tests. No accepted I/D/E/energy credit until
+the existing evidence gates are met.
+
+
 **15 November —172 Dungeons consolidation and FG evidence VERIFIED:** [Handover](docs/performance/builds/a11643b4bba1ea8bd09b08e174ad1a38104d0e23.md), [implementation](docs/performance/68-dungeons-settings-implementation.md). Binary source`a11643b4bba1ea8bd09b08e174ad1a38104d0e23`; Apple43750636336/job132923575069 passes477test executions/64invocations/zero skips, all51suites/font/SDK/all10setup and fresh app/threeextensions/package. Both exact driver components reused from fresh687a18e2/run43748103902 (479tests/65invocations/zero skips); independent downloaded IPA verifies actual new shader/patch/code/contracts/UI/Java/helpers/font and SHA05f25e43e9c775ead8b5cd6bb50fefe1f499d830aa572d04475c1dda7cf7aa68. One Dungeons settings path, offline controller editor, complete modern profiles, measured source/generated/real RGB/timing evidence and midpoint-coordinate repair included. Missing Swift bridge and timing-fixture race failures retained and corrected. Phone blur/cadence remains unconfirmed; no new uncomfortable recording or energy claim. Documentation-only delivery updates do not change binary identity.
 
 **15 November —172 Dungeons consolidation / FG stage evidence IMPLEMENTED, build pending:** [Scope and checks](docs/performance/68-dungeons-settings-implementation.md). One graphics/FPS/resolution path; offline controller editing and one external Diagnostics destination replace Dungeons in-game gauge/settings duplication. Preserve three-finger Close/Pad/Hide. Profile schema2 includes modern renderer/FG/automatic flags while legacy profiles remain explicitly partial. One-shot writer measures exact source/generated/real RGB differences and edge sums; export records effective launch/driver/session/settings and measured stage findings without claiming a certain engine cause. Midpoint-coordinate repair and frozen171 GPU witness included.51 Python suites exit0 locally with Apple skips; macOS font, Apple GPU/full build/IPA verification still required. User requests quick IPA with careful coding; publication/build follows checks, phone blur remains failed/unresolved, no new recording requested.
