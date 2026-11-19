@@ -90,6 +90,18 @@ class SettingsGroupingTests(unittest.TestCase):
         self.assertIn("tl_publication_wait(once,once_initializing)", c)
         self.assertIn("pthread_cond_wait(&buckets[i].condition,&buckets[i].mutex)", parking)
 
+    def test_gpu_private_native_metalfx_retains_one_prepared_scaler_per_image(self):
+        native = (ROOT / "patches/metalfx/HuskSpatial.inc").read_text()
+        self.assertIn("desc.storageMode=MTLStorageModePrivate", native)
+        self.assertIn("huskSpatialPrepareImage(state,c,format)", native)
+        self.assertIn("scaler.colorTexture=input;scaler.inputContentWidth=c.input_width", native)
+        self.assertIn("if(output!=state->boundOutput)", native)
+        self.assertIn("[scaler encodeToCommandBuffer:command]", native)
+        self.assertIn("std::lock_guard<std::mutex> guard(state->lock)", native)
+        self.assertIn("MTLFXSpatialScalerColorProcessingModeLinear", native)
+        self.assertIn("MTLFXSpatialScalerColorProcessingModePerceptual", native)
+        self.assertNotIn("newTextureWithDescriptor", native[native.index('bool huskSpatialEncode('):])
+
     def test_general_diagnostics_grouped_outside_about(self):
         self.assertIn('row(HuskDiagnosticsSettings()', APP)
         general = APP.split("struct HuskDiagnosticsSettings: View", 1)[1].split("struct AboutSettings: View", 1)[0]
