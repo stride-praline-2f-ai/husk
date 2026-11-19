@@ -1,5 +1,29 @@
 # Husk master development plan
 
+## 19 November 2026: JIT-CPU-WAIT-v1 for Dungeons (source only; energy unverified)
+
+Per user's battery-efficiency request, default **native initialization wait
+parking** ON only for Dungeons' JIT-loaded ARM64/UE4 runtime. Existing
+`husk-tl-publication-wait.c` replaces `sched_yield` spins with native
+predicate-checked condition-variable sleeps on concurrent
+`pthread_once` and lazy bionic-object initialization. New saved
+`dungeonsJITLowPowerWait` preference and Advanced opt-out keep original
+other-game behavior; Duo automatic CPU policy preserves the setting after
+resetting GPU queue experiments. Existing 60 real FPS, JIT bootstrap,
+executable allocation and all caches remain unchanged. New assertions
+in existing Swift launch/persistence and UI tests, plus retained actual
+native publication-wait concurrency suite. Full 52-suite Apple CI,
+IPA, Dungeons launch, p95 cadence, battery current and thermal benefit:
+**UNVERIFIED**. Condition parking is useful only where actual
+initialization contention occurs. Need matched ON/OFF energy data, not
+inferred savings. Mechanism and fallback:
+[70 JIT low-power waits](docs/performance/70-jit-native-low-power-waits.md).
+This independent launch/runtime contention item follows the
+APPLE-FX-DUO-60 rendering branch and precedes real-device energy
+acceptance; it does **not** count as a validated M4/M9 energy
+improvement or alter the permanent weights.
+
+
 ## 19 November 2026: APPLE-FX-DUO-60 native spatial profile (source branch; build/device pending)
 
 Supersedes Metal4/KosmicKrisp and old colour-only framegen in gameplay for the current request.
