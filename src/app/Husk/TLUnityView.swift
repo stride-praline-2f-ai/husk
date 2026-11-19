@@ -313,6 +313,37 @@ final class TLUnityUIView: UIView, UIKeyInput {
     }
 
     private var frameGenerationRate = FrameGenerationRate()
+    private var lastDiagnosticsLogAt: TimeInterval = -.infinity
+    private var appleInterpolatorSupported: Bool?
+    /// Passive snapshots only. No CPU thread sampling, GPU callbacks, per-frame
+    /// renderpass interception, readback or extra Metal command buffers.
+    private func logDungeonsHealth(_ fps: Double) {
+        guard autoDungeonsLog, engine == .ue4, launched else { return }
+        let now = ProcessInfo.processInfo.systemUptime
+        guard now - lastDiagnosticsLogAt >= 15 else { return }
+        lastDiagnosticsLogAt = now
+        if appleInterpolatorSupported == nil {
+            appleInterpolatorSupported = husk_native_metalfx_supported()
+            HuskLog.log("game-diagnostics", "Apple native frame interpolator hardware supported: \(appleInterpolatorSupported == true); NOT active: genuine UE4 motion/depth, GPU frame leases and dual presentation have not been connected")
+        }
+        var spatial = tl_spatial_stats()
+        tl_vk_spatial_snapshot(&spatial)
+        var candidate = tl_ri_metalfx_candidates()
+        tl_ri_metalfx_snapshot(&candidate)
+        let status = !candidate.active ? "unavailable" :
+            candidate.lost_observations > 0 ? "incomplete" :
+            candidate.readable_depth_groups > 0 && candidate.writable_vector_groups > 0 && candidate.readable_color_groups > 0
+                ? "plausible format groups only" : "no complete format candidate"
+        let mib = UInt64(os_proc_available_memory()) / 1048576
+        HuskLog.log("game-diagnostics",
+            String(format: "host render %.1f FPS; memory headroom %llu MiB; thermal class %ld; Low Power Mode %@; MetalFX spatial input %ux%u -> output %ux%u, configured %u, encoded %llu, failures %llu; Vulkan image-only depth-format groups %u, readable depth %u, velocity-like %u, readable velocity-like %u, colour %u; evidence %@; Apple frame interpolation OFF (semantic textures and presentation not verified)",
+                   fps, mib, ProcessInfo.processInfo.thermalState.rawValue,
+                   ProcessInfo.processInfo.isLowPowerModeEnabled ? "on" : "off",
+                   spatial.input_width, spatial.input_height, spatial.output_width, spatial.output_height,
+                   spatial.configured, spatial.encoded, spatial.failures,
+                   candidate.depth_attachment_groups, candidate.readable_depth_groups, candidate.vector_format_groups,
+                   candidate.writable_vector_groups, candidate.readable_color_groups, status))
+    }
     private func updateStats() {
         var p = husk_unity_perf()
         husk_unity_perf_snapshot(&p)
@@ -330,6 +361,7 @@ final class TLUnityUIView: UIView, UIKeyInput {
         }
         stats.text = text
         onStats?(text)
+        if autoDungeonsLog { logDungeonsHealth(Double(p.fps)) }
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
