@@ -724,7 +724,7 @@ static int w_vkAcquireNextImageKHR(void *device, uint64_t swapchain, uint64_t ti
     int r = real ? real(device, swapchain, timeout, sem, fence, index) : -3;
     if (measure) record_host_timing(TIMING_ACQUIRE, start);
     if (r != VK_SUCCESS && atomic_fetch_add(&bad, 1) < 20) tl_log_line("vulkan: vkAcquireNextImageKHR -> %d", r);
-    else if (atomic_load_explicit(&seen,memory_order_relaxed)<2 &&
+    else if (r == VK_SUCCESS && atomic_load_explicit(&seen,memory_order_relaxed)<2 &&
              atomic_fetch_add_explicit(&seen,1,memory_order_relaxed)<2)
         tl_log_line("vulkan: vkAcquireNextImageKHR -> %d (image %u)", r, index ? *index : 0);
     return r;
