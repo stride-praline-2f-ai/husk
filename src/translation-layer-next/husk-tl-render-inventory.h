@@ -11,6 +11,19 @@ typedef struct {
     uint64_t dropped_capacity,dropped_contention,hash_probes;
     uint32_t asset_groups,target_groups,area_groups;
 } tl_ri_stats;
+/* Advisory format/usage/extent screen only. These counters CANNOT prove that
+ * an image holds Unreal scene velocity or depth at presentation time.
+ * Never admit MetalFX frame interpolation using this result alone. */
+typedef struct {
+    uint32_t version, size;
+    bool active;
+    uint32_t depth_attachment_groups, readable_depth_groups;
+    uint32_t vector_format_groups, writable_vector_groups;
+    uint32_t renderable_color_groups, readable_color_groups;
+    uint64_t retained_image_groups, lost_observations;
+} tl_ri_metalfx_candidates;
+void tl_ri_metalfx_snapshot(tl_ri_metalfx_candidates *out);
+
 void husk_ue4_set_render_inventory(bool value);
 void tl_ri_activate(const char *project);
 bool tl_ri_active(void);
