@@ -138,24 +138,44 @@ struct TLAppSettings: Codable, Equatable {
     var pipelineFeedback = false
     var automaticDuoProfile = true
     var a20EfficiencyWorkers = true
-    var frameGeneration = false
-    var metal4Renderer = false
-    var enhancedMetal4 = false
+    // Prefer the real source-built Metal 4 path on new installations only when
+    // its packaged frame-generation bridge has passed the binary manifest gate.
+    // Explicit saved choices and unsupported packages keep their own settings.
+    static func prefersMetal4Framegen(_ caps: Metal4DriverCapabilities) -> Bool {
+        caps.frameGeneration && caps.nativeArchives
+    }
+    var frameGeneration = TLAppSettings.prefersMetal4Framegen(Metal4DriverCapabilities.current)
+    var metal4Renderer = TLAppSettings.prefersMetal4Framegen(Metal4DriverCapabilities.current)
+    var enhancedMetal4 = TLAppSettings.prefersMetal4Framegen(Metal4DriverCapabilities.current)
+    private mutating func disableMetal4FramegenConflicts() {
+        guard metal4Renderer && enhancedMetal4 && frameGeneration else { return }
+        // MetalFX spatial belongs to MoltenVK; clock/limiter and queue experiments
+        // distort the 30-rendered / 60-output presentation path.
+        spatialUpscaling = false
+        clockPresentation = false
+        feedbackClockCorrection = false
+        engineOnlyLimiter = false
+        vulkanSubmission = .driverDefault
+        execution = .init()
+    }
     mutating func selectMetal4(_ enabled: Bool, bridgeAvailable: Bool = Metal4DriverCapabilities.current.frameGeneration) {
         metal4Renderer = enabled
         if enabled && frameGeneration {
             if bridgeAvailable { enhancedMetal4 = true } else { frameGeneration = false }
         }
+        disableMetal4FramegenConflicts()
     }
     mutating func selectFrameGeneration(_ enabled: Bool, bridgeAvailable: Bool = Metal4DriverCapabilities.current.frameGeneration) {
         frameGeneration = enabled
         if enabled && metal4Renderer {
             if bridgeAvailable { enhancedMetal4 = true } else { metal4Renderer = false }
         }
+        disableMetal4FramegenConflicts()
     }
     mutating func selectEnhancedMetal4(_ enabled: Bool, bridgeAvailable: Bool = Metal4DriverCapabilities.current.nativeArchives) {
         enhancedMetal4 = enabled && bridgeAvailable
         if !enhancedMetal4 && metal4Renderer { frameGeneration = false }
+        disableMetal4FramegenConflicts()
     }
     // DUNGEONS_SIMPLE_POLICY_BEGIN
     func dungeonsFrameChoice(automaticActive: Bool) -> Int {
@@ -300,9 +320,10 @@ struct TLAppSettings: Codable, Equatable {
         pipelineFeedback = try c.decodeIfPresent(Bool.self, forKey: .pipelineFeedback) ?? false
         automaticDuoProfile = try c.decodeIfPresent(Bool.self, forKey: .automaticDuoProfile) ?? true
         a20EfficiencyWorkers = try c.decodeIfPresent(Bool.self, forKey: .a20EfficiencyWorkers) ?? true
-        frameGeneration = try c.decodeIfPresent(Bool.self, forKey: .frameGeneration) ?? false
-        metal4Renderer = try c.decodeIfPresent(Bool.self, forKey: .metal4Renderer) ?? false
-        enhancedMetal4 = try c.decodeIfPresent(Bool.self, forKey: .enhancedMetal4) ?? false
+        let preferredMetal4 = Self.prefersMetal4Framegen(Metal4DriverCapabilities.current)
+        frameGeneration = try c.decodeIfPresent(Bool.self, forKey: .frameGeneration) ?? preferredMetal4
+        metal4Renderer = try c.decodeIfPresent(Bool.self, forKey: .metal4Renderer) ?? preferredMetal4
+        enhancedMetal4 = try c.decodeIfPresent(Bool.self, forKey: .enhancedMetal4) ?? preferredMetal4
         frameGeneration = DuoDisplayPolicy.usesFrameGeneration(metal4: metal4Renderer, requested: frameGeneration,
             metal4Bridge: enhancedMetal4 && Metal4DriverCapabilities.current.frameGeneration)
         sharedMemoryReserve = try c.decodeIfPresent(Bool.self, forKey: .sharedMemoryReserve) ?? true
@@ -325,6 +346,7 @@ struct TLAppSettings: Codable, Equatable {
         haptics = try c.decodeIfPresent(Bool.self, forKey: .haptics) ?? true
         geode = try c.decodeIfPresent(Bool.self, forKey: .geode) ?? false
         window = try c.decodeIfPresent(WindowMode.self, forKey: .window) ?? .auto
+        disableMetal4FramegenConflicts()
     }
 
     private static func url(_ id: String) -> URL {
@@ -435,7 +457,7 @@ struct TLAppSettingsView: View {
                 }, set: { settings.selectDungeonsFrameChoice($0, bridgeAvailable: Metal4DriverCapabilities.current.frameGeneration) })) {
                     Text("60 FPS").tag(60)
                     Text("30 FPS").tag(30)
-                    Text("30 → 60 · Frame Generation (Beta)").tag(120)
+                    Text("30 → 60 · Metal Frame Generation (Beta)").tag(120)
                 }.disabled(!settings.usesEfficientGraphics(for: app))
                 Picker("Resolution", selection: Binding(get: { settings.duoAutomaticActive(for: app) ? 0 : settings.dungeonsResolutionChoice }, set: { settings.selectDungeonsResolutionChoice($0) })) {
                     Text("Automatic").tag(0)
@@ -538,7 +560,9 @@ struct TLAppSettingsView: View {
                     }
                 }
                 if settings.duoAutomaticActive(for: app) {
-                    Text("Active: automatic worker policy, driver-default queues and MetalFX 80% on MoltenVK. Saved manual experiments are retained but overridden. Diagnostics remain available.")
+                    Text(settings.metal4Renderer
+                         ? "Active: automatic workers and driver-default queues. MetalFX and clock experiments are off for Metal 4. Diagnostics remain available."
+                         : "Active: automatic workers, driver-default queues and MetalFX 80% on MoltenVK. Diagnostics remain available.")
                 }
                 Button("Saved graphics experiments") { profilesSheet = true }
                     .sheet(isPresented: $profilesSheet) { EfficiencyProfilesView(settings: $settings, game: app.packageName ?? app.label) }
