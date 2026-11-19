@@ -74,6 +74,22 @@ class SettingsGroupingTests(unittest.TestCase):
         self.assertIn("MTLFXFrameInterpolatorDescriptor", native)
         self.assertIn("!i->previous_color || !i->current_color || !i->depth || !i->motion", native)
 
+    def test_dungeons_jit_wait_parking_defaults_and_manual_opt_out(self):
+        launch = (ROOT / "src/app/Husk/TLUnityView.swift").read_text()
+        c = (ROOT / "src/translation-layer-next/husk-tl-bionic-pthread.c").read_text()
+        parking = (ROOT / "src/translation-layer-next/husk-tl-publication-wait.c").read_text()
+        self.assertIn("var dungeonsJITLowPowerWait = true", GAME)
+        self.assertIn("func effectiveExecution(for app: TLApp)", GAME)
+        self.assertIn("if isDungeons(app) { selected.initializationParking = dungeonsJITLowPowerWait }", GAME)
+        self.assertIn("Toggle(\"Park idle native JIT waits\", isOn: $settings.dungeonsJITLowPowerWait)", GAME)
+        self.assertIn("execution: settings.effectiveExecution(for: app)", launch)
+        self.assertIn("let keepJITLowPowerWait = execution.initializationParking", launch)
+        self.assertIn("execution.initializationParking = keepJITLowPowerWait", launch)
+        self.assertIn("husk_ue4_set_initialization_parking(execution.initializationParking)", launch)
+        self.assertIn("tl_publication_wait(o,object_initializing)", c)
+        self.assertIn("tl_publication_wait(once,once_initializing)", c)
+        self.assertIn("pthread_cond_wait(&buckets[i].condition,&buckets[i].mutex)", parking)
+
     def test_general_diagnostics_grouped_outside_about(self):
         self.assertIn('row(HuskDiagnosticsSettings()', APP)
         general = APP.split("struct HuskDiagnosticsSettings: View", 1)[1].split("struct AboutSettings: View", 1)[0]
