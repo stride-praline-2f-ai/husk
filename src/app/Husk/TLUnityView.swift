@@ -435,12 +435,13 @@ final class TLUnityUIView: UIView, UIKeyInput {
         // The existing spatial scaler uses Apple's MetalFX API through
         // MoltenVK. It needs no Metal 4 renderer or synthetic frame generator.
         spatialUpscaling = true
-        spatialInputPercent = DuoDisplayPolicy.inputPercent
+        // Keep the per-game Duo preset propagated from TLAppSettings. It
+        // remains selectable even with automatic device tuning enabled.
         execution = .init()
         engineOnlyLimiter = false; clockPresentation = false; feedbackClockCorrection = false
         driverProfiling = false; pipelineIdentification = false; pipelineFeedback = false; renderTargetInventory = false
         nativePipelineArchiveMode = 0; nativeArchiveVerification = false
-        HuskLog.log("tl", "Automatic Duo inner-screen starting profile: native Apple MetalFX spatial 80% requested through MoltenVK; 60 real FPS, worker mode \(threadPolicy), normal-priority worker allowance \(automaticFastWorkerBudget); native interpolation blocked until engine motion/depth and presentation bridge exist")
+        HuskLog.log("tl", "Automatic Duo inner-screen starting profile: Apple MetalFX spatial \(spatialInputPercent)% requested through MoltenVK; 60 real FPS, worker mode \(threadPolicy), normal-priority worker allowance \(automaticFastWorkerBudget); native frame interpolation requires genuine engine motion/depth and presentation integration")
     }
 
     private func launch(width: Int, height: Int) {
@@ -1229,7 +1230,7 @@ struct TLCocosAttemptView: View {
                     // The game always has the whole screen: it is told its size once, as it starts, so nothing may take space from it.
                     // The bar and the log are drawn over it instead, and hiding them shows everything underneath.
                     TLUnityScreen(apk: apk, extraApks: Array(app.apks.dropFirst()), dataDir: dataDir, engine: engine, portrait: portrait,
-                                  scale: settings.renderScale(for: app), sharpGraphics: settings.usesSharpGraphics(for: app), efficientGraphics: settings.usesEfficientGraphics(for: app), efficientFrameLimit: settings.efficientFrameRate.rawValue, threadPolicy: settings.workerScheduling.rawValue, submissionMode: settings.vulkanSubmission.rawValue, driverProfiling: settings.driverPhaseProfiling, pipelineIdentification: settings.pipelineIdentification, engineOnlyLimiter: settings.engineOnlyLimiter, renderTargetInventory: settings.renderTargetInventory, pipelineFeedback: settings.pipelineFeedback, spatialUpscaling: settings.spatialUpscaling, spatialInputPercent: settings.spatialInputPercent, clockPresentation: settings.clockPresentation, feedbackClockCorrection: settings.feedbackClockCorrection, nativePipelineArchiveMode: settings.nativePipelineArchiveMode, nativeArchiveVerification: settings.nativeArchiveVerification, execution: settings.execution, automaticDuoProfile: settings.supportsDuoAutomatic(for: app), a20EfficiencyWorkers: settings.a20EfficiencyWorkers, metal4Renderer: settings.metal4Renderer, enhancedMetal4: settings.enhancedMetal4, frameGeneration: settings.frameGeneration, javaChromeClearance: engine == .java && !uiHidden ? chromeClearance.top : nil, onStats: { stats = $0 }, onThreeFingerTap: { toggleInterface() })
+                                  scale: settings.renderScale(for: app), sharpGraphics: settings.usesSharpGraphics(for: app), efficientGraphics: settings.usesEfficientGraphics(for: app), efficientFrameLimit: settings.efficientFrameRate.rawValue, threadPolicy: settings.workerScheduling.rawValue, submissionMode: settings.vulkanSubmission.rawValue, driverProfiling: settings.driverPhaseProfiling, pipelineIdentification: settings.pipelineIdentification, engineOnlyLimiter: settings.engineOnlyLimiter, renderTargetInventory: settings.renderTargetInventory, pipelineFeedback: settings.pipelineFeedback, spatialUpscaling: settings.spatialUpscaling, spatialInputPercent: settings.duoAutomaticActive(for: app) ? settings.duoSpatialPreset : settings.spatialInputPercent, clockPresentation: settings.clockPresentation, feedbackClockCorrection: settings.feedbackClockCorrection, nativePipelineArchiveMode: settings.nativePipelineArchiveMode, nativeArchiveVerification: settings.nativeArchiveVerification, execution: settings.execution, automaticDuoProfile: settings.supportsDuoAutomatic(for: app), a20EfficiencyWorkers: settings.a20EfficiencyWorkers, metal4Renderer: settings.metal4Renderer, enhancedMetal4: settings.enhancedMetal4, frameGeneration: settings.frameGeneration, javaChromeClearance: engine == .java && !uiHidden ? chromeClearance.top : nil, onStats: { stats = $0 }, onThreeFingerTap: { toggleInterface() })
                         .background(Color.black)
                     .overlay {
                         // A game whose menus answer only a controller: with none paired, one on the glass. Hiding the bar leaves
