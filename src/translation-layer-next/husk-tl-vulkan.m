@@ -724,7 +724,9 @@ static int w_vkAcquireNextImageKHR(void *device, uint64_t swapchain, uint64_t ti
     int r = real ? real(device, swapchain, timeout, sem, fence, index) : -3;
     if (measure) record_host_timing(TIMING_ACQUIRE, start);
     if (r != VK_SUCCESS && atomic_fetch_add(&bad, 1) < 20) tl_log_line("vulkan: vkAcquireNextImageKHR -> %d", r);
-    else if (atomic_fetch_add(&seen, 1) < 2) tl_log_line("vulkan: vkAcquireNextImageKHR -> %d (image %u)", r, index ? *index : 0);
+    else if (atomic_load_explicit(&seen,memory_order_relaxed)<2 &&
+             atomic_fetch_add_explicit(&seen,1,memory_order_relaxed)<2)
+        tl_log_line("vulkan: vkAcquireNextImageKHR -> %d (image %u)", r, index ? *index : 0);
     return r;
 }
 
@@ -1076,8 +1078,14 @@ static int w_vkQueuePresentKHR(void *queue, const void *info)
 #endif
     if (V.probe_frames && (n == 3 || n == 60 || n == 400 || n == 3000)) { probe_frame(queue, info, n); log_layer_state(g_swapchain_layer, "present"); }
     tl_pt_copy owned;const void *forward=info;
+    /* Ordinary Dungeons presents have no extension chain and neither timing
+     * correction nor monitoring. Forward the exact guest struct directly:
+     * skip per-frame chain walks, stack cloning and unrelated clock work.
+     * Timing-chain and diagnostic paths keep their original validation. */
+    bool plain_present = info && !((const tl_pt_info *)info)->next
+                         && !tl_pt_requested() && !tl_pt_monitoring();
     tl_pt_clock clock=tl_pt_requested()?present_clock():(tl_pt_clock){0};
-    if(!tl_pt_prepare(info,&owned,clock,&forward)){
+    if(!plain_present && !tl_pt_prepare(info,&owned,clock,&forward)){
         static atomic_uint rejected;
         if(atomic_fetch_add(&rejected,1)<8)tl_log_line("[M4/M6 present-clock] unsupported timing chain/count; no guest mutation or driver call; result -7");
         return -7;
