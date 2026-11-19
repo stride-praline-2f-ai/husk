@@ -483,7 +483,8 @@ struct TLAppSettingsView: View {
             Section {
                 NavigationLink("Controls & display") { dungeonsControls }
                 NavigationLink("Advanced") { dungeonsAdvancedSettings }
-                NavigationLink("Diagnostics") { dungeonsDiagnostics }
+                Text("Game diagnostics run automatically. While playing, tap Log in the top bar to view native, graphics, performance and MetalFX evidence together; Copy full log includes the entire session.")
+                    .font(.footnote).foregroundStyle(.secondary)
                 NavigationLink("App details & storage") { dungeonsDetails }
             }
         }
