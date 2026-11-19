@@ -98,6 +98,65 @@ int main(void){const char*pure[]={"vkCreateShaderModule","vkDestroyShaderModule"
  def test_frontend_neutralisation_releases_buttons_and_axes_before_disconnect(self):self.case('neutral')
  def test_all_proc_lookup_paths_retain_compatible_wrappers(self):subprocess.run([str(self.vk)],check=True,timeout=5)
 
+class NativeTranslationPowerTests(unittest.TestCase):
+ def test_jni_virtual_subclass_cache_preserves_dispatch_and_revision(self):
+  source=(TL/'husk-tl-jni.c').read_text()
+  start=source.index('typedef struct {\n    const tl_jclass *receiver;')
+  end=source.index('\nstatic void jni_ExceptionDescribe',start)
+  actual=source[start:end]
+  harness=r'''
+#include <assert.h>
+#include <stdatomic.h>
+#include <stdint.h>
+#include <string.h>
+typedef struct tl_jclass {const char *name;struct tl_jclass *super;} tl_jclass;
+typedef struct tl_jmeth {tl_jclass *cls;const char *name,*sig;} tl_jmeth;
+typedef void (*tl_jhle_fn)(void*);
+static atomic_uint g_virtual_hle_revision=1;
+static unsigned lookups;
+static int enable_override=1;
+static void impl(void*p){(void)p;}
+static tl_jhle_fn hle_find(const char*cls,const char*name,const char*sig){
+ ++lookups;
+ if(enable_override&&!strcmp(cls,"Child")&&!strcmp(name,"render")&&!strcmp(sig,"()V"))return impl;
+ return NULL;
+}
+''' + actual + r'''
+int main(void){
+ tl_jclass base={"Base",NULL},child={"Child",&base},grand={"Grand",&child};
+ tl_jmeth render={&base,"render","()V"},other={&base,"other","()V"};
+ tl_jclass *owner=NULL;
+ assert(virtual_hle_override(&grand,&render,&owner)==impl&&owner==&child);
+ assert(lookups==2);
+ for(int i=0;i<100000;i++)assert(virtual_hle_override(&grand,&render,&owner)==impl&&owner==&child);
+ assert(lookups==2);
+ assert(virtual_hle_override(&grand,&other,&owner)==NULL&&owner==NULL);
+ assert(lookups==4);
+ enable_override=0;atomic_fetch_add(&g_virtual_hle_revision,1);
+ assert(virtual_hle_override(&grand,&render,&owner)==NULL&&owner==NULL);
+ assert(lookups==6);
+ enable_override=1;atomic_fetch_add(&g_virtual_hle_revision,1);
+ assert(virtual_hle_override(&grand,&render,&owner)==impl&&owner==&child);
+ assert(virtual_hle_override(&child,&render,&owner)==impl&&owner==&child);
+ return 0;
+}
+'''
+  with tempfile.TemporaryDirectory() as d:
+   c=Path(d)/'test.c';c.write_text(harness);exe=Path(d)/'test'
+   subprocess.run([os.environ.get('CC','cc'),'-std=c11','-Wall','-Wextra','-Werror','-O2',str(c),'-o',str(exe)],check=True)
+   subprocess.run([str(exe)],check=True,timeout=5)
+
+ def test_vulkan_present_fast_path_retains_chain_validation(self):
+  source=(TL/'husk-tl-vulkan.m').read_text()
+  begin=source.index('static int w_vkQueuePresentKHR(')
+  end=source.index('/* ------------------------------------------------------------ Direct3D 11',begin)
+  body=source[begin:end]
+  self.assertIn('bool plain_present = info && !((const tl_pt_info *)info)->next',body)
+  self.assertIn('!tl_pt_requested() && !tl_pt_monitoring()',body)
+  self.assertIn('if(!plain_present && !tl_pt_prepare(info,&owned,clock,&forward))',body)
+  self.assertIn('int r = real ? real(queue, forward) : -3;',body)
+  self.assertIn('if (r >= 0) pace_efficient_frame();',body)
+
 class ICDDispatchTests(unittest.TestCase):
  @classmethod
  def setUpClass(cls):
