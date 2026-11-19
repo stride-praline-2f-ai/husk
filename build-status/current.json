@@ -3,7 +3,7 @@
   "attempt": 1,
   "runner": "GitHub Actions 1000000939",
   "architecture": "ARM64",
-  "status": "running",
+  "status": "cancelled",
   "source": "1d64b349e0f63927b5ae5127fc470832ed985e74",
   "artifact_id": ""
 }
