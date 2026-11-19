@@ -191,6 +191,8 @@ struct TLAppSettings: Codable, Equatable {
     var sharedMemoryReserve = true
     var spatialUpscaling = false
     var spatialInputPercent = 80
+    // Independent Duo preset: preserves other device/manual upscaling choices.
+    var duoSpatialPreset = DuoDisplayPolicy.inputPercent
     var renderTargetInventory = false
     var driverPhaseProfiling = false
     var workerScheduling: WorkerScheduling = .balanced
@@ -251,6 +253,18 @@ struct TLAppSettings: Codable, Equatable {
         return screen.scale * CGFloat(fraction)
     }
 
+    @MainActor func fullscreenSpatialInputEstimate(for app: TLApp) -> String {
+        let size = UIScreen.main.bounds.size
+        let scale = renderScale(for: app)
+        let width = Int((max(size.width, size.height) * scale).rounded()) & ~7
+        let height = Int((min(size.width, size.height) * scale).rounded()) & ~7
+        let percent = duoAutomaticActive(for: app) ? duoSpatialPreset : spatialInputPercent
+        // Match the eight-pixel-aligned native Vulkan scaling contract.
+        let inputWidth = ((width * percent + 400) / 800) * 8
+        let inputHeight = ((height * percent + 400) / 800) * 8
+        return "\(inputWidth) × \(inputHeight) → \(width) × \(height)"
+    }
+
     @MainActor func fullscreenResolutionEstimate(for app: TLApp) -> String {
         let size = UIScreen.main.bounds.size
         let scale = renderScale(for: app)
@@ -301,9 +315,11 @@ struct TLAppSettings: Codable, Equatable {
         frameGeneration = false
         nativeAppleFrameInterpolation = try c.decodeIfPresent(Bool.self, forKey: .nativeAppleFrameInterpolation) ?? true
         sharedMemoryReserve = try c.decodeIfPresent(Bool.self, forKey: .sharedMemoryReserve) ?? true
-        spatialUpscaling = try c.decodeIfPresent(Bool.self, forKey: .spatialUpscaling) ?? true
+        spatialUpscaling = try c.decodeIfPresent(Bool.self, forKey: .spatialUpscaling) ?? false
         let inputPercent = try c.decodeIfPresent(Int.self, forKey: .spatialInputPercent) ?? 80
-        spatialInputPercent = [80, 85, 90, 95].contains(inputPercent) ? inputPercent : 80
+        spatialInputPercent = [50,60,67,80,85,90,95].contains(inputPercent) ? inputPercent : 80
+        let duoPercent = try c.decodeIfPresent(Int.self, forKey: .duoSpatialPreset) ?? DuoDisplayPolicy.inputPercent
+        duoSpatialPreset = [50,60,67,80].contains(duoPercent) ? duoPercent : DuoDisplayPolicy.inputPercent
         renderTargetInventory = try c.decodeIfPresent(Bool.self, forKey: .renderTargetInventory) ?? false
         driverPhaseProfiling = try c.decodeIfPresent(Bool.self, forKey: .driverPhaseProfiling) ?? false
         workerScheduling = try c.decodeIfPresent(WorkerScheduling.self, forKey: .workerScheduling) ?? .balanced
@@ -445,6 +461,9 @@ struct TLAppSettingsView: View {
                     }.disabled(!settings.usesEfficientGraphics(for: app))
                 }
                 LabeledContent("Output estimate", value: settings.fullscreenResolutionEstimate(for: app))
+                if settings.duoAutomaticActive(for: app) {
+                    LabeledContent("Apple MetalFX input → output", value: settings.fullscreenSpatialInputEstimate(for: app))
+                }
                 LabeledContent("Renderer", value: "Vulkan → Apple Metal (MoltenVK)")
                 LabeledContent("Apple frame interpolation", value: "Awaiting engine motion/depth bridge")
             } header: { Text(app.label) } footer: {
@@ -497,10 +516,22 @@ struct TLAppSettingsView: View {
     private var dungeonsAdvancedSettings: some View {
         HuskForm {
             Section {
-                Toggle("Apple MetalFX spatial upscaling", isOn: $settings.spatialUpscaling)
-                if settings.spatialUpscaling {
-                    Picker("Input scale", selection: $settings.spatialInputPercent) {
-                        ForEach([80,85,90,95], id: \.self) { Text("\($0)% of output dimensions").tag($0) }
+                if settings.duoAutomaticActive(for: app) {
+                    Picker("Duo MetalFX preset", selection: $settings.duoSpatialPreset) {
+                        Text("Balanced · 60% · 60 FPS target").tag(60)
+                        Text("Max battery · 50% · 60 FPS target").tag(50)
+                        Text("Quality · 67% · 60 FPS target").tag(67)
+                        Text("Extra sharp · 80% · 60 FPS target").tag(80)
+                    }
+                    LabeledContent("Render → output", value: settings.fullscreenSpatialInputEstimate(for: app))
+                    Text("Apple MetalFX spatial scaling is enabled by automatic device tuning. FPS is real game rendering, not generated frames.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                } else {
+                    Toggle("Apple MetalFX spatial upscaling", isOn: $settings.spatialUpscaling)
+                    if settings.spatialUpscaling {
+                        Picker("Input scale", selection: $settings.spatialInputPercent) {
+                            ForEach([50,60,67,80,85,90,95], id: \.self) { Text("\($0)% of output dimensions").tag($0) }
+                        }
                     }
                 }
                 Toggle("Prefer native Apple frame interpolation", isOn: $settings.nativeAppleFrameInterpolation)
@@ -511,7 +542,7 @@ struct TLAppSettingsView: View {
                 }
                 Toggle("Shared game memory", isOn: $settings.sharedMemoryReserve)
             } header: { Text("Graphics & Memory") } footer: {
-                Text("Native Apple MetalFX spatial upscaling runs on the MoltenVK-to-Metal renderer when its driver supports it. The separate Apple frame interpolator requires engine-supplied motion and depth. Shared memory requires supported hardware and helper extensions.")
+                Text("MetalFX's spatial pass scales the whole rendered image, including any in-game HUD, so text clarity is not guaranteed at 50%. Native frame interpolation remains unavailable without genuine engine motion/depth. Switching resolutions or folding requires swapchain recreation; restart the game when changing presets.")
             }
             Section {
                 if DuoDisplayPolicy.metrics(screen: .main).isInner {
