@@ -116,6 +116,8 @@ class SettingsGroupingTests(unittest.TestCase):
         self.assertNotIn('}.disabled(settings.duoAutomaticActive(for: app))',diag)
         self.assertIn('Toggle("Driver phase profiling", isOn: $settings.driverPhaseProfiling)\n                    .disabled(settings.duoAutomaticActive(for: app))',diag)
         self.assertIn("tl_ri_metalfx_snapshot(&candidate)", report)
+        self.assertIn("husk_native_metalfx_supported()", report)
+        self.assertIn("HuskNativeMetalFX.h", (ROOT / "src/app/Husk/HuskBridge.h").read_text())
         self.assertIn('"native_metalfx_frame_interpolation_preflight": framegenProbe', report)
         for k in ("native_metalfx_interpolation_admitted", "semantic_depth_motion_verified",
                   "gpu_producer_consumer_sync_verified", "presenter_integrated"):
