@@ -66,7 +66,7 @@ static int identification,inventory;static void host(void){}
 static void *gdpa(void*d,const char*n){(void)d;(void)n;return(void*)host;}
 static void *gipa(void*d,const char*n){(void)d;(void)n;return(void*)host;}
 static struct{void *lib;void*(*gipa)(void*,const char*);}V={(void*)1,gipa};
-static bool vk_ready(void){return true;}static bool tl_ri_active(void){return inventory;}
+static bool vk_ready(void){return true;}static bool tl_ri_active(void){return inventory!=0;}static bool tl_ri_area_active(void){return inventory>=2;}
 static void resolve_feature_hooks(void*i){(void)i;}
 #define LOG(...) do{}while(0)
 static void *lookup(void*l,const char*n){(void)l;return !strcmp(n,"vkGetDeviceProcAddr")?(void*)gdpa:(void*)host;}
@@ -83,7 +83,9 @@ int main(void){const char*pure[]={"vkCreateShaderModule","vkDestroyShaderModule"
  }
  identification=0;const char*functional[]={"vkCreateGraphicsPipelines","vkCreateComputePipelines","vkCreatePipelineCache","vkDestroyPipelineCache","vkMergePipelineCaches","vkGetDeviceQueue","vkQueueSubmit","vkQueuePresentKHR","vkAcquireNextImageKHR","vkDestroyDevice","vkCreateDevice","vkCmdBindVertexBuffers"};
  for(unsigned i=0;i<sizeof(functional)/sizeof(*functional);i++)assert(tl_vk_resolve(functional[i])!=(void*)host);
- inventory=0;assert(tl_vk_resolve("vkCmdBeginRenderPass")==host);inventory=1;assert(tl_vk_resolve("vkCmdBeginRenderPass")!=host);
+ inventory=0;assert(tl_vk_resolve("vkCmdBeginRenderPass")==host&&tl_vk_resolve("vkCreateImage")==host);
+ inventory=1;assert(tl_vk_resolve("vkCreateImage")!=host&&tl_vk_resolve("vkCmdBeginRenderPass")==host);
+ inventory=2;assert(tl_vk_resolve("vkCmdBeginRenderPass")!=host);
  assert(!w_vkGetInstanceProcAddr(NULL,NULL)&&!w_vkGetDeviceProcAddr(NULL,NULL));
  return 0;}
 '''
