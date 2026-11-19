@@ -79,7 +79,7 @@ uint32_t tl_ri_snapshot(tl_ri_group *out,uint32_t capacity,tl_ri_stats *stats){
  * A floating-point RGBA colour target can also resemble a velocity target. */
 static bool ri_depth_format(uint32_t format)
 {
- return format>=124u&&format<=130u;
+ return format==124u||format==125u||format==126u||format==128u||format==129u||format==130u;
 }
 static bool ri_vector_format(uint32_t format)
 {
