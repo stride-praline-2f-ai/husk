@@ -82,6 +82,8 @@ if mode=="geometry" {
  var json:[String:Any] = ["schema":2,"husk_bridge_abi":1,"native_archive_abi":2,"mesa":"b39d173ca9369c19fda2635be6655d308067e52d","source":"26620bf5319a0f5a5cca47cfecec797cafe45493","frame_generation":true]
  func read(_ value:[String:Any],_ binary:Bool=true)->Metal4DriverCapabilities {Metal4DriverCapabilities.read(try! JSONSerialization.data(withJSONObject:value),binaryAvailable:binary)}
  assert(read(json).frameGeneration && read(json).nativeArchives && read(json,false) == .init())
+ assert(TLAppSettings.prefersMetal4Framegen(read(json)))
+ assert(!TLAppSettings.prefersMetal4Framegen(read(json,false)))
  for key in ["schema","husk_bridge_abi","native_archive_abi"] {var invalid=json;invalid[key]=99;assert(read(invalid) == .init())}
  var invalid=json;invalid["schema"]=true;assert(read(invalid) == .init())
  invalid=json;invalid["source"]="wrong";assert(read(invalid) == .init())
@@ -94,6 +96,16 @@ if mode=="geometry" {
  selected.selectEnhancedMetal4(false,bridgeAvailable:true);assert(selected.metal4Renderer && !selected.frameGeneration && !selected.enhancedMetal4)
  selected.selectEnhancedMetal4(true,bridgeAvailable:false);assert(!selected.enhancedMetal4)
  selected.selectFrameGeneration(true,bridgeAvailable:false);assert(!selected.metal4Renderer && selected.frameGeneration)
+ var combined=TLAppSettings()
+ combined.metal4Renderer=true;combined.enhancedMetal4=true;combined.frameGeneration=false
+ combined.spatialUpscaling=true;combined.clockPresentation=true;combined.feedbackClockCorrection=true
+ combined.engineOnlyLimiter=true;combined.vulkanSubmission = .asynchronous
+ combined.selectFrameGeneration(true,bridgeAvailable:true)
+ assert(combined.metal4Renderer && combined.frameGeneration && combined.enhancedMetal4)
+ assert(!combined.spatialUpscaling && !combined.clockPresentation && !combined.feedbackClockCorrection && !combined.engineOnlyLimiter && combined.vulkanSubmission == .driverDefault)
+ let persisted=try JSONEncoder().encode(combined)
+ let restored=try JSONDecoder().decode(TLAppSettings.self,from:persisted)
+ assert(restored.metal4Renderer && restored.frameGeneration && restored.enhancedMetal4 && !restored.spatialUpscaling)
 } else if mode=="rate" {
  var rate=FrameGenerationRate();assert(rate.sample(time:1,real:10,generated:9,resets:0)==nil)
  assert(rate.sample(time:2,real:38,generated:36,resets:0)==55)
