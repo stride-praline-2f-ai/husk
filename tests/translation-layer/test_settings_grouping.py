@@ -113,7 +113,7 @@ class SettingsGroupingTests(unittest.TestCase):
         self.assertIn("driverProfiling = false; pipelineIdentification = false; pipelineFeedback = false", block)
         diag = GAME.split("private var dungeonsDiagnostics: some View",1)[1].split("private var dungeonsDetails:",1)[0]
         self.assertIn('Toggle("Render-target inventory", isOn: $settings.renderTargetInventory)',diag)
-        self.assertNotIn('\\n            }.disabled(settings.duoAutomaticActive(for: app))',diag)
+        self.assertNotIn('\n            }.disabled(settings.duoAutomaticActive(for: app))',diag)
         self.assertIn('Toggle("Driver phase profiling", isOn: $settings.driverPhaseProfiling)\n                    .disabled(settings.duoAutomaticActive(for: app))',diag)
         self.assertIn("tl_ri_metalfx_snapshot(&candidate)", report)
         self.assertIn("husk_native_metalfx_supported()", report)
