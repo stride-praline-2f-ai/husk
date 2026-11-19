@@ -600,19 +600,24 @@ struct TLAppSettingsView: View {
             }
             Section {
                 Toggle("Render-target inventory", isOn: $settings.renderTargetInventory)
+                if settings.renderTargetInventory {
+                    Text("Opt-in Vulkan image formats and sizes only. This can identify possible depth/motion-buffer candidates, not prove that they contain Unreal velocity or depth. Export the performance report after gameplay; restart to begin or stop collection.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
                 Toggle("Driver phase profiling", isOn: $settings.driverPhaseProfiling)
+                    .disabled(settings.duoAutomaticActive(for: app))
                 Picker("Pipeline detail", selection: Binding(get: { settings.pipelineIdentification ? (settings.pipelineFeedback ? 2 : 1) : 0 }, set: {
                     settings.pipelineIdentification = $0 > 0; settings.pipelineFeedback = $0 == 2
                 })) {
                     Text("Off").tag(0); Text("Identification").tag(1); Text("Identification & feedback").tag(2)
-                }
+                }.disabled(settings.duoAutomaticActive(for: app))
                 Toggle("Verify native archive reuse", isOn: $settings.nativeArchiveVerification)
-                    .disabled(settings.nativePipelineArchiveMode != 2 || (settings.metal4Renderer && !settings.enhancedMetal4))
+                    .disabled(settings.duoAutomaticActive(for: app) || settings.nativePipelineArchiveMode != 2 || (settings.metal4Renderer && !settings.enhancedMetal4))
             } header: { Text("Detailed Collection") } footer: {
                 Text(settings.duoAutomaticActive(for: app)
-                     ? "Automatic device tuning overrides detailed launch collection. Turn it off in Advanced to use these saved options. Capture, sharing and performance reports remain accessible."
+                     ? "Render-target inventory is available as a one-shot diagnostic with Automatic Duo tuning. Other detailed launch collection remains overridden. Disable inventory and restart after exporting."
                      : "Detailed collection adds overhead and needs a full restart. Leave it off during normal play.")
-            }.disabled(settings.duoAutomaticActive(for: app))
+            }
         }.navigationTitle("Diagnostics")
     }
 
