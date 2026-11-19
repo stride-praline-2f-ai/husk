@@ -321,9 +321,11 @@ struct TLAppSettings: Codable, Equatable {
         automaticDuoProfile = try c.decodeIfPresent(Bool.self, forKey: .automaticDuoProfile) ?? true
         a20EfficiencyWorkers = try c.decodeIfPresent(Bool.self, forKey: .a20EfficiencyWorkers) ?? true
         let preferredMetal4 = Self.prefersMetal4Framegen(Metal4DriverCapabilities.current)
-        frameGeneration = try c.decodeIfPresent(Bool.self, forKey: .frameGeneration) ?? preferredMetal4
         metal4Renderer = try c.decodeIfPresent(Bool.self, forKey: .metal4Renderer) ?? preferredMetal4
         enhancedMetal4 = try c.decodeIfPresent(Bool.self, forKey: .enhancedMetal4) ?? preferredMetal4
+        // A saved MoltenVK choice must not silently enable its separate FG path.
+        frameGeneration = try c.decodeIfPresent(Bool.self, forKey: .frameGeneration)
+            ?? (preferredMetal4 && metal4Renderer && enhancedMetal4)
         frameGeneration = DuoDisplayPolicy.usesFrameGeneration(metal4: metal4Renderer, requested: frameGeneration,
             metal4Bridge: enhancedMetal4 && Metal4DriverCapabilities.current.frameGeneration)
         sharedMemoryReserve = try c.decodeIfPresent(Bool.self, forKey: .sharedMemoryReserve) ?? true
