@@ -316,6 +316,7 @@ final class TLUnityUIView: UIView, UIKeyInput {
     private var lastDiagnosticsLogAt: TimeInterval = -.infinity
     private var appleInterpolatorSupported: Bool?
     private var previousProcessCPUSample: (at: TimeInterval, seconds: Double)?
+    private var lastMetalFXInventoryFingerprint = ""
     /// Passive snapshots only. No CPU thread sampling, GPU callbacks, per-frame
     /// renderpass interception, readback or extra Metal command buffers.
     private func logDungeonsHealth(_ fps: Double) {
@@ -361,6 +362,46 @@ final class TLUnityUIView: UIView, UIKeyInput {
                    spatial.configured, spatial.encoded, spatial.failures,
                    candidate.depth_attachment_groups, candidate.readable_depth_groups, candidate.vector_format_groups,
                    candidate.writable_vector_groups, candidate.readable_color_groups, status))
+        logMetalFXImageCandidates(candidate)
+    }
+
+    /// Read only the existing bounded Vulkan creation inventory, not texture
+    /// contents. Change-only reporting, with at most twelve image categories,
+    /// avoids per-frame logging and keeps the Dungeons game log self-contained.
+    private func logMetalFXImageCandidates(_ candidate: tl_ri_metalfx_candidates) {
+        guard candidate.active else { return }
+        var groups = Array(repeating: tl_ri_group(), count: 256)
+        let count = groups.withUnsafeMutableBufferPointer {
+            tl_ri_snapshot($0.baseAddress, UInt32($0.count), nil)
+        }
+        let rows = groups.prefix(Int(count)).filter { $0.kind == 0 }
+        let depthFormats: Set<UInt32> = [124, 125, 126, 128, 129, 130]
+        let vectorFormats: Set<UInt32> = [83, 97, 103]
+        let candidates = rows.filter {
+            (depthFormats.contains($0.format) && $0.usage & 0x20 != 0)
+            || (vectorFormats.contains($0.format) && $0.usage & 0x18 != 0)
+        }.sorted {
+            // Prioritise textures that can be sampled later and match a
+            // reasonable game frame extent; keep stable sorting otherwise.
+            let lhs = (($0.usage & 0x4 != 0) ? 1 : 0) + (($0.width >= 256 && $0.height >= 256) ? 1 : 0)
+            let rhs = (($1.usage & 0x4 != 0) ? 1 : 0) + (($1.width >= 256 && $1.height >= 256) ? 1 : 0)
+            if lhs != rhs { return lhs > rhs }
+            if $0.width != $1.width { return $0.width > $1.width }
+            if $0.height != $1.height { return $0.height > $1.height }
+            return $0.format < $1.format
+        }
+        let descriptions = candidates.prefix(12).map { g in
+            let label = depthFormats.contains(g.format) ? "depth-like" : "vector-like"
+            return "\(label) \(g.width)x\(g.height) VkFormat=\(g.format) usage=0x\(String(g.usage, radix: 16)) samples=\(g.samples)"
+        }
+        // Frame counts change continuously, so deliberately exclude them
+        // from the fingerprint. Only resource discovery/loss changes produce
+        // another detail line; no flooding on a stable frame loop.
+        let fingerprint = "\(candidate.retained_image_groups):\(candidate.lost_observations):\(candidate.readable_depth_groups):\(candidate.writable_vector_groups):" + descriptions.joined(separator: ";")
+        guard fingerprint != lastMetalFXInventoryFingerprint else { return }
+        lastMetalFXInventoryFingerprint = fingerprint
+        HuskLog.log("game-diagnostics",
+            "MetalFX resource candidates: image groups \(candidate.retained_image_groups), observation losses \(candidate.lost_observations), depth-like \(candidate.depth_attachment_groups) / readable \(candidate.readable_depth_groups), vector-like \(candidate.vector_format_groups) / readable \(candidate.writable_vector_groups); \(descriptions.isEmpty ? "none observed" : descriptions.joined(separator: " | ")); shown \(descriptions.count)/\(candidates.count), types NOT verified as real motion/depth; no interpolated frames produced")
     }
     private func updateStats() {
         var p = husk_unity_perf()
