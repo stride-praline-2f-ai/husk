@@ -147,17 +147,6 @@ struct TLAppSettings: Codable, Equatable {
     var frameGeneration = TLAppSettings.prefersMetal4Framegen(Metal4DriverCapabilities.current)
     var metal4Renderer = TLAppSettings.prefersMetal4Framegen(Metal4DriverCapabilities.current)
     var enhancedMetal4 = TLAppSettings.prefersMetal4Framegen(Metal4DriverCapabilities.current)
-    private mutating func disableMetal4FramegenConflicts() {
-        guard metal4Renderer && enhancedMetal4 && frameGeneration else { return }
-        // MetalFX spatial belongs to MoltenVK; clock/limiter and queue experiments
-        // distort the 30-rendered / 60-output presentation path.
-        spatialUpscaling = false
-        clockPresentation = false
-        feedbackClockCorrection = false
-        engineOnlyLimiter = false
-        vulkanSubmission = .driverDefault
-        execution = .init()
-    }
     mutating func selectMetal4(_ enabled: Bool, bridgeAvailable: Bool = Metal4DriverCapabilities.current.frameGeneration) {
         metal4Renderer = enabled
         if enabled && frameGeneration {
@@ -176,6 +165,17 @@ struct TLAppSettings: Codable, Equatable {
         enhancedMetal4 = enabled && bridgeAvailable
         if !enhancedMetal4 && metal4Renderer { frameGeneration = false }
         disableMetal4FramegenConflicts()
+    }
+    private mutating func disableMetal4FramegenConflicts() {
+        guard metal4Renderer && enhancedMetal4 && frameGeneration else { return }
+        // MetalFX spatial belongs to MoltenVK; clock/limiter and queue experiments
+        // distort the 30-rendered / 60-output presentation path.
+        spatialUpscaling = false
+        clockPresentation = false
+        feedbackClockCorrection = false
+        engineOnlyLimiter = false
+        vulkanSubmission = .driverDefault
+        execution = .init()
     }
     // DUNGEONS_SIMPLE_POLICY_BEGIN
     func dungeonsFrameChoice(automaticActive: Bool) -> Int {
