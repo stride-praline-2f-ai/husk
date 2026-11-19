@@ -115,6 +115,12 @@ targets:
           # Security verifies the licence signature Minecraft's UI engine checks through Java's Signature class.
           - "-framework"
           - "Security"
+          # Native Apple MetalFX adapter is optional on older supported iOS.
+          # Weak-link the framework so the iOS 15.5 baseline still loads.
+          - "-framework"
+          - "Metal"
+          - "-weak_framework"
+          - "MetalFX"
           # On-device pairing for Built-in StikJIT, built by scripts/build_rppairing_ios.sh.
           - "-lhusk_rppairing"
     dependencies:
