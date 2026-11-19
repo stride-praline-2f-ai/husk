@@ -58,22 +58,21 @@ class SettingsGroupingTests(unittest.TestCase):
         self.assertIn('Button { dismiss() }', bar)
         self.assertIn('Button { toggleInterface() }', bar)
 
-    def test_metal4_framegen_defaults_and_no_automatic_metalfx_conflict(self):
+    def test_native_apple_spatial_presets_and_retired_paths(self):
         launch = (ROOT / "src/app/Husk/TLUnityView.swift").read_text()
-        self.assertIn("static func prefersMetal4Framegen(_ caps: Metal4DriverCapabilities)", GAME)
-        for name in ("frameGeneration", "metal4Renderer", "enhancedMetal4"):
-            self.assertIn(
-                f"var {name} = TLAppSettings.prefersMetal4Framegen(Metal4DriverCapabilities.current)", GAME
-            )
-        self.assertIn("?? preferredMetal4", GAME)
-        self.assertIn("disableMetal4FramegenConflicts()", GAME)
-        self.assertIn("spatialUpscaling = false", GAME)
-        self.assertIn("clockPresentation = false", GAME)
-        self.assertIn("feedbackClockCorrection = false", GAME)
-        self.assertIn("engineOnlyLimiter = false", GAME)
-        self.assertIn("spatialUpscaling = !metal4Renderer", launch)
-        self.assertIn("husk_ue4_set_spatial_upscaling(false)", launch)
-        self.assertIn("husk_metal4_preflight()", launch)
+        native = (ROOT / "src/translation-layer-next/HuskNativeMetalFX.m").read_text()
+        policy = (ROOT / "src/app/Husk/DuoDisplayPolicy.swift").read_text()
+        self.assertIn("var duoSpatialPreset = DuoDisplayPolicy.inputPercent", GAME)
+        self.assertIn("static let inputPercent = 60", policy)
+        for value in (50,60,67,80):
+            self.assertIn(f"tag({value})", GAME)
+        self.assertIn("duoAutomaticActive(for: app) ? settings.duoSpatialPreset : settings.spatialInputPercent", launch)
+        self.assertIn("spatialUpscaling = true", launch)
+        self.assertIn("husk_ue4_set_frame_generation(false)", launch)
+        self.assertNotIn("husk_metal4_preflight()", launch)
+        self.assertNotIn("let metal4 = fw +", launch)
+        self.assertIn("MTLFXFrameInterpolatorDescriptor", native)
+        self.assertIn("!i->previous_color || !i->current_color || !i->depth || !i->motion", native)
 
     def test_general_diagnostics_grouped_outside_about(self):
         self.assertIn('row(HuskDiagnosticsSettings()', APP)
