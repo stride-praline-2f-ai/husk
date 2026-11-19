@@ -600,6 +600,10 @@ final class TLUnityUIView: UIView, UIKeyInput {
             // inventory is explicit. Other UE4 titles keep their original default.
             let inventoryMode: UInt32 = renderTargetInventory ? 2 : (autoDungeonsLog ? 1 : 0)
             husk_ue4_set_render_inventory_mode(inventoryMode)
+            // Runtime activation is separate from requesting interception.
+            // Do it before the guest resolves Vulkan entrypoints or creates
+            // its first render target, and reject other project names.
+            tl_ri_activate(autoDungeonsLog ? "Dungeons" : nil)
             if autoDungeonsLog { HuskLog.log("game-diagnostics", "automatic combined game log active; Vulkan inventory mode \(inventoryMode) (1=image-only, 2=full explicit); detailed GPU tracing remains off") }
             husk_crash_stage("ue4_fork_launch_options_applied")
             HuskLog.log("tl", "ue4: requested graphics preset: \(efficientGraphics ? "Sharp / Efficient" : (sharpGraphics ? "Sharp / High Quality" : "Game Default")), surface \(width)x\(height)")
