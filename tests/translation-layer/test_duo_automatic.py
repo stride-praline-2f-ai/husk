@@ -35,7 +35,7 @@ if mode=="geometry" {
  assert(portrait.isInner && landscape.isInner)
  let (w,h)=target(landscape);assert(w==1816 && h==1280)
  assert(target(portrait).0==w && target(portrait).1==h)
- assert((w*DuoDisplayPolicy.inputPercent/100) & ~7==1448 && (h*DuoDisplayPolicy.inputPercent/100) & ~7==1024)
+ assert(((w*DuoDisplayPolicy.inputPercent+400)/800)*8==1088 && ((h*DuoDisplayPolicy.inputPercent+400)/800)*8==768)
  assert(portrait.scale(percent:100)! < 3)
 } else if mode=="a20" {
  assert(DuoDisplayPolicy.fastWorkerBudget(gpuName:"Apple A20 Pro GPU",cpuCount:6)==2)
@@ -63,49 +63,38 @@ if mode=="geometry" {
  assert(!portrait.automatic(enabled:false,efficientDungeons:true,windowed:false))
  assert(!portrait.automatic(enabled:true,efficientDungeons:false,windowed:false))
  assert(!portrait.automatic(enabled:true,efficientDungeons:true,windowed:true))
- assert(DuoDisplayPolicy.fps==60 && DuoDisplayPolicy.worker==2 && DuoDisplayPolicy.submission==0)
+ assert(DuoDisplayPolicy.fps==60 && DuoDisplayPolicy.inputPercent==60 && DuoDisplayPolicy.worker==2 && DuoDisplayPolicy.submission==0)
 } else if mode=="decode" {
  let original=Data("{\"spatialUpscaling\":false,\"efficientResolution\":65,\"customResolutionPercent\":71}".utf8)
  let settings=try JSONDecoder().decode(TLAppSettings.self,from:original)
  assert(!settings.metal4Renderer && !settings.frameGeneration && settings.automaticDuoProfile && settings.a20EfficiencyWorkers && settings.sharedMemoryReserve && !settings.spatialUpscaling && settings.efficientResolution == .performance && settings.customResolutionPercent==71)
  assert(settings.supportsDuoAutomatic(for:game))
  assert(!settings.supportsDuoAutomatic(for:TLApp(label:"Other game",packageName:nil,report:FakeReport(nativeEngine:.ue4))))
- var manual=settings;manual.metal4Renderer=true;manual.frameGeneration=true;manual.automaticDuoProfile=false;manual.a20EfficiencyWorkers=false;manual.sharedMemoryReserve=false
+ var manual=settings;manual.metal4Renderer=true;manual.enhancedMetal4=true;manual.frameGeneration=true
+ manual.duoSpatialPreset=50;manual.nativeAppleFrameInterpolation=true
+ manual.automaticDuoProfile=false;manual.a20EfficiencyWorkers=false;manual.sharedMemoryReserve=false
  let roundtrip=try JSONDecoder().decode(TLAppSettings.self,from:JSONEncoder().encode(manual))
- assert(roundtrip.metal4Renderer && !roundtrip.frameGeneration && !roundtrip.automaticDuoProfile && !roundtrip.a20EfficiencyWorkers && !roundtrip.sharedMemoryReserve && roundtrip.customResolutionPercent==71 && !roundtrip.spatialUpscaling)
- var chosen=TLAppSettings();chosen.selectFrameGeneration(true);assert(chosen.frameGeneration && !chosen.metal4Renderer)
- chosen.selectMetal4(true);assert(chosen.metal4Renderer && !chosen.frameGeneration)
- chosen.selectFrameGeneration(true);assert(chosen.frameGeneration && !chosen.metal4Renderer)
- chosen.selectFrameGeneration(false);assert(!chosen.frameGeneration && !chosen.metal4Renderer)
- for m4 in [false,true] {for fg in [false,true] {assert(DuoDisplayPolicy.usesFrameGeneration(metal4:m4,requested:fg)==(fg && !m4))}}
+ assert(!roundtrip.metal4Renderer && !roundtrip.frameGeneration && !roundtrip.enhancedMetal4 && !roundtrip.automaticDuoProfile && !roundtrip.a20EfficiencyWorkers && !roundtrip.sharedMemoryReserve && roundtrip.customResolutionPercent==71 && !roundtrip.spatialUpscaling)
+ assert(roundtrip.nativeAppleFrameInterpolation && roundtrip.duoSpatialPreset==50)
+ var chosen=TLAppSettings()
+ chosen.selectFrameGeneration(true);chosen.selectMetal4(true);chosen.selectEnhancedMetal4(true)
+ assert(!chosen.frameGeneration && !chosen.metal4Renderer && !chosen.enhancedMetal4)
+ assert(chosen.nativeAppleFrameInterpolation && chosen.duoSpatialPreset==60)
 } else if mode=="metal4-bridge" {
  var json:[String:Any] = ["schema":2,"husk_bridge_abi":1,"native_archive_abi":2,"mesa":"b39d173ca9369c19fda2635be6655d308067e52d","source":"26620bf5319a0f5a5cca47cfecec797cafe45493","frame_generation":true]
  func read(_ value:[String:Any],_ binary:Bool=true)->Metal4DriverCapabilities {Metal4DriverCapabilities.read(try! JSONSerialization.data(withJSONObject:value),binaryAvailable:binary)}
  assert(read(json).frameGeneration && read(json).nativeArchives && read(json,false) == .init())
- assert(TLAppSettings.prefersMetal4Framegen(read(json)))
- assert(!TLAppSettings.prefersMetal4Framegen(read(json,false)))
  for key in ["schema","husk_bridge_abi","native_archive_abi"] {var invalid=json;invalid[key]=99;assert(read(invalid) == .init())}
- var invalid=json;invalid["schema"]=true;assert(read(invalid) == .init())
- invalid=json;invalid["source"]="wrong";assert(read(invalid) == .init())
+ var invalid=json;invalid["source"]="wrong";assert(read(invalid) == .init())
  invalid=json;invalid.removeValue(forKey:"frame_generation");assert(read(invalid) == .init())
  assert(Metal4DriverCapabilities.read(Data("broken".utf8),binaryAvailable:true) == .init())
- var selected=TLAppSettings();assert(!selected.enhancedMetal4)
+ var selected=TLAppSettings();assert(!selected.metal4Renderer && !selected.frameGeneration)
  selected.selectMetal4(true,bridgeAvailable:true);selected.selectFrameGeneration(true,bridgeAvailable:true)
- assert(selected.metal4Renderer && selected.frameGeneration && selected.enhancedMetal4)
- assert(DuoDisplayPolicy.usesFrameGeneration(metal4:true,requested:true,metal4Bridge:true))
- selected.selectEnhancedMetal4(false,bridgeAvailable:true);assert(selected.metal4Renderer && !selected.frameGeneration && !selected.enhancedMetal4)
- selected.selectEnhancedMetal4(true,bridgeAvailable:false);assert(!selected.enhancedMetal4)
- selected.selectFrameGeneration(true,bridgeAvailable:false);assert(!selected.metal4Renderer && selected.frameGeneration)
- var combined=TLAppSettings()
- combined.metal4Renderer=true;combined.enhancedMetal4=true;combined.frameGeneration=false
- combined.spatialUpscaling=true;combined.clockPresentation=true;combined.feedbackClockCorrection=true
- combined.engineOnlyLimiter=true;combined.vulkanSubmission = .asynchronous
- combined.selectFrameGeneration(true,bridgeAvailable:true)
- assert(combined.metal4Renderer && combined.frameGeneration && combined.enhancedMetal4)
- assert(!combined.spatialUpscaling && !combined.clockPresentation && !combined.feedbackClockCorrection && !combined.engineOnlyLimiter && combined.vulkanSubmission == .driverDefault)
- let persisted=try JSONEncoder().encode(combined)
- let restored=try JSONDecoder().decode(TLAppSettings.self,from:persisted)
- assert(restored.metal4Renderer && restored.frameGeneration && restored.enhancedMetal4 && !restored.spatialUpscaling)
+ assert(!selected.metal4Renderer && !selected.enhancedMetal4 && !selected.frameGeneration)
+ let old=try JSONSerialization.data(withJSONObject:["metal4Renderer":true,"enhancedMetal4":true,"frameGeneration":true])
+ let legacy=try JSONDecoder().decode(TLAppSettings.self,from:old)
+ assert(!legacy.metal4Renderer && !legacy.enhancedMetal4 && !legacy.frameGeneration)
+ assert(legacy.duoSpatialPreset==60 && legacy.nativeAppleFrameInterpolation)
 } else if mode=="rate" {
  var rate=FrameGenerationRate();assert(rate.sample(time:1,real:10,generated:9,resets:0)==nil)
  assert(rate.sample(time:2,real:38,generated:36,resets:0)==55)
@@ -125,6 +114,11 @@ if mode=="geometry" {
  AppWindows.defaultWindowed = true;assert(!settings.duoAutomaticActive(for:game));AppWindows.defaultWindowed = false
  let scale=settings.renderScale(for:game);assert(abs(Double(scale)-portrait.scale()!)<0.00001)
  assert(settings.fullscreenResolutionEstimate(for:game)=="1816 × 1280")
+ assert(settings.fullscreenSpatialInputEstimate(for:game)=="1088 × 768 → 1816 × 1280")
+ settings.duoSpatialPreset=50
+ assert(settings.fullscreenSpatialInputEstimate(for:game)=="912 × 640 → 1816 × 1280")
+ settings.duoSpatialPreset=67
+ assert(settings.fullscreenSpatialInputEstimate(for:game)=="1216 × 856 → 1816 × 1280")
  settings.automaticDuoProfile=false;assert(!settings.duoAutomaticActive(for:game))
  assert(settings.renderScale(for:game)>scale && settings.renderScale(for:game)<3)
 } else if mode=="m4" {
