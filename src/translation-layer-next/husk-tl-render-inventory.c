@@ -73,3 +73,52 @@ uint32_t tl_ri_snapshot(tl_ri_group *out,uint32_t capacity,tl_ri_stats *stats){
  uint32_t n=out?(capacity<length?capacity:length):0;if(n)memcpy(out,groups,n*sizeof(*out));
  pthread_mutex_unlock(&mu);return n;
 }
+
+/* Vulkan 1.x VkFormat numeric values. Classify only metadata, never infer
+ * a texture's scene meaning or replace engine-provided motion/depth.
+ * A floating-point RGBA colour target can also resemble a velocity target. */
+static bool ri_depth_format(uint32_t format)
+{
+ return format>=124u&&format<=130u;
+}
+static bool ri_vector_format(uint32_t format)
+{
+ return format==83u || format==103u || format==97u;
+}
+static bool ri_color_format(uint32_t format)
+{
+ return !ri_depth_format(format) && format>0u;
+}
+void tl_ri_metalfx_snapshot(tl_ri_metalfx_candidates *out)
+{
+ if(!out)return;
+ tl_ri_metalfx_candidates result={0};
+ result.version=1;result.size=sizeof(result);
+ pthread_mutex_lock(&mu);
+ result.active=atomic_load_explicit(&active,memory_order_relaxed);
+ result.lost_observations=atomic_load_explicit(&capacity_drops,memory_order_relaxed)+
+                          atomic_load_explicit(&contention_drops,memory_order_relaxed);
+ for(uint32_t i=0;i<length;i++){
+  const tl_ri_group *g=&groups[i];
+  if(g->kind!=0||!g->width||!g->height||g->depth!=1||g->samples!=1)continue;
+  result.retained_image_groups++;
+  bool read=(g->usage & (0x4u|0x1u))!=0; /* SAMPLED or TRANSFER_SRC */
+  bool render=(g->usage & 0x10u)!=0; /* COLOR_ATTACHMENT */
+  bool depth=(g->usage & 0x20u)!=0; /* DEPTH_STENCIL_ATTACHMENT */
+  bool storage=(g->usage & 0x8u)!=0; /* STORAGE */
+  if(ri_depth_format(g->format)&&depth){
+   result.depth_attachment_groups++;
+   if(read)result.readable_depth_groups++;
+  }
+  if(ri_vector_format(g->format) && (render||storage)){
+   result.vector_format_groups++;
+   if(read)result.writable_vector_groups++;
+  }
+  if(ri_color_format(g->format)&&render){
+   result.renderable_color_groups++;
+   if(read)result.readable_color_groups++;
+  }
+ }
+ pthread_mutex_unlock(&mu);
+ *out=result;
+}
