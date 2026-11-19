@@ -102,6 +102,27 @@ class SettingsGroupingTests(unittest.TestCase):
         self.assertIn("MTLFXSpatialScalerColorProcessingModePerceptual", native)
         self.assertNotIn("newTextureWithDescriptor", native[native.index('bool huskSpatialEncode('):])
 
+    def test_dungeons_native_metalfx_preflight_remains_opt_in_under_automatic_duo(self):
+        launch = (ROOT / "src/app/Husk/TLUnityView.swift").read_text()
+        report = (ROOT / "src/app/Husk/EfficiencyDiagnostics.swift").read_text()
+        inventory = (ROOT / "src/translation-layer-next/husk-tl-render-inventory.c").read_text()
+        # Automatic profile must preserve the requested opt-in image inventory
+        # while still resetting the expensive unrelated profiling experiments.
+        block = launch.split("private func applyDuoAutomaticProfile()",1)[1].split("private func launch(",1)[0]
+        self.assertNotIn("renderTargetInventory = false", block)
+        self.assertIn("driverProfiling = false; pipelineIdentification = false; pipelineFeedback = false", block)
+        diag = GAME.split("private var dungeonsDiagnostics: some View",1)[1].split("private var dungeonsDetails:",1)[0]
+        self.assertIn('Toggle("Render-target inventory", isOn: $settings.renderTargetInventory)',diag)
+        self.assertNotIn('}.disabled(settings.duoAutomaticActive(for: app))',diag)
+        self.assertIn('Toggle("Driver phase profiling", isOn: $settings.driverPhaseProfiling)\n                    .disabled(settings.duoAutomaticActive(for: app))',diag)
+        self.assertIn("tl_ri_metalfx_snapshot(&candidate)", report)
+        self.assertIn('"native_metalfx_frame_interpolation_preflight": framegenProbe', report)
+        for k in ("native_metalfx_interpolation_admitted", "semantic_depth_motion_verified",
+                  "gpu_producer_consumer_sync_verified", "presenter_integrated"):
+            self.assertIn(f'"{k}": false',report)
+        self.assertIn("if(!atomic_load_explicit(&active,memory_order_relaxed)||!raw)return;",inventory)
+        self.assertIn("tl_ri_metalfx_snapshot(tl_ri_metalfx_candidates *out)",inventory)
+
     def test_general_diagnostics_grouped_outside_about(self):
         self.assertIn('row(HuskDiagnosticsSettings()', APP)
         general = APP.split("struct HuskDiagnosticsSettings: View", 1)[1].split("struct AboutSettings: View", 1)[0]
