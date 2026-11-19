@@ -1498,8 +1498,20 @@ struct TLCocosAttemptView: View {
             HStack {
                 Text(settings.isDungeons(app) ? "GAME LOG & DIAGNOSTICS" : "ATTEMPT LOG").font(.technical(10, weight: .bold)).foregroundStyle(Theme.textDim)
                 Spacer()
-                Button { UIPasteboard.general.string = model.logText } label: {
-                    Label("Copy", systemImage: "doc.on.doc").font(.system(size: 11))
+                Button {
+                    if settings.isDungeons(app) {
+                        // The viewer intentionally retains a bounded tail for
+                        // responsiveness; the unified on-disk log has every
+                        // line, including launch and startup context.
+                        HuskLog.flushNow()
+                        UIPasteboard.general.string = (try? String(contentsOf: HuskLog.logFileURL, encoding: .utf8))
+                            ?? model.logText
+                    } else {
+                        UIPasteboard.general.string = model.logText
+                    }
+                } label: {
+                    Label(settings.isDungeons(app) ? "Copy full log" : "Copy", systemImage: "doc.on.doc")
+                        .font(.system(size: 11))
                 }
             }
             .padding(.horizontal, 10).padding(.vertical, 6)
