@@ -315,6 +315,7 @@ final class TLUnityUIView: UIView, UIKeyInput {
     private var frameGenerationRate = FrameGenerationRate()
     private var lastDiagnosticsLogAt: TimeInterval = -.infinity
     private var appleInterpolatorSupported: Bool?
+    private var previousProcessCPUSample: (at: TimeInterval, seconds: Double)?
     /// Passive snapshots only. No CPU thread sampling, GPU callbacks, per-frame
     /// renderpass interception, readback or extra Metal command buffers.
     private func logDungeonsHealth(_ fps: Double) {
@@ -334,10 +335,27 @@ final class TLUnityUIView: UIView, UIKeyInput {
             candidate.lost_observations > 0 ? "incomplete" :
             candidate.readable_depth_groups > 0 && candidate.writable_vector_groups > 0 && candidate.readable_color_groups > 0
                 ? "plausible format groups only" : "no complete format candidate"
-        let mib = UInt64(os_proc_available_memory()) / 1048576
+        // Mach task accounting is a process-scoped counter, not a CPU-core
+        // placement/power measurement. Sample every 15 seconds, never enumerate
+        // threads or attach command-buffer completion callbacks.
+        var process = tl_em_process()
+        tl_em_process_sample(true, &process)
+        var cpuDescription = "unavailable"
+        if process.cpu_seconds >= 0 {
+            if let previous = previousProcessCPUSample, now > previous.at,
+               process.cpu_seconds >= previous.seconds {
+                let oneCore = 100 * (process.cpu_seconds - previous.seconds) / (now - previous.at)
+                cpuDescription = String(format: "%.1f%% of one core", oneCore)
+            }
+            previousProcessCPUSample = (now, process.cpu_seconds)
+        }
+        let footprint = process.footprint_bytes >= 0 ?
+            "\(process.footprint_bytes / 1048576) MiB" : "unavailable"
+        let headroom = process.jetsam_bytes >= 0 ?
+            "\(process.jetsam_bytes / 1048576) MiB" : "unavailable"
         HuskLog.log("game-diagnostics",
-            String(format: "host render %.1f FPS; memory headroom %llu MiB; thermal class %ld; Low Power Mode %@; MetalFX spatial input %ux%u -> output %ux%u, configured %u, encoded %llu, failures %llu; Vulkan image-only depth-format groups %u, readable depth %u, velocity-like %u, readable velocity-like %u, colour %u; evidence %@; Apple frame interpolation OFF (semantic textures and presentation not verified)",
-                   fps, mib, ProcessInfo.processInfo.thermalState.rawValue,
+            String(format: "host render %.1f FPS; process CPU %@; footprint %@, jetsam headroom %@; thermal class %ld; Low Power Mode %@; MetalFX spatial input %ux%u -> output %ux%u, configured %u, encoded %llu, failures %llu; Vulkan image-only depth-format groups %u, readable depth %u, velocity-like %u, readable velocity-like %u, colour %u; evidence %@; Apple frame interpolation OFF (semantic textures and presentation not verified)",
+                   fps, cpuDescription, footprint, headroom, ProcessInfo.processInfo.thermalState.rawValue,
                    ProcessInfo.processInfo.isLowPowerModeEnabled ? "on" : "off",
                    spatial.input_width, spatial.input_height, spatial.output_width, spatial.output_height,
                    spatial.configured, spatial.encoded, spatial.failures,
