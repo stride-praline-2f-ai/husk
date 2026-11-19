@@ -429,7 +429,9 @@ final class TLUnityUIView: UIView, UIKeyInput {
                                                      performanceCores: topology.performance, efficiencyCores: topology.efficiency)
         HuskLog.log("tl", "[NX18-HENGE-A20-v1] worker topology: total \(cpuCount), performance \(topology.performance), efficiency \(topology.efficiency); zero means unavailable; allowance \(automaticFastWorkerBudget), no core affinity")
         submissionMode = DuoDisplayPolicy.submission
-        spatialUpscaling = true
+        // MetalFX spatial is a MoltenVK-only stage. Do not enable it in
+        // automatic tuning when Metal 4 + native frame generation is selected.
+        spatialUpscaling = !metal4Renderer
         spatialInputPercent = DuoDisplayPolicy.inputPercent
         execution = .init()
         engineOnlyLimiter = false; clockPresentation = false; feedbackClockCorrection = false
