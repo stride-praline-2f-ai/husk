@@ -368,8 +368,11 @@ final class EfficiencyDiagnostics: ObservableObject {
         // Metadata can suggest scene attachments. It cannot establish shader
         // semantics, queue ownership, GPU completion, motion coordinates or
         // real depth. Never enable the interpolator from these counters.
+        let nativeSupported = husk_native_metalfx_supported()
         let candidateStatus: String
-        if !candidate.active {
+        if !nativeSupported {
+            candidateStatus = "unsupported_apple_metalfx_interpolator"
+        } else if !candidate.active {
             candidateStatus = "not_collected"
         } else if candidate.retained_image_groups == 0 || candidate.lost_observations > 0 {
             candidateStatus = "inconclusive_incomplete_image_observations"
@@ -380,6 +383,7 @@ final class EfficiencyDiagnostics: ObservableObject {
         }
         let framegenProbe: [String: Any] = [
             "status": candidateStatus,
+            "native_apple_interpolator_supported_by_current_device": nativeSupported,
             "depth_attachment_format_groups": candidate.depth_attachment_groups,
             "readable_depth_format_groups": candidate.readable_depth_groups,
             "velocity_like_format_groups": candidate.vector_format_groups,
