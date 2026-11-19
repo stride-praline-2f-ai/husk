@@ -49,7 +49,8 @@ class SettingsGroupingTests(unittest.TestCase):
         self.assertEqual(dungeons.count('Picker("Frame rate"'), 1)
         self.assertEqual(dungeons.count('Picker("Resolution"'), 1)
         self.assertNotIn('Picker("Frame Limit"', dungeons)
-        self.assertIn('NavigationLink("Diagnostics") { dungeonsDiagnostics }', dungeons)
+        self.assertNotIn('NavigationLink("Diagnostics") { dungeonsDiagnostics }', dungeons)
+        self.assertIn("Game diagnostics run automatically.", dungeons)
         self.assertIn('dungeons: true', dungeons)
         self.assertIn('connectToGame: false', GAME)
         bar = (ROOT / 'src/app/Husk/TLUnityView.swift').read_text().split('private var barControls: some View', 1)[1].split('private var logPanel:', 1)[0]
@@ -124,6 +125,27 @@ class SettingsGroupingTests(unittest.TestCase):
             self.assertIn(f'"{k}": false',report)
         self.assertIn("if(!atomic_load_explicit(&active,memory_order_relaxed)||!raw)return;",inventory)
         self.assertIn("tl_ri_metalfx_snapshot(tl_ri_metalfx_candidates *out)",inventory)
+
+    def test_dungeons_game_log_is_unified_and_default_on_without_per_frame_tracing(self):
+        launch = (ROOT / "src/app/Husk/TLUnityView.swift").read_text()
+        native = (ROOT / "src/translation-layer-next/husk-tl-render-inventory.c").read_text()
+        vk = (ROOT / "src/translation-layer-next/husk-tl-vulkan.m").read_text()
+        self.assertIn('autoDungeonsLog: settings.isDungeons(app)', launch)
+        self.assertIn('let inventoryMode: UInt32 = renderTargetInventory ? 2 : (autoDungeonsLog ? 1 : 0)', launch)
+        self.assertIn('husk_ue4_set_render_inventory_mode(inventoryMode)', launch)
+        self.assertIn('logDungeonsHealth(Double(p.fps))',launch)
+        self.assertIn('guard now - lastDiagnosticsLogAt >= 15 else { return }', launch)
+        self.assertIn('tl_ri_metalfx_snapshot(&candidate)',launch)
+        self.assertIn('tl_vk_spatial_snapshot(&spatial)',launch)
+        self.assertIn('husk_native_metalfx_supported()',launch)
+        self.assertIn('private var showLog: Bool { get { showLogSetting && (settings.isDungeons(app) || devInfo)',launch)
+        self.assertIn('HuskLog.recentLines(1200).joined(separator: "\\n")',launch)
+        self.assertIn('Text(settings.isDungeons(app) ? "GAME LOG & DIAGNOSTICS" : "ATTEMPT LOG")',launch)
+        self.assertIn('String(contentsOf: HuskLog.logFileURL, encoding: .utf8)',launch)
+        self.assertIn('tl_ri_inventory_mode()<2', native)
+        self.assertIn('!tl_ri_area_active()',vk)
+        self.assertNotIn('husk_native_metalfx_encode(',launch)
+        self.assertNotIn('tl_gput_native_start(true)',launch)
 
     def test_general_diagnostics_grouped_outside_about(self):
         self.assertIn('row(HuskDiagnosticsSettings()', APP)
