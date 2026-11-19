@@ -36,7 +36,9 @@ enum DuoDisplayPolicy {
             enabled && efficientDungeons && !windowed && isInner
         }
     }
-    static let inputPercent = 80
+    // Balanced Apple MetalFX spatial input for the inner display; the game's
+    // real render rate remains 60 FPS, never old 30→60 synthetic framegen.
+    static let inputPercent = 60
     static let fps = 60
     static let worker = 2 // Balanced: preserves critical roles, no core affinity.
     static let submission = 0 // Driver Default.
