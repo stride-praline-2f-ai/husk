@@ -80,6 +80,26 @@ if mode=="geometry" {
  chosen.selectFrameGeneration(true);chosen.selectMetal4(true);chosen.selectEnhancedMetal4(true)
  assert(!chosen.frameGeneration && !chosen.metal4Renderer && !chosen.enhancedMetal4)
  assert(chosen.nativeAppleFrameInterpolation && chosen.duoSpatialPreset==60)
+} else if mode=="jit-power" {
+ let other=TLApp(label:"Other UE4 game",packageName:"com.example.other",report:FakeReport(nativeEngine:.ue4))
+ var settings=TLAppSettings()
+ assert(settings.dungeonsJITLowPowerWait)
+ assert(settings.efficientFrameRate == .smooth && settings.effectiveExecution(for:game).initializationParking)
+ assert(!settings.effectiveExecution(for:other).initializationParking)
+ settings.execution.prefill=2;settings.execution.commandBufferLimit=8
+ var effective=settings.effectiveExecution(for:game)
+ assert(effective.initializationParking && effective.prefill==2 && effective.commandBufferLimit==8)
+ assert(!settings.execution.initializationParking) // never modifies the stored non-Dungeons experiment
+ settings.dungeonsJITLowPowerWait=false
+ assert(!settings.effectiveExecution(for:game).initializationParking)
+ assert(settings.effectiveExecution(for:game).commandBufferLimit==8)
+ let saved=try JSONEncoder().encode(settings)
+ let restored=try JSONDecoder().decode(TLAppSettings.self,from:saved)
+ assert(!restored.dungeonsJITLowPowerWait && !restored.effectiveExecution(for:game).initializationParking)
+ assert(restored.efficientFrameRate == .smooth)
+ let older=try JSONDecoder().decode(TLAppSettings.self,from:Data("{}".utf8))
+ assert(older.dungeonsJITLowPowerWait && older.effectiveExecution(for:game).initializationParking)
+ assert(!older.effectiveExecution(for:other).initializationParking)
 } else if mode=="metal4-bridge" {
  var json:[String:Any] = ["schema":2,"husk_bridge_abi":1,"native_archive_abi":2,"mesa":"b39d173ca9369c19fda2635be6655d308067e52d","source":"26620bf5319a0f5a5cca47cfecec797cafe45493","frame_generation":true]
  func read(_ value:[String:Any],_ binary:Bool=true)->Metal4DriverCapabilities {Metal4DriverCapabilities.read(try! JSONSerialization.data(withJSONObject:value),binaryAvailable:binary)}
@@ -140,6 +160,7 @@ print("PASS",mode)
  def test_opt_out_window_and_other_game_do_not_apply_profile(self):self.case('admission')
  def test_old_settings_migrate_without_overwriting_manual_values_and_opt_out_roundtrips(self):self.case('decode')
  def test_duo_phone_budget_survives_tablet_ui_idiom_and_manual_native_uses_panel_pixels(self):self.case('duo-settings')
+ def test_dungeons_native_jit_wait_parking_is_reversible_and_does_not_touch_other_games(self):self.case('jit-power')
  def test_m4_baseline_and_default_scaler_are_unchanged(self):self.case('m4')
  def test_verified_source_bridge_admission_and_explicit_combined_selection(self):self.case('metal4-bridge')
  def test_output_rate_uses_actual_callbacks_and_rejects_resets_and_gaps(self):self.case('rate')
