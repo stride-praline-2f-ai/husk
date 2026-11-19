@@ -1139,6 +1139,7 @@ final class TLUnityModel: ObservableObject {
     private var pollInterval: TimeInterval = 0
     private var polling = false
     private var logVisible = false
+    private var unifiedLog = false
     private var logRevision: UInt64 = 0
 
     func start() {
@@ -1161,12 +1162,22 @@ final class TLUnityModel: ObservableObject {
 
     func stop() { polling = false; timer?.invalidate(); timer = nil }
 
-    func setLogVisible(_ visible: Bool) {
+    func setLogVisible(_ visible: Bool, unified: Bool = false) {
+        if unifiedLog != unified { logText = ""; logRevision = 0 }
+        unifiedLog = unified
         logVisible = visible
         if visible { refreshLog() }
     }
 
     private func refreshLog() {
+        if unifiedLog {
+            // One live Dungeons log: native Vulkan/UE4/JNI/QEMU lines plus
+            // host Swift/MetalFX/thermal summaries in received order.
+            // Materialise only when visible, bounded by HuskLog's ring.
+            let text = HuskLog.recentLines(1200).joined(separator: "\n")
+            if text != logText { logText = text }
+            return
+        }
         guard let c = husk_tl_attempt_log_if_changed(&logRevision) else { return }
         defer { free(c) }
         let text = String(cString: c)
@@ -1237,7 +1248,7 @@ struct TLCocosAttemptView: View {
     @State private var uiHidden: Bool
     /// The line saying how to get the interface back, shown for a few seconds after it goes.
     @State private var hint = false
-    private var showLog: Bool { get { showLogSetting && devInfo && !settings.isDungeons(app) } nonmutating set { showLogSetting = newValue } }
+    private var showLog: Bool { get { showLogSetting && (settings.isDungeons(app) || devInfo) } nonmutating set { showLogSetting = newValue } }
 
     init(app: TLApp) {
         self.app = app
@@ -1338,11 +1349,11 @@ struct TLCocosAttemptView: View {
             if uiHidden { showHint() }
             CrashReport.gameStarted(app)
             padLayout = PadLayout.load(app.id)
-            model.setLogVisible(showLog && !uiHidden)
+            model.setLogVisible(showLog && !uiHidden, unified: settings.isDungeons(app))
             model.start()
         }
-        .onChange(of: showLog) { model.setLogVisible($0 && !uiHidden) }
-        .onChange(of: uiHidden) { model.setLogVisible(showLog && !$0) }
+        .onChange(of: showLog) { model.setLogVisible($0 && !uiHidden, unified: settings.isDungeons(app)) }
+        .onChange(of: uiHidden) { model.setLogVisible(showLog && !$0, unified: settings.isDungeons(app)) }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in model.stop() }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in model.start() }
         // What happened, for the library: ten seconds of frames is a game that plays; a refusal is one that did not start.
@@ -1469,7 +1480,7 @@ struct TLCocosAttemptView: View {
             if settings.showStats, model.state == Int32(HUSK_UNITY_RUNNING) {
                 Text(stats).font(.technical(11)).foregroundStyle(.white.opacity(0.7)).lineLimit(1)
             }
-            if devInfo && !settings.isDungeons(app) {
+            if devInfo || settings.isDungeons(app) {
                 Button { withAnimation(.snappy(duration: 0.25)) { showLog.toggle() } } label: {
                     Text(showLog ? "Hide log" : "Log").font(.system(size: 12, weight: .semibold))
                 }
@@ -1485,7 +1496,7 @@ struct TLCocosAttemptView: View {
     private var logPanel: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("ATTEMPT LOG").font(.technical(10, weight: .bold)).foregroundStyle(Theme.textDim)
+                Text(settings.isDungeons(app) ? "GAME LOG & DIAGNOSTICS" : "ATTEMPT LOG").font(.technical(10, weight: .bold)).foregroundStyle(Theme.textDim)
                 Spacer()
                 Button { UIPasteboard.general.string = model.logText } label: {
                     Label("Copy", systemImage: "doc.on.doc").font(.system(size: 11))
