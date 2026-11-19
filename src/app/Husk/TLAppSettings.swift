@@ -134,6 +134,10 @@ struct TLAppSettings: Codable, Equatable {
     var nativePipelineArchiveMode = 0
     var nativeArchiveVerification = false
     var execution = HuskExecutionOptions()
+    // Dungeons' ARM64 library initialization can wait on translated bionic
+    // pthread_once/lazy objects. Park competing threads instead of running
+    // repeated sched_yield loops; changing this never lowers the FPS cap.
+    var dungeonsJITLowPowerWait = true
     var pipelineIdentification = false
     var pipelineFeedback = false
     var automaticDuoProfile = true
@@ -229,6 +233,12 @@ struct TLAppSettings: Codable, Equatable {
         usesSharpGraphics(for: app) && (unrealGraphics == .automatic || unrealGraphics == .efficientHigh)
     }
 
+    func effectiveExecution(for app: TLApp) -> HuskExecutionOptions {
+        var selected = execution.safe
+        if isDungeons(app) { selected.initializationParking = dungeonsJITLowPowerWait }
+        return selected
+    }
+
     func supportsDuoAutomatic(for app: TLApp) -> Bool {
         automaticDuoProfile && usesEfficientGraphics(for: app) && isDungeons(app)
     }
@@ -302,6 +312,7 @@ struct TLAppSettings: Codable, Equatable {
         clockPresentation = try c.decodeIfPresent(Bool.self, forKey: .clockPresentation) ?? false
         feedbackClockCorrection = try c.decodeIfPresent(Bool.self, forKey: .feedbackClockCorrection) ?? false
         execution = (try c.decodeIfPresent(HuskExecutionOptions.self, forKey: .execution) ?? .init()).safe
+        dungeonsJITLowPowerWait = try c.decodeIfPresent(Bool.self, forKey: .dungeonsJITLowPowerWait) ?? true
         nativeArchiveVerification = try c.decodeIfPresent(Bool.self, forKey: .nativeArchiveVerification) ?? false
         let archiveMode = try c.decodeIfPresent(Int.self, forKey: .nativePipelineArchiveMode) ?? 0
         nativePipelineArchiveMode = [0,1,2].contains(archiveMode) ? archiveMode : 0
@@ -541,6 +552,9 @@ struct TLAppSettingsView: View {
                     Text("Off").tag(false); Text("On").tag(true)
                 }
                 Toggle("Shared game memory", isOn: $settings.sharedMemoryReserve)
+                Toggle("Park idle native JIT waits", isOn: $settings.dungeonsJITLowPowerWait)
+                Text("Uses native condition-variable sleeps instead of CPU-spinning during contested Unreal library/object initialization. Does not change executable memory, graphics, or the 60 FPS target. Disable and restart if startup or gameplay regresses.")
+                    .font(.footnote).foregroundStyle(.secondary)
             } header: { Text("Graphics & Memory") } footer: {
                 Text("MetalFX's spatial pass scales the whole rendered image, including any in-game HUD, so text clarity is not guaranteed at 50%. Native frame interpolation remains unavailable without genuine engine motion/depth. Switching resolutions or folding requires swapchain recreation; restart the game when changing presets.")
             }
