@@ -1518,7 +1518,8 @@ static const struct { const char *name; void *fn; } k_over[] = {
 static void *overridden(const char *name)
 {
     /* Default-off inventory does not interpose per-render-pass calls at all. */
-    if ((!strcmp(name,"vkCreateImage") || !strcmp(name,"vkCmdBeginRenderPass")) && !tl_ri_active()) return NULL;
+    if (!strcmp(name,"vkCreateImage") && !tl_ri_active()) return NULL;
+    if (!strcmp(name,"vkCmdBeginRenderPass") && !tl_ri_area_active()) return NULL;
     for (size_t i = 0; i < sizeof(k_over) / sizeof(k_over[0]); i++) if (!strcmp(k_over[i].name, name)) return k_over[i].fn;
     return NULL;
 }
