@@ -132,9 +132,12 @@ final class TLUnityUIView: UIView, UIKeyInput {
         self.driverProfiling = driverProfiling
         self.pipelineIdentification = pipelineIdentification
         self.pipelineFeedback = pipelineFeedback
-        self.enhancedMetal4 = enhancedMetal4 && Metal4DriverCapabilities.current.nativeArchives
-        self.frameGeneration = DuoDisplayPolicy.usesFrameGeneration(metal4: metal4Renderer, requested: frameGeneration, metal4Bridge: self.enhancedMetal4 && Metal4DriverCapabilities.current.frameGeneration)
-        self.metal4Renderer = metal4Renderer
+        // The native Apple pipeline does not route through KosmicKrisp or
+        // Husk's colour-flow interpolator. Keep legacy parameters for ABI
+        // compatibility with callers, but make them inert.
+        self.enhancedMetal4 = false
+        self.frameGeneration = false
+        self.metal4Renderer = false
         self.spatialUpscaling = spatialUpscaling
         self.spatialInputPercent = spatialInputPercent
         self.clockPresentation = clockPresentation
@@ -429,20 +432,15 @@ final class TLUnityUIView: UIView, UIKeyInput {
                                                      performanceCores: topology.performance, efficiencyCores: topology.efficiency)
         HuskLog.log("tl", "[NX18-HENGE-A20-v1] worker topology: total \(cpuCount), performance \(topology.performance), efficiency \(topology.efficiency); zero means unavailable; allowance \(automaticFastWorkerBudget), no core affinity")
         submissionMode = DuoDisplayPolicy.submission
-        // MetalFX spatial is a MoltenVK-only stage. Do not enable it in
-        // automatic tuning when Metal 4 + native frame generation is selected.
-        spatialUpscaling = !metal4Renderer
+        // The existing spatial scaler uses Apple's MetalFX API through
+        // MoltenVK. It needs no Metal 4 renderer or synthetic frame generator.
+        spatialUpscaling = true
         spatialInputPercent = DuoDisplayPolicy.inputPercent
         execution = .init()
         engineOnlyLimiter = false; clockPresentation = false; feedbackClockCorrection = false
         driverProfiling = false; pipelineIdentification = false; pipelineFeedback = false; renderTargetInventory = false
-        if !(metal4Renderer && enhancedMetal4) {
-            nativePipelineArchiveMode = 0; nativeArchiveVerification = false
-        }
-        let rendering = metal4Renderer
-            ? (frameGeneration ? "Metal 4 requests 30 rendered → 60 output target" : "Metal 4 requests 60 rendered FPS")
-            : (frameGeneration ? "MetalFX 80%, 30 rendered → 60 output target" : "MetalFX 80%, 60 rendered FPS")
-        HuskLog.log("tl", "Automatic Duo inner-screen starting profile: reduced output, \(rendering), worker mode \(threadPolicy), normal-priority worker allowance \(automaticFastWorkerBudget), Driver Default; QoS hints, not core affinity; visual/energy optimum unverified")
+        nativePipelineArchiveMode = 0; nativeArchiveVerification = false
+        HuskLog.log("tl", "Automatic Duo inner-screen starting profile: native Apple MetalFX spatial 80% requested through MoltenVK; 60 real FPS, worker mode \(threadPolicy), normal-priority worker allowance \(automaticFastWorkerBudget); native interpolation blocked until engine motion/depth and presentation bridge exist")
     }
 
     private func launch(width: Int, height: Int) {
@@ -515,12 +513,11 @@ final class TLUnityUIView: UIView, UIKeyInput {
         case .ue4:
             // Unreal draws with Vulkan, which on this device is MoltenVK, a framework of the app's own.
             husk_ue4_set_diagnostic_session(HuskLog.sessionID)
-            if let capture = FramegenDiagnostics.consume(apk: apk) {
-                husk_ue4_set_framegen_capture_directory(capture)
-            } else { husk_ue4_set_framegen_capture_directory(nil) }
-            husk_ue4_set_frame_generation(frameGeneration)
-            husk_ue4_set_clock_presentation(frameGeneration ? false : clockPresentation)
-            husk_ue4_set_feedback_clock(frameGeneration ? false : feedbackClockCorrection)
+            // Retired: no custom optical-flow framegen and no legacy capture.
+            husk_ue4_set_framegen_capture_directory(nil)
+            husk_ue4_set_frame_generation(false)
+            husk_ue4_set_clock_presentation(clockPresentation)
+            husk_ue4_set_feedback_clock(feedbackClockCorrection)
             husk_ue4_set_native_archive(Int32(nativePipelineArchiveMode))
             husk_ue4_set_native_archive_verification(nativeArchiveVerification)
             husk_ue4_set_spatial_upscaling(spatialUpscaling)
@@ -545,42 +542,24 @@ final class TLUnityUIView: UIView, UIKeyInput {
             var selectedDriverPath = "UNAVAILABLE"
             if let fw = Bundle.main.privateFrameworksPath {
                 let candidate = fw + "/HuskMoltenVK.framework/HuskMoltenVK"
-                let experimental = (spatialUpscaling || nativePipelineArchiveMode != 0 || frameGeneration) && FileManager.default.fileExists(atPath: candidate)
-                var selected = experimental ? candidate : fw + "/MoltenVK.framework/MoltenVK"
-                if metal4Renderer {
-                    let metal4 = fw + (enhancedMetal4 ? "/HuskKosmicKrisp.framework/HuskKosmicKrisp" : "/KosmicKrisp.framework/KosmicKrisp")
-                    if #available(iOS 26.0, *), FileManager.default.fileExists(atPath: metal4),
-                       husk_metal4_preflight() {
-                        selected = metal4
-                        // Both Metal4 drivers preserve the selected extent.
-                        // Only the source-built enhancement has Husk archives/FG.
-                        husk_ue4_set_spatial_upscaling(false)
-                        if !enhancedMetal4 {
-                            husk_ue4_set_native_archive(0)
-                            husk_ue4_set_native_archive_verification(false)
-                        }
-                        husk_ue4_set_clock_presentation(false)
-                        husk_ue4_set_feedback_clock(false)
-                        HuskLog.log("tl", enhancedMetal4 ? "[M3/M9 METAL4] source-built enhancements requested; native archive/framegen configure calls decide activation; selected output retained" : "[M3/M9 METAL4] published KosmicKrisp beta requested; selected output retained; source-built enhancements OFF")
-                    } else {
-                        HuskLog.log("tl", "[M3/M9 METAL4] beta unavailable on this OS/device/package; existing MoltenVK path retained")
-                    }
-                }
+                let experimental = (spatialUpscaling || nativePipelineArchiveMode != 0)
+                    && FileManager.default.fileExists(atPath: candidate)
+                let selected = experimental ? candidate : fw + "/MoltenVK.framework/MoltenVK"
                 husk_ue4_set_vulkan(selected)
                 selectedDriverPath = selected
-                let usingMetal4 = selected.hasSuffix("KosmicKrisp.framework/KosmicKrisp") || selected.hasSuffix("HuskKosmicKrisp.framework/HuskKosmicKrisp")
-                husk_crash_stage(usingMetal4 ? "ue4_metal4_selected" : (experimental ? "ue4_experimental_moltenvk_selected" : "ue4_original_moltenvk_selected"))
-                HuskLog.log("tl", "[M3/M9 renderer] selected \(usingMetal4 ? "KosmicKrisp Metal 4 beta" : (experimental ? "pinned experimental MoltenVK" : "original MoltenVK")); spatial requested \(spatialUpscaling && !usingMetal4), frame generation requested \(frameGeneration); native preflight decides activation")
+                husk_crash_stage(experimental ? "ue4_experimental_moltenvk_selected" : "ue4_original_moltenvk_selected")
+                HuskLog.log("tl", "[APPLE-METALFX] MoltenVK driver selected; native spatial requested \(spatialUpscaling); KosmicKrisp and retired colour-flow interpolation disabled")
             }
             husk_crash_stage("ue4_native_runtime_launch_enter")
             started = husk_ue4_launch(apk, dataDir, layerPtr, Int32(width), Int32(height), angle, ca)
-            let activeMetal4 = started && tl_vk_is_metal4()
+            let activeMetal4 = false // Retired renderer is never selected.
             let effective: [String: Any] = ["host_session_id": HuskLog.sessionID,
                 "host_monotonic_seconds": ProcessInfo.processInfo.systemUptime,
                 "started": started, "launch_width": width, "launch_height": height,
                 "selected_driver_path": selectedDriverPath, "metal4_active": activeMetal4,
-                "frame_generation_requested": frameGeneration, "requested_rendered_fps": frameGeneration ? 30 : efficientFrameLimit,
-                "requested_output_fps": frameGeneration ? 60 : efficientFrameLimit,
+                "frame_generation_requested": false, "requested_rendered_fps": efficientFrameLimit,
+                "requested_output_fps": efficientFrameLimit,
+                "native_apple_interpolation_active": false, "native_apple_interpolation_reason": "Missing engine depth/motion handoff and presentation bridge",
                 "worker_policy": threadPolicy, "automatic_fast_worker_budget": automaticFastWorkerBudget,
                 "submission_mode": submissionMode, "prefill": execution.prefill, "command_buffer_limit": execution.commandBufferLimit,
                 "swapchain_images": execution.swapchainImages, "initialization_parking": execution.initializationParking,
@@ -588,7 +567,7 @@ final class TLUnityUIView: UIView, UIKeyInput {
                 "clock_presentation_requested_after_overrides": clockPresentation && !frameGeneration && !activeMetal4,
                 "clock_feedback_requested_after_overrides": feedbackClockCorrection && !frameGeneration && !activeMetal4,
                 "archive_mode_requested_after_overrides": activeMetal4 && !enhancedMetal4 ? 0 : nativePipelineArchiveMode,
-                "scope": "Host launch after device/renderer overrides. Native FG active/failure counters are separate. Engine runtime CVars and actual worker core placement remain unavailable."]
+                "scope": "Apple MetalFX spatial uses the MoltenVK driver where available; native frame interpolation is not activated without genuine UE4 depth/motion and a synchronised present stage."]
             FramegenDiagnostics.recordLaunch(apk: apk, values: effective)
             if let bytes = try? JSONSerialization.data(withJSONObject: effective, options: [.sortedKeys]), let line = String(data: bytes, encoding: .utf8) {
                 HuskLog.log("framegen-config", line)
