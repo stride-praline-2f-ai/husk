@@ -55,6 +55,29 @@ int reserved(void){
  if(s.hash_probes>4000||s.observed_images!=302||s.observed_render_areas!=1)return 2;
  return 0;
 }
+
+int framegen_candidates(void){
+ tl_ri_metalfx_candidates v={0};
+ husk_ue4_set_render_inventory(false);tl_ri_activate("Dungeons");
+ tl_ri_metalfx_snapshot(&v);
+ if(v.version!=1||v.size!=sizeof(v)||v.active||v.readable_depth_groups||v.writable_vector_groups)return 1;
+ husk_ue4_set_render_inventory(true);tl_ri_activate("Dungeons");
+ image_info p={.type=14,.width=1088,.height=768,.depth=1,.samples=1,.format=126,.usage=0x24};
+ tl_ri_image(&p);tl_ri_image(&p); /* same depth group */
+ p.format=83;p.usage=0x14;tl_ri_image(&p); /* motion-like RG16F, not verified motion */
+ p.format=44;p.usage=0x14;tl_ri_image(&p); /* ordinary colour */
+ p.format=127;p.usage=0x24;tl_ri_image(&p); /* stencil-only: not depth */
+ p.format=103;p.usage=0x10;tl_ri_image(&p); /* unsampleable motion-like format */
+ tl_ri_metalfx_snapshot(&v);
+ if(!v.active||v.depth_attachment_groups!=1||v.readable_depth_groups!=1)return 2;
+ if(v.vector_format_groups!=2||v.writable_vector_groups!=1)return 3;
+ if(v.renderable_color_groups!=3||v.readable_color_groups!=2)return 4;
+ if(v.retained_image_groups!=5||v.lost_observations!=0)return 5;
+ tl_ri_activate("Other");tl_ri_metalfx_snapshot(&v);
+ if(v.active||v.retained_image_groups||v.readable_depth_groups||v.writable_vector_groups)return 6;
+ return 0;
+}
+
 '''
   (p/'test.c').write_text(harness);subprocess.run([os.environ.get('CC','cc'),'-std=c11','-Wall','-Wextra','-Werror','-shared','-fPIC','-pthread','-I',str(ROOT/'src/translation-layer-next'),str(p/'test.c'),'-o',str(p/'test.so')],check=True);cls.lib=ctypes.CDLL(str(p/'test.so'))
  def test_disabled_lookup_does_not_interpose_or_read_input(self):self.assertEqual(self.lib.exercise(0),0)
@@ -63,4 +86,5 @@ int reserved(void){
  def test_registry_capacity_and_loss_are_disclosed(self):self.assertEqual(self.lib.bounded(),0)
  def test_assets_cannot_starve_targets_or_areas_and_existing_counts_survive(self):self.assertEqual(self.lib.reserved(),0)
  def test_render_thread_never_waits_for_diagnostic_mutex(self):self.assertEqual(self.lib.contended(),0)
+ def test_native_metalfx_candidates_are_only_bounded_requested_metadata(self):self.assertEqual(self.lib.framegen_candidates(),0)
 if __name__=='__main__':unittest.main()
