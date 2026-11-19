@@ -27,6 +27,17 @@ jobs:
         run: |
           set -euo pipefail
           cp .github/ci/write_status.py "$RUNNER_TEMP/husk-build-status.py"
+          if [ "${GITHUB_REF_NAME}" = "feature/apple-native-metalfx-rebuild" ]; then
+            # The optimized source branch intentionally omits bulky pinned
+            # release-input files; read these exact assets from production main
+            # without changing or merging the feature source.
+            git fetch --no-tags origin main
+            mkdir -p vendor source
+            for asset in vendor/HuskMoltenVK-verified.zip.b64 source/build.json source/husk.bundle.b64; do
+              git show "origin/main:$asset" > "$asset"
+              test -s "$asset"
+            done
+          fi
           python3 - <<'DRIVER'
           import base64,hashlib,os
           from pathlib import Path
