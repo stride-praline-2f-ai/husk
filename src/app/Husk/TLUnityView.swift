@@ -444,7 +444,10 @@ final class TLUnityUIView: UIView, UIKeyInput {
         execution = .init()
         execution.initializationParking = keepJITLowPowerWait
         engineOnlyLimiter = false; clockPresentation = false; feedbackClockCorrection = false
-        driverProfiling = false; pipelineIdentification = false; pipelineFeedback = false; renderTargetInventory = false
+        // Keep the user-requested, default-OFF render-target inventory available
+        // for a one-shot native MetalFX feasibility diagnosis. It is bounded,
+        // records Vulkan metadata only, and never changes command encoding.
+        driverProfiling = false; pipelineIdentification = false; pipelineFeedback = false
         nativePipelineArchiveMode = 0; nativeArchiveVerification = false
         HuskLog.log("tl", "Automatic Duo inner-screen starting profile: Apple MetalFX spatial \(spatialInputPercent)% requested through MoltenVK; 60 real FPS, worker mode \(threadPolicy), normal-priority worker allowance \(automaticFastWorkerBudget); native frame interpolation requires genuine engine motion/depth and presentation integration")
     }
