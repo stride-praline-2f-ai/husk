@@ -65,6 +65,10 @@ struct TLApp { var packageName:String?; var label:String; var report:FakeReport?
 struct TLAppSettings {
  enum EfficientFrameRate:Int {case cool=30,smooth=60}
  enum EfficientResolution:Int {case custom = -1, automatic=0,native=100,sharp=85}
+ enum VulkanSubmission { case driverDefault }
+ struct HuskExecutionOptions {}
+ var engineOnlyLimiter=true,clockPresentation=true,feedbackClockCorrection=true
+ var vulkanSubmission = VulkanSubmission.driverDefault,execution=HuskExecutionOptions()
  var frameGeneration=false,metal4Renderer=false,enhancedMetal4=false,automaticDuoProfile=true
  var efficientFrameRate=EfficientFrameRate.smooth,efficientResolution=EfficientResolution.automatic,customResolutionPercent=80
  var spatialUpscaling=true,workerScheduling=4
@@ -80,6 +84,7 @@ precondition(!settings.automaticDuoProfile && !settings.frameGeneration && setti
 settings.selectDungeonsResolutionChoice(0);precondition(!settings.automaticDuoProfile)
 settings.metal4Renderer=true;settings.selectDungeonsFrameChoice(120,bridgeAvailable:true)
 precondition(settings.frameGeneration && settings.enhancedMetal4 && settings.dungeonsFrameChoice(automaticActive:true)==120)
+precondition(!settings.spatialUpscaling && !settings.clockPresentation && !settings.feedbackClockCorrection && !settings.engineOnlyLimiter)
 settings.selectDungeonsRendererChoice(1,bridgeAvailable:true)
 precondition(settings.metal4Renderer && !settings.enhancedMetal4 && !settings.frameGeneration)
 settings.efficientResolution = .sharp;settings.customResolutionPercent=80
@@ -87,7 +92,7 @@ precondition(settings.dungeonsResolutionChoice == -1 && settings.dungeonsResolut
 settings.selectDungeonsResolutionChoice(-1);precondition(settings.efficientResolution == .custom && settings.customResolutionPercent==85)
 settings.selectDungeonsFrameChoice(60,bridgeAvailable:true);settings.selectDungeonsResolutionChoice(0)
 precondition(settings.automaticDuoProfile && settings.efficientFrameRate == .smooth)
-precondition(settings.spatialUpscaling && settings.workerScheduling==4)
+precondition(!settings.spatialUpscaling && settings.workerScheduling==4)
 print("PASS: actual Dungeons choice policy preserves manual scale, makes30FPS effective, combines FG/renderer controls and retains other stored preferences")
 ''')
    exe=p/'check';subprocess.run(['swiftc',str(p/'main.swift'),'-o',str(exe)],check=True);subprocess.run([str(exe)],check=True)
