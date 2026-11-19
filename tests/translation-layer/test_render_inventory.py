@@ -56,6 +56,27 @@ int reserved(void){
  return 0;
 }
 
+int passive_dungeons_inventory(void){
+ husk_ue4_set_render_inventory_mode(1);tl_ri_activate("Dungeons");
+ if(tl_ri_inventory_mode()!=1||!tl_ri_active()||tl_ri_area_active())return 1;
+ if(overridden("vkCreateImage")!=(void *)w_vkCreateImage)return 2;
+ if(overridden("vkCmdBeginRenderPass")!=NULL)return 3;
+ image_info p={.type=14,.width=912,.height=640,.depth=1,.samples=1,.format=126,.usage=0x24};
+ tl_ri_image(&p);
+ begin_info rp={.type=43,.width=912,.height=640};
+ tl_ri_render_area(&rp);
+ tl_ri_metalfx_candidates v;tl_ri_metalfx_snapshot(&v);
+ if(!v.active||v.readable_depth_groups!=1||v.retained_image_groups!=1)return 4;
+ tl_ri_stats stats;tl_ri_snapshot(NULL,0,&stats);
+ if(stats.observed_render_areas||stats.observed_images!=1)return 5;
+ husk_ue4_set_render_inventory(true);tl_ri_activate("Dungeons");
+ if(tl_ri_inventory_mode()!=2||!tl_ri_area_active())return 6;
+ if(overridden("vkCmdBeginRenderPass")!=(void *)w_vkCmdBeginRenderPass)return 7;
+ tl_ri_render_area(&rp);tl_ri_snapshot(NULL,0,&stats);
+ if(stats.observed_render_areas!=1)return 8;
+ husk_ue4_set_render_inventory_mode(0);tl_ri_activate("Dungeons");
+ return (tl_ri_active()||tl_ri_area_active()||overridden("vkCreateImage")||overridden("vkCmdBeginRenderPass"))?9:0;
+}
 int framegen_candidates(void){
  tl_ri_metalfx_candidates v={0};
  husk_ue4_set_render_inventory(false);tl_ri_activate("Dungeons");
@@ -87,4 +108,5 @@ int framegen_candidates(void){
  def test_assets_cannot_starve_targets_or_areas_and_existing_counts_survive(self):self.assertEqual(self.lib.reserved(),0)
  def test_render_thread_never_waits_for_diagnostic_mutex(self):self.assertEqual(self.lib.contended(),0)
  def test_native_metalfx_candidates_are_only_bounded_requested_metadata(self):self.assertEqual(self.lib.framegen_candidates(),0)
+ def test_automatic_dungeons_diagnostic_is_image_only_and_manual_can_collect_renderpasses(self):self.assertEqual(self.lib.passive_dungeons_inventory(),0)
 if __name__=='__main__':unittest.main()
