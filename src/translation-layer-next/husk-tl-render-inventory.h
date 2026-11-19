@@ -24,6 +24,11 @@ typedef struct {
 } tl_ri_metalfx_candidates;
 void tl_ri_metalfx_snapshot(tl_ri_metalfx_candidates *out);
 
+/* 0=off, 1=lightweight image allocations only, 2=explicit full inventory.
+ * Mode 1 never wraps or samples per-frame renderpass calls. */
+void husk_ue4_set_render_inventory_mode(uint32_t mode);
+bool tl_ri_area_active(void);
+uint32_t tl_ri_inventory_mode(void);
 void husk_ue4_set_render_inventory(bool value);
 void tl_ri_activate(const char *project);
 bool tl_ri_active(void);
