@@ -7,6 +7,7 @@
 #define GROUPS 256
 #define SLOTS 512
 static atomic_bool requested,active;
+static atomic_uint inventory_mode; /* 0 off; 1 image-only; 2 full per-pass diagnostics */
 static atomic_uint_fast64_t images,areas,capacity_drops,contention_drops;
 static pthread_mutex_t mu=PTHREAD_MUTEX_INITIALIZER;
 static tl_ri_group groups[GROUPS];
@@ -19,7 +20,14 @@ static uint64_t probes;
 typedef struct {uint32_t type;const void *next;uint32_t flags,image_type,format,width,height,depth,mips,layers,samples,tiling,usage;} image_info;
 typedef struct {uint32_t type;const void *next;uint64_t renderpass,framebuffer;int32_t x,y;uint32_t width,height;} begin_info;
 _Static_assert(offsetof(image_info,width)==28&&offsetof(image_info,usage)==56&&offsetof(begin_info,width)==40,"Vulkan image/render-area ABI");
-void husk_ue4_set_render_inventory(bool value){atomic_store(&requested,value);}
+void husk_ue4_set_render_inventory_mode(uint32_t mode){
+ if(mode>2)mode=2;
+ atomic_store_explicit(&inventory_mode,mode,memory_order_release);
+ atomic_store_explicit(&requested,mode!=0,memory_order_release);
+}
+void husk_ue4_set_render_inventory(bool value){husk_ue4_set_render_inventory_mode(value?2:0);}
+uint32_t tl_ri_inventory_mode(void){return atomic_load_explicit(&inventory_mode,memory_order_acquire);}
+bool tl_ri_area_active(void){return tl_ri_active()&&tl_ri_inventory_mode()>=2;}
 void tl_ri_activate(const char *project){
  atomic_store(&active,false);pthread_mutex_lock(&mu);
  memset(groups,0,sizeof(groups));memset(slots,0,sizeof(slots));memset(used,0,sizeof(used));length=0;probes=0;
@@ -59,7 +67,7 @@ void tl_ri_image(const void *raw){
  record((tl_ri_group){.kind=0,.width=p->width,.height=p->height,.depth=p->depth,.format=p->format,.usage=p->usage,.samples=p->samples});
 }
 void tl_ri_render_area(const void *raw){
- if(!atomic_load_explicit(&active,memory_order_relaxed)||!raw)return;
+ if(!atomic_load_explicit(&active,memory_order_relaxed)||tl_ri_inventory_mode()<2||!raw)return;
  const begin_info *p=raw;if(p->type!=43)return;
  record((tl_ri_group){.kind=1,.width=p->width,.height=p->height,.depth=1});
 }
