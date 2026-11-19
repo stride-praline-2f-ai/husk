@@ -16,11 +16,11 @@ class SpatialTests(unittest.TestCase):
 #include "husk-tl-spatial.h"
 #include <assert.h>
 int main(void){tl_spatial_config c={0};assert(sizeof(c)==32&&sizeof(tl_spatial_stats)==56&&sizeof(tl_spatial_observations)==64);
- assert(tl_spatial_dimensions(2128,1600,80,&c));assert(c.input_width==1696&&c.input_height==1280);
+ assert(tl_spatial_dimensions(2128,1600,80,&c));assert(c.input_width==1704&&c.input_height==1280);
  assert(c.output_width==2128&&c.output_height==1600&&c.version==1&&c.enabled==1);
  assert(c.input_width%8==0&&c.input_height%8==0);
- int percents[]={85,90,95},widths[]={1808,1912,2016},heights[]={1360,1440,1520};
- for(int i=0;i<3;i++){assert(tl_spatial_dimensions(2128,1600,percents[i],&c));assert(c.input_width==(unsigned)widths[i]&&c.input_height==(unsigned)heights[i]);assert(c.output_width==2128&&c.output_height==1600);}
+ int percents[]={50,60,67,80,85,90,95},widths[]={1064,1280,1424,1704,1808,1912,2024},heights[]={800,960,1072,1280,1360,1440,1520};
+ for(int i=0;i<7;i++){assert(tl_spatial_dimensions(2128,1600,percents[i],&c));assert(c.input_width==(unsigned)widths[i]&&c.input_height==(unsigned)heights[i]);assert(c.output_width==2128&&c.output_height==1600);}
  return 0;}
 ''',extra=[TL/"husk-tl-spatial.c"])
     def test_invalid_dimensions_leave_original_request_untouched(self):
@@ -48,7 +48,7 @@ static int driver_present=1,driver_accepts=1,ready=1,sharp=1,calls;
 static bool vk_ready(void){return ready!=0;}
 static bool tl_ue4_sharp_graphics_enabled(void){return sharp!=0;}
 static void tl_log_line(const char *format,...){(void)format;}
-static int configure(const tl_spatial_config*c){calls++;assert(c->output_width==2128&&c->input_width==1696);return driver_accepts;}
+static int configure(const tl_spatial_config*c){calls++;assert(c->output_width==2128&&c->input_width==1704);return driver_accepts;}
 static void* fake_dlsym(void *lib,const char*name){(void)lib;return driver_present&&!strcmp(name,"vkHuskSpatialConfigure")?(void*)configure:NULL;}
 #define dlsym fake_dlsym
 #define vk_symbol(name) fake_dlsym(V.lib,name)
@@ -64,8 +64,8 @@ int main(void){
  driver_present=0;assert(!tl_vk_spatial_prepare("Dungeons",&w,&h));assert(w==2128&&h==1600);
  driver_present=1;driver_accepts=0;assert(!tl_vk_spatial_prepare("Dungeons",&w,&h));assert(w==2128&&h==1600);
  tl_vk_spatial_touch(&x,&y);assert(x==1064&&y==800);
- driver_accepts=1;assert(tl_vk_spatial_prepare("Dungeons",&w,&h)&&w==1696&&h==1280);
- tl_vk_spatial_touch(&x,&y);assert(x==848&&y==640&&tl_vk_spatial_active());
+ driver_accepts=1;assert(tl_vk_spatial_prepare("Dungeons",&w,&h)&&w==1704&&h==1280);
+ tl_vk_spatial_touch(&x,&y);assert(x==852&&y==640&&tl_vk_spatial_active());
  tl_spatial_stats s;tl_vk_spatial_snapshot(&s);assert(s.version==1&&s.size==sizeof(s)&&s.configured==0);
  tl_spatial_observations o;assert(!tl_vk_spatial_observations(&o)&&o.version==1&&o.size==64);
  return 0;}
