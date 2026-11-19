@@ -22,9 +22,11 @@
 @end
 @implementation HuskNativeFXState
 - (void)dealloc {
+#if !__has_feature(objc_arc)
     [interpolator release];
     [device release];
     [super dealloc];
+#endif
 }
 @end
 
@@ -43,7 +45,7 @@ void *husk_native_metalfx_create(void *raw_device, const husk_metalfx_config *c)
         !c->color_format || !c->depth_format || !c->motion_format || !c->output_format)
         return NULL;
     if (@available(iOS 18.0, *)) {
-        id<MTLDevice> metalDevice = (id<MTLDevice>)raw_device;
+        id<MTLDevice> metalDevice = (__bridge id<MTLDevice>)raw_device;
         if (!metalDevice || ![MTLFXFrameInterpolatorDescriptor supportsDevice:metalDevice])
             return NULL;
         MTLFXFrameInterpolatorDescriptor *desc = [MTLFXFrameInterpolatorDescriptor new];
@@ -56,13 +58,24 @@ void *husk_native_metalfx_create(void *raw_device, const husk_metalfx_config *c)
         desc.motionTextureFormat = (MTLPixelFormat)c->motion_format;
         desc.outputTextureFormat = (MTLPixelFormat)c->output_format;
         id<MTLFXFrameInterpolator> fx = [desc newFrameInterpolatorWithDevice:metalDevice];
+#if !__has_feature(objc_arc)
         [desc release];
+#endif
         if (!fx) return NULL;
         HuskNativeFXState *s = [HuskNativeFXState new];
+#if __has_feature(objc_arc)
+        s->device = metalDevice;
+        s->interpolator = fx;
+#else
         s->device = [metalDevice retain];
         s->interpolator = fx;
+#endif
         s->contract = *c;
+#if __has_feature(objc_arc)
+        return (__bridge_retained void *)s;
+#else
         return s;
+#endif
     }
     return NULL;
 }
@@ -78,13 +91,13 @@ bool husk_native_metalfx_encode(void *opaque, void *raw_buffer,
         !isfinite(i->aspect_ratio) || i->aspect_ratio <= 0.0f)
         return false;
     if (@available(iOS 18.0, *)) {
-        HuskNativeFXState *s = (HuskNativeFXState *)opaque;
-        id<MTLTexture> previous = (id<MTLTexture>)i->previous_color;
-        id<MTLTexture> current = (id<MTLTexture>)i->current_color;
-        id<MTLTexture> depth = (id<MTLTexture>)i->depth;
-        id<MTLTexture> motion = (id<MTLTexture>)i->motion;
-        id<MTLTexture> output = (id<MTLTexture>)i->output;
-        id<MTLCommandBuffer> buffer = (id<MTLCommandBuffer>)raw_buffer;
+        HuskNativeFXState *s = (__bridge HuskNativeFXState *)opaque;
+        id<MTLTexture> previous = (__bridge id<MTLTexture>)i->previous_color;
+        id<MTLTexture> current = (__bridge id<MTLTexture>)i->current_color;
+        id<MTLTexture> depth = (__bridge id<MTLTexture>)i->depth;
+        id<MTLTexture> motion = (__bridge id<MTLTexture>)i->motion;
+        id<MTLTexture> output = (__bridge id<MTLTexture>)i->output;
+        id<MTLCommandBuffer> buffer = (__bridge id<MTLCommandBuffer>)raw_buffer;
         if (previous.device != s->device || current.device != s->device ||
             depth.device != s->device || motion.device != s->device ||
             output.device != s->device)
@@ -103,6 +116,8 @@ bool husk_native_metalfx_encode(void *opaque, void *raw_buffer,
         // The caller is responsible for GPU dependency ordering, camera cuts,
         // UI composition and presenting generated then real images on time.
         id<MTLFXFrameInterpolator> fx = s->interpolator;
+        fx.contentWidth = s->contract.width;
+        fx.contentHeight = s->contract.height;
         fx.prevColorTexture = previous;
         fx.colorTexture = current;
         fx.depthTexture = depth;
@@ -124,5 +139,10 @@ bool husk_native_metalfx_encode(void *opaque, void *raw_buffer,
 }
 
 void husk_native_metalfx_destroy(void *opaque) {
+    if (!opaque) return;
+#if __has_feature(objc_arc)
+    CFBridgingRelease(opaque);
+#else
     [(HuskNativeFXState *)opaque release];
+#endif
 }
