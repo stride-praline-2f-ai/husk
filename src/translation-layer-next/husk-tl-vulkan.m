@@ -168,7 +168,7 @@ static atomic_bool spatial_prepared;
 static float spatial_touch_x=1.0f,spatial_touch_y=1.0f;
 void husk_ue4_set_spatial_upscaling(bool enabled){spatial_requested=enabled;}
 void husk_ue4_set_spatial_input_percent(int percent){
-    spatial_input_percent=(percent==80||percent==85||percent==90||percent==95)?percent:80;
+    spatial_input_percent=(percent==50||percent==60||percent==67||percent==80||percent==85||percent==90||percent==95)?percent:80;
 }
 bool tl_vk_spatial_active(void){return atomic_load_explicit(&spatial_prepared,memory_order_acquire);}
 void tl_vk_spatial_touch(float *x,float *y){
