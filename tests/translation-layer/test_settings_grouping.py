@@ -58,6 +58,23 @@ class SettingsGroupingTests(unittest.TestCase):
         self.assertIn('Button { dismiss() }', bar)
         self.assertIn('Button { toggleInterface() }', bar)
 
+    def test_metal4_framegen_defaults_and_no_automatic_metalfx_conflict(self):
+        launch = (ROOT / "src/app/Husk/TLUnityView.swift").read_text()
+        self.assertIn("static func prefersMetal4Framegen(_ caps: Metal4DriverCapabilities)", GAME)
+        for name in ("frameGeneration", "metal4Renderer", "enhancedMetal4"):
+            self.assertIn(
+                f"var {name} = TLAppSettings.prefersMetal4Framegen(Metal4DriverCapabilities.current)", GAME
+            )
+        self.assertIn("?? preferredMetal4", GAME)
+        self.assertIn("disableMetal4FramegenConflicts()", GAME)
+        self.assertIn("spatialUpscaling = false", GAME)
+        self.assertIn("clockPresentation = false", GAME)
+        self.assertIn("feedbackClockCorrection = false", GAME)
+        self.assertIn("engineOnlyLimiter = false", GAME)
+        self.assertIn("spatialUpscaling = !metal4Renderer", launch)
+        self.assertIn("husk_ue4_set_spatial_upscaling(false)", launch)
+        self.assertIn("husk_metal4_preflight()", launch)
+
     def test_general_diagnostics_grouped_outside_about(self):
         self.assertIn('row(HuskDiagnosticsSettings()', APP)
         general = APP.split("struct HuskDiagnosticsSettings: View", 1)[1].split("struct AboutSettings: View", 1)[0]
