@@ -9,6 +9,7 @@
 static atomic_bool requested,active;
 static atomic_uint inventory_mode; /* 0 off; 1 image-only; 2 full per-pass diagnostics */
 static atomic_uint_fast64_t images,areas,capacity_drops,contention_drops;
+static atomic_uint_fast64_t dropped_assets,dropped_targets,dropped_areas;
 static pthread_mutex_t mu=PTHREAD_MUTEX_INITIALIZER;
 static tl_ri_group groups[GROUPS];
 static uint16_t slots[SLOTS];
@@ -32,6 +33,7 @@ void tl_ri_activate(const char *project){
  atomic_store(&active,false);pthread_mutex_lock(&mu);
  memset(groups,0,sizeof(groups));memset(slots,0,sizeof(slots));memset(used,0,sizeof(used));length=0;probes=0;
  atomic_store(&images,0);atomic_store(&areas,0);atomic_store(&capacity_drops,0);atomic_store(&contention_drops,0);
+ atomic_store(&dropped_assets,0);atomic_store(&dropped_targets,0);atomic_store(&dropped_areas,0);
  atomic_store(&active,atomic_load(&requested)&&project&&!strcmp(project,"Dungeons"));pthread_mutex_unlock(&mu);
 }
 bool tl_ri_active(void){return atomic_load_explicit(&active,memory_order_relaxed);}
@@ -57,8 +59,12 @@ static void record(tl_ri_group value){
   if(equal(groups[index],value)){groups[index].count++;pthread_mutex_unlock(&mu);return;}
  }
  unsigned kind=value.kind==1?2:(value.usage&(0x10u|0x20u|0x8u))?1:0;
- if(scan==SLOTS||length==GROUPS||used[kind]>=limits[kind])atomic_fetch_add(&capacity_drops,1);
- else {value.count=1;groups[length]=value;slots[slot]=(uint16_t)(++length);used[kind]++;}
+ if(scan==SLOTS||length==GROUPS||used[kind]>=limits[kind]){
+  atomic_fetch_add_explicit(&capacity_drops,1,memory_order_relaxed);
+  if(kind==0)atomic_fetch_add_explicit(&dropped_assets,1,memory_order_relaxed);
+  else if(kind==1)atomic_fetch_add_explicit(&dropped_targets,1,memory_order_relaxed);
+  else atomic_fetch_add_explicit(&dropped_areas,1,memory_order_relaxed);
+ } else {value.count=1;groups[length]=value;slots[slot]=(uint16_t)(++length);used[kind]++;}
  pthread_mutex_unlock(&mu);
 }
 void tl_ri_image(const void *raw){
@@ -77,7 +83,10 @@ uint32_t tl_ri_snapshot(tl_ri_group *out,uint32_t capacity,tl_ri_stats *stats){
  if(stats)*stats=(tl_ri_stats){.requested=atomic_load(&requested),.active=atomic_load(&active),
    .observed_images=atomic_load(&images),.observed_render_areas=atomic_load(&areas),.dropped=full+busy,
    .dropped_capacity=full,.dropped_contention=busy,.hash_probes=probes,
-   .asset_groups=used[0],.target_groups=used[1],.area_groups=used[2]};
+   .asset_groups=used[0],.target_groups=used[1],.area_groups=used[2],
+   .dropped_capacity_assets=atomic_load_explicit(&dropped_assets,memory_order_relaxed),
+   .dropped_capacity_targets=atomic_load_explicit(&dropped_targets,memory_order_relaxed),
+   .dropped_capacity_areas=atomic_load_explicit(&dropped_areas,memory_order_relaxed)};
  uint32_t n=out?(capacity<length?capacity:length):0;if(n)memcpy(out,groups,n*sizeof(*out));
  pthread_mutex_unlock(&mu);return n;
 }
@@ -104,8 +113,12 @@ void tl_ri_metalfx_snapshot(tl_ri_metalfx_candidates *out)
  result.version=1;result.size=sizeof(result);
  pthread_mutex_lock(&mu);
  result.active=atomic_load_explicit(&active,memory_order_relaxed);
- result.lost_observations=atomic_load_explicit(&capacity_drops,memory_order_relaxed)+
-                          atomic_load_explicit(&contention_drops,memory_order_relaxed);
+ result.lost_asset_observations=atomic_load_explicit(&dropped_assets,memory_order_relaxed);
+ result.lost_target_observations=atomic_load_explicit(&dropped_targets,memory_order_relaxed);
+ result.lost_render_area_observations=atomic_load_explicit(&dropped_areas,memory_order_relaxed);
+ result.lost_contention_observations=atomic_load_explicit(&contention_drops,memory_order_relaxed);
+ result.lost_observations=result.lost_asset_observations+result.lost_target_observations+
+                          result.lost_render_area_observations+result.lost_contention_observations;
  for(uint32_t i=0;i<length;i++){
   const tl_ri_group *g=&groups[i];
   if(g->kind!=0||!g->width||!g->height||g->depth!=1||g->samples!=1)continue;
