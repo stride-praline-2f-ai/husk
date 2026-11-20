@@ -11,6 +11,10 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include <stdatomic.h>
+#ifdef __APPLE__
+#include <dispatch/dispatch.h>
+#endif
 
 /* MoltenVK v1.4.2 private API 43: 11 shader, 3 cache, 9 queue, 1 memory
  * trackers in this order. Require the complete exact-size ABI; never read a
@@ -126,6 +130,23 @@ void tl_dp_report(void)
                     phase_names[i], added, t.count, t.average, t.latest, t.maximum, reset ? " (counter reset/wrap)" : "");
     }
     if (!emitted) tl_log_line("ue4 driver profile: no new validated activities; ABI acceptance alone does not establish active tracking");
+}
+/* Sampling performance statistics can block on internal native-driver
+ * locks. Never query them on Dungeons' presentation loop. At most one utility
+ * report can be queued at a time. Teardown serializes with profile_mu. */
+static atomic_bool report_queued;
+static void report_job(void *unused){
+ (void)unused;
+ tl_dp_report();
+ atomic_store_explicit(&report_queued,false,memory_order_release);
+}
+void tl_dp_schedule_report(void){
+ if(!enabled||atomic_exchange_explicit(&report_queued,true,memory_order_acq_rel))return;
+#ifdef __APPLE__
+ dispatch_async_f(dispatch_get_global_queue(QOS_CLASS_UTILITY,0),NULL,report_job);
+#else
+ report_job(NULL);
+#endif
 }
 const char *tl_dp_name(uint32_t phase){return phase<24?phase_names[phase]:"unknown";}
 uint32_t tl_dp_copy(tl_dp_phase *out,uint32_t capacity,tl_dp_info *info){
