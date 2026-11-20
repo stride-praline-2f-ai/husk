@@ -4,6 +4,9 @@
 #include <stdatomic.h>
 #include <stdio.h>
 #include <string.h>
+#ifdef __APPLE__
+#include <dispatch/dispatch.h>
+#endif
 _Static_assert(sizeof(tl_pi_stage) == 48 && sizeof(tl_pi_graphics) == 144 && sizeof(tl_pi_compute) == 96 && offsetof(tl_pi_graphics, subpass) == 120, "Vulkan 64-bit pipeline ABI");
 #define MODULES 4096
 #define SIGNATURES 2048
@@ -212,6 +215,24 @@ void tl_pi_report(void) {
     if (lost) tl_log_line("ue4 pipeline identity: M2/PIPE-01 diagnostic records unavailable/dropped %llu; bounded registry/events",(unsigned long long)lost);
 }
 
+/* Capture remains on pipeline-create paths, but assembling human-readable
+ * pipeline records and writing the combined file must never block render.
+ * Inactive path is one atomic test; at most one queued drain per 10 s. */
+static atomic_bool report_queued;
+static void pi_report_job(void *unused){
+ (void)unused;
+ tl_pi_report();
+ atomic_store_explicit(&report_queued,false,memory_order_release);
+}
+void tl_pi_schedule_report(void){
+ if(!atomic_load_explicit(&enabled,memory_order_relaxed)||
+    atomic_exchange_explicit(&report_queued,true,memory_order_acq_rel))return;
+#ifdef __APPLE__
+ dispatch_async_f(dispatch_get_global_queue(QOS_CLASS_UTILITY,0),NULL,pi_report_job);
+#else
+ pi_report_job(NULL);
+#endif
+}
 uint32_t tl_pi_copy_groups(tl_pi_group *out, uint32_t capacity) {
     if (!atomic_load(&enabled) || !out || !capacity) return 0;
     pthread_mutex_lock(&mu);uint32_t n=0;
