@@ -891,6 +891,11 @@ static void w_vkDestroyDevice(void *device, const void *alloc)
     tl_gput_native_forget(device);
     typedef void (*fn)(void *, const void *);
     fn real = V.lib ? (fn)vk_symbol("vkDestroyDevice") : NULL;
+    /* A normal foreground exit may never trigger the iOS pause checkpoint.
+     * Save the native cache while this device and its VkPipelineCache handles
+     * are still valid. This is teardown-only: NEVER put a serialized cache
+     * readback or exclusive checkpoint lock on the render/submit path. */
+    tl_pc_checkpoint();
     tl_pc_forget_device(device, real, alloc);
 }
 
