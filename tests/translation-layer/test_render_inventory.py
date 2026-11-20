@@ -22,7 +22,15 @@ static void *get(void*lib,const char*name){(void)lib;if(!strcmp(name,"vkCreateIm
 #define dlsym get
 #define vk_symbol(name) get(V.lib,name)
 '''+wrappers+r'''
-static const struct{const char*name;void*fn;}k_over[]={{"vkCreateImage",w_vkCreateImage},{"vkCmdBeginRenderPass",w_vkCmdBeginRenderPass}};
+static const struct{const char*name;void*fn;}k_over[]={
+ {"vkCreateImage",w_vkCreateImage},
+ {"vkDestroyImage",w_vkDestroyImage},
+ {"vkCreateImageView",w_vkCreateImageView},
+ {"vkDestroyImageView",w_vkDestroyImageView},
+ {"vkCreateFramebuffer",w_vkCreateFramebuffer},
+ {"vkDestroyFramebuffer",w_vkDestroyFramebuffer},
+ {"vkCmdBeginRenderPass",w_vkCmdBeginRenderPass}
+};
 '''+lookup+r'''
 int exercise(int mode){
  husk_ue4_set_render_inventory(mode!=0);tl_ri_activate(mode==2?"Other":"Dungeons");status=calls=begins=errors=0;
