@@ -10,6 +10,8 @@ typedef struct {
     uint64_t observed_images,observed_render_areas,dropped;
     uint64_t dropped_capacity,dropped_contention,hash_probes;
     uint32_t asset_groups,target_groups,area_groups;
+    /* Capacity loss counted by resource class; excludes lock contention. */
+    uint64_t dropped_capacity_assets,dropped_capacity_targets,dropped_capacity_areas;
 } tl_ri_stats;
 /* Advisory format/usage/extent screen only. These counters CANNOT prove that
  * an image holds Unreal scene velocity or depth at presentation time.
@@ -21,6 +23,10 @@ typedef struct {
     uint32_t vector_format_groups, writable_vector_groups;
     uint32_t renderable_color_groups, readable_color_groups;
     uint64_t retained_image_groups, lost_observations;
+    /* Asset-only overflow must not automatically invalidate retained
+     * attachment-format evidence; all results remain metadata-only. */
+    uint64_t lost_asset_observations,lost_target_observations;
+    uint64_t lost_render_area_observations,lost_contention_observations;
 } tl_ri_metalfx_candidates;
 void tl_ri_metalfx_snapshot(tl_ri_metalfx_candidates *out);
 
