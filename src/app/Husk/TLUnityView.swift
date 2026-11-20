@@ -435,6 +435,12 @@ final class TLUnityUIView: UIView, UIKeyInput {
                     lineage.mixed_depth_vector_framebuffers,
                     lineage.missing_image_view_links, lineage.missing_framebuffer_view_links,
                     lineage.dropped_records, status))
+        var gpuGate = tl_lifecycle_gpu_gate_stats()
+        tl_lifecycle_gpu_gate_snapshot(&gpuGate)
+        HuskLog.log("game-diagnostics",
+            String(format: "GPU foreground gate: paused %u, waiting Vulkan callers %u, parked calls %llu, parked wall %.1f ms cumulative; work scheduled before background may still complete or fail, VK device loss is not automatically recoverable",
+                   gpuGate.paused, gpuGate.waiting_calls, gpuGate.parked_calls,
+                   Double(gpuGate.parked_wall_ns) / 1e6))
         logMetalFXImageCandidates(candidate)
         Self.dungeonsThreadReporter.capture()
     }
