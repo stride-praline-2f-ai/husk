@@ -26,3 +26,20 @@
 - Next, implement a source-built MoltenVK bridge with GPU completed-frame leases, real current/previous scene colour + depth + true velocity and camera constants. Integrate `HuskNativeMetalFX.m` on an ordered Metal command buffer. Follow Apple's dedicated frame-presentation thread approach (generated / real frames) with correct timestamp pacing and no duplicate presents. Require scene-aware UI composition, camera-cut reset, resource-retirement and resize/background/device-loss tests. Only then expose a feature-toggle and evaluate 30 rendered -> 60 displayed.
 - Apple integration: https://github.com/apple/game-porting-toolkit/blob/main/game-porting-skills/skills/using-metalfx-frame-interpolation/SKILL.md ; https://developer.apple.com/videos/play/wwdc2025/211/
 - Phase is **diagnostic and feasibility**, not functioning Apple frame generation. An actual Mac CI build and on-device report are still required. Keep current stable 60-real-FPS spatial path until they pass.
+
+
+## 20 November 2026: measured `ba600be` Duo game log
+
+The complete user's 8+ minute `husk.log` (A20 Pro, iOS 27.3, Dungeons Android v1.4) now establishes:
+
+- Native Apple frame interpolator hardware support was explicitly **true** at runtime. The prototype remains **OFF** because there are no validated engine motion/depth texture handles or dual-frame presenter.
+- Apple MetalFX spatial scaling **encoded over 26,000 calls with zero reported failures**, at **912 x 640 input → 1816 x 1280 output**. That establishes actual encode operation, not subjective image quality or measured energy savings.
+- The passive image-only observer accumulated **4 depth-format groups (3 readable)**, **9 velocity-like float-format groups (9 readable/writable)** and **37 colour groups**; metadata suggests actual Unreal candidates rather than proving semantic contents. The previous preflight described all candidate data as "incomplete" if *any* observation was lost, even if overflow occurred only in unrelated asset formats.
+- Repeated `vkCreateGraphicsPipelines` calls had recorded host durations up to **565 ms** in one interval. Stalls continue after a compatible **5.43 MB Vulkan pipeline cache seed** was accepted. Acceptance does not prove a cache hit, and frame interpolation cannot make a missing real frame appear during such a stall.
+- Nominal thermal state (`0`) and approximately **4.7–5.0 GiB jetsam headroom** persisted, despite host CPU usage approaching **~200% of one core** (roughly two cores' worth) and a physical process footprint around **1.9 GiB**. Low Power Mode switched on during the session; the measured FPS and process CPU should not be interpreted as energy consumption.
+- Repeated `VK_ERROR_FEATURE_NOT_PRESENT`/primitive restart warnings are nonfatal within this observed session; the game continues producing frames. The missing optional patch OBB notice also did not stop gameplay.
+- Image-only inventory pass is now automatically enabled, and change-only snapshots can enumerate format/extent/usage for up to 12 candidates in the same game log.
+
+**Source correction on this branch:** Count asset-target-renderpass capacity losses individually in the native bounded inventory and report them explicitly in the Dungeons game log and JSON. Positive candidate-format groups remain visible even if unrelated asset observation slots are full. Fewer false inconclusive statuses does **not** amount to verified UE4 motion vectors or admission to Apple frame interpolation.
+
+**Next engineering gate:** prove each candidate's Vulkan image/view identity, framebuffer attachment mapping, scene producer pipeline, camera matrix and frame chronological availability, then export ownership-safe MoltenVK Metal textures. This is not possible from image-creation format and usage alone; no working native frame-generation path is claimed.
