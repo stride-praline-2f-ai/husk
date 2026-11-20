@@ -17,7 +17,7 @@ class MetalExportDeviceTests(unittest.TestCase):
         end = src.index("static int w_vkCreateDevice(", begin)
         native = src[begin:end]
         assert "VK_EXT_metal_objects" in native
-        assert "VK_ERROR_EXTENSION_NOT_PRESENT" in native
+        assert "if(result!=VK_SUCCESS)" in native
         cls.tmp = tempfile.TemporaryDirectory()
         cls.addClassCleanup(cls.tmp.cleanup)
         folder = Path(cls.tmp.name)
@@ -49,13 +49,13 @@ static int fake_create(void*pd,const vk_device_ci*info,const void*a,void**out) {
  for(unsigned i=0;i<info->extCount;i++)
   if(!strcmp(info->exts[i],"VK_EXT_metal_objects"))last_included=1;
  included+=last_included;
- if(reject&&last_included)return VK_ERROR_EXTENSION_NOT_PRESENT;
+ if(reject&&last_included)return reject==2 ? -8 : VK_ERROR_EXTENSION_NOT_PRESENT;
  *out=(void *)123;return 0;
 }
 static pfn_create_device g_real_create_device=fake_create;
 ''' + native + r'''
 int try_device(int mode){
- metal4_backend=0;active=mode!=0;offered=mode!=2;reject=mode==3;
+ metal4_backend=0;active=mode!=0;offered=mode!=2;reject=mode==3 ? 1 : mode==4 ? 2 : 0;
  calls=included=last_included=0;
  const char *names[]={"VK_KHR_swapchain"};
  vk_device_ci ci={0};ci.extCount=1;ci.exts=names;void *created=NULL;
@@ -63,7 +63,7 @@ int try_device(int mode){
  if(result!=0||created!=(void *)123||ci.extCount!=1||strcmp(ci.exts[0],"VK_KHR_swapchain"))return 1;
  if(mode==0||mode==2){if(calls!=1||included!=0||last_included)return 2;}
  if(mode==1){if(calls!=1||included!=1||!last_included)return 3;}
- if(mode==3){if(calls!=2||included!=1||last_included)return 4;}
+ if(mode==3||mode==4){if(calls!=2||included!=1||last_included)return 4;}
  return 0;
 }
 int guest_requested(void){
@@ -88,8 +88,9 @@ int guest_requested(void){
     def test_supported_extension_added_without_modifying_guest_request(self):
         self.assertEqual(self.lib.try_device(1),0)
 
-    def test_extension_rejection_retries_original_once(self):
+    def test_any_optional_extension_failure_retries_original_once(self):
         self.assertEqual(self.lib.try_device(3),0)
+        self.assertEqual(self.lib.try_device(4),0)
 
     def test_guest_requested_extension_is_not_duplicated(self):
         self.assertEqual(self.lib.guest_requested(),0)
