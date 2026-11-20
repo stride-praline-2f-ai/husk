@@ -1421,11 +1421,40 @@ static void w_vkGetPhysicalDeviceMemoryProperties2KHR(void *pd, vk_mem_props2 *p
 }
 
 static pfn_create_device g_real_create_device;
+/* The game does not request VK_EXT_metal_objects itself. Enable this
+ * MoltenVK-only export capability for the Dungeons diagnostic bridge,
+ * without changing the guest-facing list or touching any texture.
+ * On extension-not-present, retry the exact original create info. */
+static int create_with_optional_metal_export(void *pd,const vk_device_ci *ci,const void *alloc,void **out){
+    static const char metal_ext[]="VK_EXT_metal_objects";
+    if(!ci||!tl_ri_active()||metal4_backend||ci->extCount>256||!g_real_enum_dev_ext||
+       !real_dev_ext(pd,metal_ext))
+        return g_real_create_device(pd,ci,alloc,out);
+    for(uint32_t i=0;i<ci->extCount;i++)if(ci->exts[i]&&!strcmp(ci->exts[i],metal_ext)){
+        int r=g_real_create_device(pd,ci,alloc,out);
+        if(!r)tl_log_line("vulkan: native Metal objects export extension requested by guest; actual UE4 motion/depth NOT verified");
+        return r;
+    }
+    const char *ext[257];
+    for(uint32_t i=0;i<ci->extCount;i++)ext[i]=ci->exts[i];
+    ext[ci->extCount]=metal_ext;
+    vk_device_ci copy=*ci;
+    copy.extCount++;
+    copy.exts=ext;
+    int result=g_real_create_device(pd,&copy,alloc,out);
+    if(result==VK_ERROR_EXTENSION_NOT_PRESENT){
+        tl_log_line("vulkan: native Metal objects export rejected; retrying untouched guest device extensions");
+        if(out)*out=NULL;
+        return g_real_create_device(pd,ci,alloc,out);
+    }
+    if(result==VK_SUCCESS)tl_log_line("vulkan: native Metal object export capability enabled; Vulkan image/view lineage is advisory, NO GPU texture export or interpolation active");
+    return result;
+}
 static int w_vkCreateDevice(void *pd, const vk_device_ci *ci, const void *alloc, void **out)
 {
     if (!g_real_create_device) return -3;
     if (!dxvk_game()) {
-        int result = tl_pf_create_device(pd, ci, alloc, out, g_real_create_device, g_real_enum_dev_ext);
+        int result = tl_pf_create_device(pd, ci, alloc, out, create_with_optional_metal_export, g_real_enum_dev_ext);
         if (result == VK_SUCCESS && out && *out) {
             tl_sb_device(pd,*out);
         tl_dp_device(*out);
