@@ -1442,8 +1442,10 @@ static int create_with_optional_metal_export(void *pd,const vk_device_ci *ci,con
     copy.extCount++;
     copy.exts=ext;
     int result=g_real_create_device(pd,&copy,alloc,out);
-    if(result==VK_ERROR_EXTENSION_NOT_PRESENT){
-        tl_log_line("vulkan: native Metal objects export rejected; retrying untouched guest device extensions");
+    if(result!=VK_SUCCESS){
+        /* Optional capability must NEVER prevent Dungeons launching, including
+         * drivers returning a feature/initialization error instead of -7. */
+        tl_log_line("vulkan: optional Metal export rejected (%d); retrying untouched guest device extensions", result);
         if(out)*out=NULL;
         return g_real_create_device(pd,ci,alloc,out);
     }
