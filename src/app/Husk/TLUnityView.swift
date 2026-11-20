@@ -6,6 +6,62 @@ import AVFoundation
 import Metal
 import UniformTypeIdentifiers
 
+
+/* Lightweight hot-thread attribution for the automatic *combined game log*.
+ * One task_threads scan per ~15 s, on utility QoS; no suspend, callstack, GPU
+ * instrumentation, thread priority change or separate report. A terminated
+ * thread has no delta here: sums must NOT be equated with process-total CPU. */
+private final class DungeonsThreadCPUReporter {
+    private let queue = DispatchQueue(label: "com.husk.dungeons.cpu-threads", qos: .utility)
+    private var previous: [UInt64: Double] = [:]
+    private var previousAt: Double?
+    func capture() {
+        queue.async { [self] in
+            let began = ProcessInfo.processInfo.systemUptime
+            var rows = Array(repeating: tl_em_thread(), count: 128)
+            var stats = tl_em_thread_stats()
+            let count = rows.withUnsafeMutableBufferPointer { buffer in
+                tl_em_thread_sample(buffer.baseAddress, UInt32(buffer.count), &stats)
+            }
+            let at = ProcessInfo.processInfo.systemUptime
+            guard stats.result == 0 else {
+                HuskLog.log("game-diagnostics", "CPU hot threads unavailable (Mach result \(stats.result)); process CPU remains sampled separately")
+                return
+            }
+            var current: [UInt64: Double] = [:]
+            var hot: [(name: String, cpu: Double)] = []
+            let elapsed = previousAt.map { at - $0 } ?? 0
+            for var record in rows.prefix(Int(count)) {
+                let consumed = record.user_seconds + record.system_seconds
+                guard consumed.isFinite && consumed >= 0 else { continue }
+                current[record.identity] = consumed
+                if elapsed > 2, let old = previous[record.identity], consumed >= old {
+                    let name = withUnsafePointer(to: &record.name) { ptr in
+                        ptr.withMemoryRebound(to: CChar.self, capacity: 64) { String(cString: $0) }
+                    }
+                    hot.append((name: name.isEmpty ? "unnamed" : name, cpu: consumed - old))
+                }
+            }
+            previous = current
+            previousAt = at
+            guard elapsed > 2 else {
+                HuskLog.log("game-diagnostics", "CPU hot-thread sampler baseline: \(count)/\(stats.enumerated) live threads; next ~15s snapshot provides per-thread deltas")
+                return
+            }
+            hot.sort { $0.cpu > $1.cpu }
+            let top = hot.prefix(6).map {
+                String(format: "%@ %.1f%%core", $0.name, 100 * $0.cpu / elapsed)
+            }.joined(separator: " | ")
+            let accounted = hot.reduce(0.0) { $0 + $1.cpu }
+            let overheadMS = (ProcessInfo.processInfo.systemUptime - began) * 1000
+            HuskLog.log("game-diagnostics", String(format:
+                "CPU hot threads (%.1fs): top6 %@; still-live matched CPU %.1f%%core; matched %ld/%ld sampled, enumerated %u, truncated %@, scan %.2f ms; INCOMPLETE for terminated/unseen threads, host+guest shared process, not CPU P/E placement, GPU time or watts",
+                elapsed, top.isEmpty ? "no matching threads" : top, 100 * accounted / elapsed,
+                hot.count, count, stats.enumerated, stats.truncated ? "yes" : "no", overheadMS))
+        }
+    }
+}
+
 /// The engines the native runtime drives. Both draw into a CAMetalLayer through ANGLE. Starting a different APK
 /// stops the current session first.
 enum TLNativeEngine {
@@ -317,6 +373,10 @@ final class TLUnityUIView: UIView, UIKeyInput {
     private var appleInterpolatorSupported: Bool?
     private var previousProcessCPUSample: (at: TimeInterval, seconds: Double)?
     private var lastMetalFXInventoryFingerprint = ""
+    // Sample live host-thread CPU on a utility serial queue, at most once per
+    // existing 15-second game-log window. Mach enumeration must NOT stall UIKit
+    // or enter the render, Vulkan, or guest-translated hot paths.
+    private static let dungeonsThreadReporter = DungeonsThreadCPUReporter()
     /// Passive snapshots only. No CPU thread sampling, GPU callbacks, per-frame
     /// renderpass interception, readback or extra Metal command buffers.
     private func logDungeonsHealth(_ fps: Double) {
@@ -376,6 +436,7 @@ final class TLUnityUIView: UIView, UIKeyInput {
                     lineage.missing_image_view_links, lineage.missing_framebuffer_view_links,
                     lineage.dropped_records, status))
         logMetalFXImageCandidates(candidate)
+        Self.dungeonsThreadReporter.capture()
     }
 
     /// Read only the existing bounded Vulkan creation inventory, not texture
