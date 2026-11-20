@@ -19,6 +19,13 @@ bool tl_lifecycle_next(bool *paused,uint64_t *sequence);
 void tl_lifecycle_complete(bool paused,uint64_t sequence);
 bool tl_lifecycle_wait_paused(uint32_t milliseconds); /* worker only, max5s */
 void tl_lifecycle_snapshot(tl_lifecycle_stats *out);
+/* Foreground protection for iOS GPU work. Pause is published from UIApplication
+ * willResignActive, ahead of the background transition. Guest renderer calls
+ * park without returning a synthetic VK_ERROR_DEVICE_LOST. No GPU-driver calls
+ * or long waits on UIKit. A submission already in flight cannot be recalled. */
+void tl_lifecycle_gpu_gate_wait(void);
+typedef struct { uint64_t parked_calls, parked_wall_ns; uint32_t waiting_calls, paused; } tl_lifecycle_gpu_gate_stats;
+void tl_lifecycle_gpu_gate_snapshot(tl_lifecycle_gpu_gate_stats *out);
 #ifdef __cplusplus
 }
 #endif
