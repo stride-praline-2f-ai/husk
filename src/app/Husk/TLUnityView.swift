@@ -332,6 +332,8 @@ final class TLUnityUIView: UIView, UIKeyInput {
         tl_vk_spatial_snapshot(&spatial)
         var candidate = tl_ri_metalfx_candidates()
         tl_ri_metalfx_snapshot(&candidate)
+        var lineage = tl_ri_lineage_stats()
+        tl_ri_lineage_snapshot(&lineage)
         let candidateFound = candidate.readable_depth_groups > 0
             && candidate.writable_vector_groups > 0 && candidate.readable_color_groups > 0
         let status = !candidate.active ? "unavailable" :
@@ -359,7 +361,7 @@ final class TLUnityUIView: UIView, UIKeyInput {
         let headroom = process.jetsam_bytes >= 0 ?
             "\(process.jetsam_bytes / 1048576) MiB" : "unavailable"
         HuskLog.log("game-diagnostics",
-            String(format: "host render %.1f FPS; process CPU %@; footprint %@, jetsam headroom %@; thermal class %ld; Low Power Mode %@; MetalFX spatial input %ux%u -> output %ux%u, configured %u, encoded %llu, failures %llu; Vulkan image-only depth-format groups %u, readable depth %u, velocity-like %u, readable velocity-like %u, colour %u; lost assets %llu, lost targets %llu, lock misses %llu; evidence %@; Apple frame interpolation OFF (semantic textures and presentation not verified)",
+            String(format: "host render %.1f FPS; process CPU %@; footprint %@, jetsam headroom %@; thermal class %ld; Low Power Mode %@; MetalFX spatial input %ux%u -> output %ux%u, configured %u, encoded %llu, failures %llu; Vulkan image-only depth-format groups %u, readable depth %u, velocity-like %u, readable velocity-like %u, colour %u; lost assets %llu, lost targets %llu, lock misses %llu; live Vulkan lineage created targets %llu, target views %llu, framebuffer links %llu (depth %llu, vector-like %llu, both %llu), missing links %llu/%llu, overflow %llu; evidence %@; Apple frame interpolation OFF (semantic textures and presentation not verified)",
                    fps, cpuDescription, footprint, headroom, ProcessInfo.processInfo.thermalState.rawValue,
                    ProcessInfo.processInfo.isLowPowerModeEnabled ? "on" : "off",
                    spatial.input_width, spatial.input_height, spatial.output_width, spatial.output_height,
@@ -367,7 +369,12 @@ final class TLUnityUIView: UIView, UIKeyInput {
                    candidate.depth_attachment_groups, candidate.readable_depth_groups, candidate.vector_format_groups,
                    candidate.writable_vector_groups, candidate.readable_color_groups,
                     candidate.lost_asset_observations, candidate.lost_target_observations,
-                    candidate.lost_contention_observations, status))
+                    candidate.lost_contention_observations,
+                    lineage.tracked_target_images, lineage.tracked_target_views, lineage.tracked_framebuffers,
+                    lineage.depth_framebuffers, lineage.vector_like_framebuffers,
+                    lineage.mixed_depth_vector_framebuffers,
+                    lineage.missing_image_view_links, lineage.missing_framebuffer_view_links,
+                    lineage.dropped_records, status))
         logMetalFXImageCandidates(candidate)
     }
 
