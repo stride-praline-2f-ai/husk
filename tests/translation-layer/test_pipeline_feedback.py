@@ -41,6 +41,7 @@ int run(int mode){
  if(mode==0)husk_ue4_set_pipeline_feedback(false),tl_pf_activate("Dungeons");
  if(mode==2){offers=0;}
  if(mode==4){failure=-7;}
+ if(mode==13){failure=-8;}
  if(mode==5){failure=-4;}
  if(mode==6)fail_at=2;
  if(mode==12)tl_pf_activate("Other");
@@ -48,10 +49,10 @@ int run(int mode){
  if(memcmp(&saved,&info,sizeof(info))||errors)return 1;
  if(mode==5)return result==-4&&calls==1?0:2;
  if(result||device!=(void *)7)return 3;
- if(mode==4&&calls!=2)return 4;
+ if((mode==4||mode==13)&&calls!=2)return 4;
  if((mode==0||mode==3||mode==12)&&enumerations)return 5;
  tl_pf_stats st;tl_pf_snapshot(&st);tl_pf_batch batch;
- if(mode==0||mode==2||mode==4||mode==6||mode==12){const void*view=tl_pf_prepare(false,device,65,(void *)1,&batch);tl_pf_release(&batch);return view==(void *)1&&!st.enabled_devices?0:6;}
+ if(mode==0||mode==2||mode==4||mode==6||mode==12||mode==13){const void*view=tl_pf_prepare(false,device,65,(void *)1,&batch);tl_pf_release(&batch);return view==(void *)1&&!st.enabled_devices?0:6;}
  if(mode==7){allocations=0;fail_at=1;const void*view=tl_pf_prepare(false,device,2,ci,&batch);tl_pf_release(&batch);return view==ci?0:7;}
  if(mode==8){tl_pf_info guest={.type=FEEDBACK_TYPE};ci[0].next=&guest;tl_pi_graphics copy[2];memcpy(copy,ci,sizeof(ci));const tl_pi_graphics *view=tl_pf_prepare(false,device,2,ci,&batch);int ok=view!=ci&&view[0].next==&guest&&view[1].next!=ci[1].next&&batch.injected==1&&!memcmp(ci,copy,sizeof(ci));tl_pf_release(&batch);return ok?0:8;}
  if(mode==9){struct node {uint32_t type;const void*next;}chain={1,NULL};chain.next=&chain;ci[0].next=ci[1].next=&chain;const void*view=tl_pf_prepare(false,device,2,ci,&batch);tl_pf_release(&batch);return view==ci?0:9;}
@@ -74,6 +75,7 @@ int run(int mode){
  def test_unsupported_driver_keeps_original_device_and_pipeline_inputs(self):self.assertEqual(self.lib.run(2),0)
  def test_guest_extension_is_not_duplicated(self):self.assertEqual(self.lib.run(3),0)
  def test_only_extension_not_present_allows_diagnostic_fallback(self):self.assertEqual(self.lib.run(4),0)
+ def test_feature_not_present_allows_diagnostic_fallback(self):self.assertEqual(self.lib.run(13),0)
  def test_device_loss_is_not_retried(self):self.assertEqual(self.lib.run(5),0)
  def test_device_extension_allocation_failure_falls_back(self):self.assertEqual(self.lib.run(6),0)
  def test_batch_allocation_failure_leaves_original_infos(self):self.assertEqual(self.lib.run(7),0)
