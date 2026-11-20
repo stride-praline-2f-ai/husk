@@ -1701,15 +1701,33 @@ static pthread_key_t g_tls_key;
 static pthread_once_t g_tls_once = PTHREAD_ONCE_INIT;
 
 typedef struct { void *blk[MAX_TLS_MODULES + 1]; } tls_thread;
-static void tls_thread_free(void *p) { tls_thread *t = p; for (int i = 0; i <= MAX_TLS_MODULES; i++) free(t->blk[i]); free(t); }
-static void tls_key_init(void) { pthread_key_create(&g_tls_key, tls_thread_free); }
+/* __tls_get_addr and UE4 TLSDESC entries are invoked on hot guest paths.
+ * Keep the per-thread block directory directly in native TLS. The pthread
+ * key exists only to run the destructor when that thread exits: no
+ * pthread_once or pthread_getspecific on an established translation call. */
+static _Thread_local tls_thread *tls_current;
+static bool tls_key_ready;
+static void tls_thread_free(void *p) {
+    tls_thread *t = p;
+    if (!t) return;
+    tls_current = NULL;
+    for (int i = 0; i <= MAX_TLS_MODULES; i++) free(t->blk[i]);
+    free(t);
+}
+static void tls_key_init(void) { tls_key_ready = pthread_key_create(&g_tls_key, tls_thread_free) == 0; }
 
 static void *tls_block(unsigned module)
 {
-    pthread_once(&g_tls_once, tls_key_init);
     if (module == 0 || module > (unsigned)g_ntls) return NULL;
-    tls_thread *t = pthread_getspecific(g_tls_key);
-    if (!t) { t = calloc(1, sizeof(*t)); pthread_setspecific(g_tls_key, t); }
+    tls_thread *t = tls_current;
+    if (!t) {
+        pthread_once(&g_tls_once, tls_key_init);
+        if (!tls_key_ready) return NULL;
+        t = calloc(1, sizeof(*t));
+        if (!t) return NULL;
+        if (pthread_setspecific(g_tls_key, t)) { free(t); return NULL; }
+        tls_current = t;
+    }
     if (!t->blk[module]) {
         uint64_t al = g_tlsmod[module].align < 16 ? 16 : g_tlsmod[module].align;
         void *b = NULL;
