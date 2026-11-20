@@ -614,7 +614,7 @@ static int w_vkCreateImage(void *device,const void *ci,const void *alloc,uint64_
     typedef int (*fn)(void *,const void *,const void *,uint64_t *);
     fn real=V.lib?(fn)vk_symbol("vkCreateImage"):NULL;
     int result=real?real(device,ci,alloc,out):-3;
-    if(result==VK_SUCCESS&&out&&*out)tl_ri_image(ci);
+    if(result==VK_SUCCESS&&out&&*out){tl_ri_image(ci);tl_ri_image_created(device,*out,ci);}
     return result;
 }
 static void w_vkCmdBeginRenderPass(void *command,const void *info,uint32_t contents)
@@ -623,9 +623,43 @@ static void w_vkCmdBeginRenderPass(void *command,const void *info,uint32_t conte
     static _Atomic(fn) cached;
     fn real=atomic_load_explicit(&cached,memory_order_acquire);
     if(!real&&V.lib){real=(fn)vk_symbol("vkCmdBeginRenderPass");atomic_store_explicit(&cached,real,memory_order_release);}
-    if(real){real(command,info,contents);tl_ri_render_area(info);}
+    if(real){real(command,info,contents);tl_ri_render_area(info);tl_ri_pass_begin(info);}
 }
 
+/* Create/destroy only, never in the per-draw path. Target image views and
+ * framebuffer references are observed without stealing Metal ownership. */
+static int w_vkCreateImageView(void *device,const void *ci,const void *alloc,uint64_t *out){
+ typedef int(*fn)(void *,const void *,const void *,uint64_t *);
+ fn real=V.lib?(fn)vk_symbol("vkCreateImageView"):NULL;
+ int result=real?real(device,ci,alloc,out):-3;
+ if(result==VK_SUCCESS&&out&&*out)tl_ri_view_created(device,*out,ci);
+ return result;
+}
+static void w_vkDestroyImage(void *device,uint64_t image,const void *alloc){
+ typedef void(*fn)(void *,uint64_t,const void *);
+ fn real=V.lib?(fn)vk_symbol("vkDestroyImage"):NULL;
+ if(real)real(device,image,alloc);
+ tl_ri_image_destroyed(device,image);
+}
+static void w_vkDestroyImageView(void *device,uint64_t view,const void *alloc){
+ typedef void(*fn)(void *,uint64_t,const void *);
+ fn real=V.lib?(fn)vk_symbol("vkDestroyImageView"):NULL;
+ if(real)real(device,view,alloc);
+ tl_ri_view_destroyed(device,view);
+}
+static int w_vkCreateFramebuffer(void *device,const void *ci,const void *alloc,uint64_t *out){
+ typedef int(*fn)(void *,const void *,const void *,uint64_t *);
+ fn real=V.lib?(fn)vk_symbol("vkCreateFramebuffer"):NULL;
+ int result=real?real(device,ci,alloc,out):-3;
+ if(result==VK_SUCCESS&&out&&*out)tl_ri_framebuffer_created(device,*out,ci);
+ return result;
+}
+static void w_vkDestroyFramebuffer(void *device,uint64_t framebuffer,const void *alloc){
+ typedef void(*fn)(void *,uint64_t,const void *);
+ fn real=V.lib?(fn)vk_symbol("vkDestroyFramebuffer"):NULL;
+ if(real)real(device,framebuffer,alloc);
+ tl_ri_framebuffer_destroyed(device,framebuffer);
+}
 typedef int (*pfn_create_swapchain)(void *, const void *, const void *, uint64_t *);
 static int64_t monotonic_ns(void);
 enum { TIMING_ACQUIRE, TIMING_SUBMIT, TIMING_PRESENT, TIMING_SLEEP, TIMING_GRAPHICS_PIPELINES, TIMING_COMPUTE_PIPELINES, TIMING_COUNT };
@@ -1481,6 +1515,11 @@ static const struct { const char *name; void *fn; } k_over[] = {
     { "vkGetPastPresentationTimingGOOGLE", w_vkGetPastPresentationTimingGOOGLE },
     { "vkQueueSubmit", w_vkQueueSubmit },
     { "vkCreateImage", w_vkCreateImage },
+    { "vkDestroyImage", w_vkDestroyImage },
+    { "vkCreateImageView", w_vkCreateImageView },
+    { "vkDestroyImageView", w_vkDestroyImageView },
+    { "vkCreateFramebuffer", w_vkCreateFramebuffer },
+    { "vkDestroyFramebuffer", w_vkDestroyFramebuffer },
     { "vkCmdBeginRenderPass", w_vkCmdBeginRenderPass },
     { "vkGetDeviceQueue", w_vkGetDeviceQueue },
     { "vkGetDeviceQueue2", w_vkGetDeviceQueue2 },
@@ -1523,7 +1562,10 @@ static const struct { const char *name; void *fn; } k_over[] = {
 static void *overridden(const char *name)
 {
     /* Default-off inventory does not interpose per-render-pass calls at all. */
-    if (!strcmp(name,"vkCreateImage") && !tl_ri_active()) return NULL;
+    if ((!strcmp(name,"vkCreateImage")||!strcmp(name,"vkDestroyImage")||
+         !strcmp(name,"vkCreateImageView")||!strcmp(name,"vkDestroyImageView")||
+         !strcmp(name,"vkCreateFramebuffer")||!strcmp(name,"vkDestroyFramebuffer"))
+         && !tl_ri_active()) return NULL;
     if (!strcmp(name,"vkCmdBeginRenderPass") && !tl_ri_area_active()) return NULL;
     for (size_t i = 0; i < sizeof(k_over) / sizeof(k_over[0]); i++) if (!strcmp(k_over[i].name, name)) return k_over[i].fn;
     return NULL;
