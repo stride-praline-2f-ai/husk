@@ -181,7 +181,7 @@ int parallel_readers(void) {
         self.lib.add(7);self.lib.tl_pc_checkpoint();path=next(self.root.glob('*.bin'));original=path.read_bytes()
         for blob in (b'',original[:32],b'bad!'+original[4:], original[:33]+bytes([original[33]^1])+original[34:]):
             path.write_bytes(blob);self.assertIsNone(self.blob())
-        with path.open('wb') as f:f.truncate(32*1024*1024+9)
+        with path.open('wb') as f:f.truncate(96*1024*1024+9)
         self.assertIsNone(self.blob())
 
     def test_unsupported_serialization_leaves_existing_file_intact(self):
