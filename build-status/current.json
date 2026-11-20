@@ -1,9 +1,9 @@
 {
-  "run_id": 44705493903,
+  "run_id": 44705950242,
   "attempt": 1,
-  "runner": "GitHub Actions 1000000959",
+  "runner": "GitHub Actions 1000000960",
   "architecture": "ARM64",
-  "status": "cancelled",
-  "source": "56d6d7285ebb53fa6f7de6a09cbce4c0963c1956",
+  "status": "running",
+  "source": "9f2b6a1710491a127c38b617febd87b321f4e7bc",
   "artifact_id": ""
 }
