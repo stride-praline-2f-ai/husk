@@ -27,6 +27,7 @@ class FastTLS(unittest.TestCase):
         harness = r'''
 #define _POSIX_C_SOURCE 200809L
 #include <pthread.h>
+#include <stdatomic.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -40,14 +41,24 @@ static void *waddr(const tl_lib *lib, uint64_t offset) {
 }
 ''' + body + r'''
 static tl_lib owner;
-static pthread_barrier_t bar;
-static int errors;
+/* macOS does not expose pthread_barrier_t. Use a portable 3-party latch. */
+static pthread_mutex_t sync_mutex=PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t sync_cond=PTHREAD_COND_INITIALIZER;
+static int arrivals;
+static atomic_int errors;
+static void barrier_three(void) {
+    pthread_mutex_lock(&sync_mutex);
+    arrivals++;
+    if(arrivals==3)pthread_cond_broadcast(&sync_cond);
+    while(arrivals<3)pthread_cond_wait(&sync_cond,&sync_mutex);
+    pthread_mutex_unlock(&sync_mutex);
+}
 static void *worker(void *argument) {
     uint8_t *p = tl_ld_tls_get_addr(1, 0);
-    if(!p || p[0] != 7 || p[1] != 3 || tl_ld_tls_get_addr(1, 0) != p) return (void *)1;
-    p[0] = (uint8_t)(uintptr_t)argument;
-    pthread_barrier_wait(&bar);
-    if(p[0] != (uint8_t)(uintptr_t)argument) errors++;
+    int valid = p && p[0] == 7 && p[1] == 3 && tl_ld_tls_get_addr(1, 0) == p;
+    if(valid)p[0] = (uint8_t)(uintptr_t)argument;
+    barrier_three();
+    if(!valid || p[0] != (uint8_t)(uintptr_t)argument) atomic_fetch_add(&errors,1);
     return NULL;
 }
 int run_fast_tls_tests(void) {
@@ -62,14 +73,12 @@ int run_fast_tls_tests(void) {
     if(tl_ld_tls_get_addr(0, 0) || tl_ld_tls_get_addr(17, 0)) return 3;
     main_p[0] = 99;
     pthread_t a,b;
-    if(pthread_barrier_init(&bar, NULL, 3)) return 4;
     if(pthread_create(&a,NULL,worker,(void *)(uintptr_t)13)) return 5;
     if(pthread_create(&b,NULL,worker,(void *)(uintptr_t)19)) return 6;
-    pthread_barrier_wait(&bar);
+    barrier_three();
     void *ar=NULL,*br=NULL;
     pthread_join(a,&ar);pthread_join(b,&br);
-    pthread_barrier_destroy(&bar);
-    if(ar || br || errors || main_p[0] != 99) return 7;
+    if(ar || br || atomic_load(&errors) || main_p[0] != 99) return 7;
     return 0;
 }
 '''
