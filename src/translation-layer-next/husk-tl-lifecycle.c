@@ -33,8 +33,9 @@ static uint64_t monotonic_ns(void){struct timespec t;clock_gettime(CLOCK_MONOTON
 void tl_lifecycle_bind(void (*wake)(void *),void *looper){
  pthread_once(&once,initialise);pthread_mutex_lock(&lock);
  owner=pthread_self();bound=true;wake_owner=wake;owner_looper=looper;
- /* A fresh activity instance cannot inherit an old background gate. */
- atomic_store_explicit(&gpu_paused,false,memory_order_release);
+ /* A late activity bind must retain an early willResignActive request.
+  * Resetting here could reopen Metal submissions after iOS backgrounding. */
+ atomic_store_explicit(&gpu_paused,state.requested_paused!=0,memory_order_release);
  pthread_mutex_unlock(&lock);
 }
 void tl_lifecycle_ready(bool initially_paused){
