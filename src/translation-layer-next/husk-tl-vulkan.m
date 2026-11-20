@@ -1083,7 +1083,7 @@ static void pace_efficient_frame(void)
         /* Bounded (max eight/interval) native PSO identity + actual
          * application-cache feedback. This happens on the 10s reporting
          * cadence, never on each rendered frame. */
-        tl_pi_report();
+        tl_pi_schedule_report(); /* pipeline identity file I/O off present path */
         if (wait_samples) tl_log_line("[M4/M9 pacing-wait] requested %.3f ms average, actual %.3f ms average, max overshoot %.3f ms (%llu sleeps); current-thread host wait, not engine/GPU duration",
             wait_requested_ns / (1e6 * wait_samples), wait_actual_ns / (1e6 * wait_samples),
             wait_excess_max_ns / 1e6, (unsigned long long)wait_samples);
