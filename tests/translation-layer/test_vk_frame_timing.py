@@ -183,10 +183,10 @@ int exercise_pipeline_observation(int diagnostic_mutex_busy) {
     pipeline_delay_ns=0;
     if (result || out[1]!=47 || atomic_load(&pipeline_inflight)) return 2;
     if (tl_thread_policy_trial_active()) return 3;
-    if (atomic_load(&pipeline_window_slow)!=1 || atomic_load(&pipeline_window_max)!=22000000) return 4;
+    if (atomic_load(&pipeline_window_slow)!=1 || atomic_load(&pipeline_window_max)!=23000000) return 4;
     if (diagnostic_mutex_busy) { if (worst_pipeline.elapsed) return 5; }
     else {
-        if (worst_pipeline.elapsed!=22000000 || worst_pipeline.lock_wait!=1000000 || worst_pipeline.count!=2 || !worst_pipeline.cache) return 6;
+        if (worst_pipeline.elapsed!=23000000 || worst_pipeline.lock_wait!=1000000 || worst_pipeline.driver_wall_ns!=21000000 || worst_pipeline.count!=2 || !worst_pipeline.cache) return 6;
         report_pipeline_event();if (worst_pipeline.elapsed) return 7;
     }
     husk_ue4_set_thread_policy(0);tl_thread_policy_activate("Dungeons");
