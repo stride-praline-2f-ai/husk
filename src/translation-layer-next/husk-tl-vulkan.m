@@ -1092,7 +1092,7 @@ static void pace_efficient_frame(void)
         tl_fg_stats fg;
         if(tl_vk_framegen_snapshot(&fg))tl_log_line("[M9-FRAMEGEN] active %u failed %u; since-launch GPU-completed rendered %llu, presented real %llu/generated %llu, dropped %llu, resets %llu, GPU errors %llu; generated slots include local or whole-frame real-image fallback; not energy or unique-pixel measurement",fg.active,fg.failed,(unsigned long long)fg.rendered,(unsigned long long)fg.presented_real,(unsigned long long)fg.generated,(unsigned long long)fg.dropped,(unsigned long long)fg.resets,(unsigned long long)fg.gpu_errors);
     }
-        tl_dp_report();
+        tl_dp_schedule_report(); /* native driver query off the present path */
         count = late = 0; report_at = now;
     }
 }
