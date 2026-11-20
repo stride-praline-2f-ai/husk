@@ -34,6 +34,7 @@
 #include "husk-tl-driver-profile.h"
 #include "husk-tl-efficiency.h"
 #include "husk-tl-pipeline-diagnostics.h"
+#include "husk-tl-lifecycle.h"
 #include "husk-tl-pipeline-feedback.h"
 #include "husk-tl-gpu-timing.h"
 #include "husk-tl-render-inventory.h"
@@ -761,6 +762,7 @@ static int w_vkGetSwapchainImagesKHR(void *device,uint64_t swapchain,uint32_t *c
 typedef int (*pfn_acquire)(void *, uint64_t, uint64_t, uint64_t, uint64_t, uint32_t *);
 static int w_vkAcquireNextImageKHR(void *device, uint64_t swapchain, uint64_t timeout, uint64_t sem, uint64_t fence, uint32_t *index)
 {
+    tl_lifecycle_gpu_gate_wait();
     static pfn_acquire real;
     static atomic_int bad, seen;
     if (!real && V.lib) real = (pfn_acquire)vk_symbol("vkAcquireNextImageKHR");
@@ -779,6 +781,7 @@ static int w_vkAcquireNextImageKHR(void *device, uint64_t swapchain, uint64_t ti
 typedef int (*pfn_queue_submit)(void *, uint32_t, const void *, uint64_t);
 static int w_vkQueueSubmit(void *queue, uint32_t count, const void *submits, uint64_t fence)
 {
+    tl_lifecycle_gpu_gate_wait();
     static _Atomic(pfn_queue_submit) cached;
     pfn_queue_submit real = atomic_load_explicit(&cached, memory_order_acquire);
     if (!real && V.lib) {
@@ -864,6 +867,7 @@ static int w_vkGetPipelineCacheData(void *device, uint64_t cache, size_t *size, 
 typedef int (*pfn_create_pipelines)(void *, uint64_t, uint32_t, const void *, const void *, uint64_t *);
 static int measure_pipeline_create(pfn_create_pipelines real, unsigned stage, void *device, uint64_t cache, uint32_t count, const void *ci, const void *alloc, uint64_t *out)
 {
+    tl_lifecycle_gpu_gate_wait();
     TL_CP_SCOPE(stage==TIMING_COMPUTE_PIPELINES?TL_CP_COMPUTE:TL_CP_GRAPHICS);
     tl_pi_request identity = tl_pi_identify(stage == TIMING_COMPUTE_PIPELINES, device, count, ci);
     tl_pf_batch feedback_batch;
@@ -1130,6 +1134,7 @@ static int w_vkGetPastPresentationTimingGOOGLE(void *device,uint64_t swap,uint32
 typedef int (*pfn_queue_present)(void *, const void *);
 static int w_vkQueuePresentKHR(void *queue, const void *info)
 {
+    tl_lifecycle_gpu_gate_wait();
     TL_CP_SCOPE(TL_CP_PRESENT);
     static _Atomic(pfn_queue_present) cached;
     pfn_queue_present real=atomic_load_explicit(&cached,memory_order_acquire);
