@@ -91,6 +91,33 @@ int target_overflow_is_not_asset_overflow(void){
  return 0;
 }
 
+int framegen_lineage(void){
+ husk_ue4_set_render_inventory_mode(1);tl_ri_activate("Dungeons");
+ image_info d={.type=14,.width=912,.height=640,.depth=1,.samples=1,.format=126,.usage=0x24};
+ image_info v=d;v.format=83;v.usage=0x14;
+ tl_ri_image_created((void*)7,101,&d);tl_ri_image_created((void*)7,102,&v);
+ ri_view_create dv={.type=15,.image=101,.format=126};
+ ri_view_create vv={.type=15,.image=102,.format=83};
+ tl_ri_view_created((void*)7,201,&dv);tl_ri_view_created((void*)7,202,&vv);
+ uint64_t attachments[2]={201,202};
+ ri_fb_create fb={.type=37,.renderpass=301,.attachments=2,.views=attachments,.width=912,.height=640,.layers=1};
+ tl_ri_framebuffer_created((void*)7,401,&fb);
+ tl_ri_lineage_stats stats;tl_ri_lineage_snapshot(&stats);
+ if(stats.version!=1||stats.size!=sizeof(stats)||stats.tracked_target_images!=2||
+    stats.tracked_target_views!=2||stats.tracked_framebuffers!=1||stats.depth_framebuffers!=1||
+    stats.vector_like_framebuffers!=1||stats.mixed_depth_vector_framebuffers!=1)return 1;
+ begin_info b={.type=43,.framebuffer=401,.width=912,.height=640};
+ tl_ri_pass_begin(&b);tl_ri_lineage_snapshot(&stats);
+ if(stats.used_depth_framebuffers||stats.used_vector_like_framebuffers)return 2; /* passive: no per-frame probes */
+ husk_ue4_set_render_inventory_mode(2); /* switch for test only; real game restarts */
+ tl_ri_pass_begin(&b);tl_ri_lineage_snapshot(&stats);
+ if(stats.used_depth_framebuffers!=1||stats.used_vector_like_framebuffers!=1)return 3;
+ tl_ri_view_destroyed((void*)7,201);tl_ri_image_destroyed((void*)7,101);
+ tl_ri_framebuffer_destroyed((void*)7,401);
+ tl_ri_activate("Dungeons");tl_ri_lineage_snapshot(&stats);
+ if(stats.tracked_target_images||stats.tracked_target_views||stats.tracked_framebuffers)return 4;
+ return 0;
+}
 int framegen_candidates(void){
  tl_ri_metalfx_candidates v={0};
  husk_ue4_set_render_inventory(false);tl_ri_activate("Dungeons");
@@ -123,5 +150,6 @@ int framegen_candidates(void){
  def test_assets_cannot_starve_targets_or_areas_and_existing_counts_survive(self):self.assertEqual(self.lib.reserved(),0)
  def test_render_thread_never_waits_for_diagnostic_mutex(self):self.assertEqual(self.lib.contended(),0)
  def test_native_metalfx_candidates_are_only_bounded_requested_metadata(self):self.assertEqual(self.lib.framegen_candidates(),0)
+ def test_vulkan_target_view_framebuffer_lineage_is_bounded_and_passive_by_default(self):self.assertEqual(self.lib.framegen_lineage(),0)
  def test_automatic_dungeons_diagnostic_is_image_only_and_manual_can_collect_renderpasses(self):self.assertEqual(self.lib.passive_dungeons_inventory(),0)
 if __name__=='__main__':unittest.main()
