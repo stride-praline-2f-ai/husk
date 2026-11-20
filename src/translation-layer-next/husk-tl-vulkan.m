@@ -670,12 +670,21 @@ static atomic_uint pipeline_inflight;
 static atomic_uint_fast64_t pipeline_window_max, pipeline_window_slow;
 static pthread_mutex_t pipeline_event_mu = PTHREAD_MUTEX_INITIALIZER;
 static struct pipeline_event {
-    uint64_t elapsed, lock_wait;
+    uint64_t elapsed, lock_wait, caller_cpu_ns, driver_wall_ns;
     int64_t finished;
     unsigned stage, count;
-    bool cache;
+    bool cache, cpu_valid;
     int result;
 } worst_pipeline;
+/* Two thread CPU clock reads per pipeline *creation*, not per draw/submit.
+ * Caller CPU is host CPU including MoltenVK driver code on this thread only.
+ * The difference with wall is non-CPU wait/deschedule and other-thread work,
+ * never proof of an exclusive compiler or GPU duration. */
+static uint64_t pipeline_thread_cpu_ns(void) {
+    struct timespec ts;
+    if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts) != 0 || ts.tv_sec < 0 || ts.tv_nsec < 0) return 0;
+    return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
+}
 static uint64_t record_host_timing(unsigned stage, int64_t start)
 {
     uint64_t elapsed = (uint64_t)(monotonic_ns() - start);
@@ -687,7 +696,8 @@ static uint64_t record_host_timing(unsigned stage, int64_t start)
 /* Keep one worst slow call per reporting period. Producers never wait for the
  * diagnostic mutex, and no pipeline thread writes a per-call log or waits GPU idle. */
 static void record_pipeline_event(unsigned stage, uint32_t count, bool cache, int result,
-                                  int64_t finished, uint64_t elapsed, uint64_t lock_wait)
+                                  int64_t finished, uint64_t elapsed, uint64_t lock_wait,
+                                  uint64_t driver_wall_ns, uint64_t caller_cpu_ns, bool cpu_valid)
 {
     uint_fast64_t old = atomic_load_explicit(&pipeline_window_max, memory_order_relaxed);
     while (elapsed > old && !atomic_compare_exchange_weak_explicit(&pipeline_window_max, &old, elapsed,
@@ -696,7 +706,7 @@ static void record_pipeline_event(unsigned stage, uint32_t count, bool cache, in
     atomic_fetch_add_explicit(&pipeline_window_slow, 1, memory_order_relaxed);
     if (pthread_mutex_trylock(&pipeline_event_mu)) return;
     if (elapsed > worst_pipeline.elapsed)
-        worst_pipeline = (struct pipeline_event){elapsed, lock_wait, finished, stage, count, cache, result};
+        worst_pipeline = (struct pipeline_event){elapsed, lock_wait, caller_cpu_ns, driver_wall_ns, finished, stage, count, cache, cpu_valid, result};
     pthread_mutex_unlock(&pipeline_event_mu);
 }
 static void report_pipeline_event(void)
@@ -705,9 +715,11 @@ static void report_pipeline_event(void)
     struct pipeline_event event = worst_pipeline; worst_pipeline = (struct pipeline_event){0};
     pthread_mutex_unlock(&pipeline_event_mu);
     if (event.elapsed)
-        tl_log_line("ue4 pipeline stall: worst observed %s call %.3f ms, store-lock wait %.3f ms, batch %u, cache %s, result %d, finished monotonic %.6f s; host duration, not exclusive frame/GPU time or verified cache miss",
+        tl_log_line("ue4 pipeline stall: worst %s call wall %.3f ms, caller-thread CPU %s%.3f ms, driver-call wall %.3f ms, store-lock wait %.3f ms, batch %u, cache %s, result %d, finished monotonic %.6f s; caller CPU INCLUSIVE of native driver, wall may include other-thread compilation/waits; neither is GPU time nor a proven cache miss",
                     event.stage == TIMING_GRAPHICS_PIPELINES ? "graphics" : "compute", event.elapsed / 1e6,
-                    event.lock_wait / 1e6, event.count, event.cache ? "yes" : "no", event.result, event.finished / 1e9);
+                    event.cpu_valid ? "" : "unavailable/", event.caller_cpu_ns / 1e6,
+                    event.driver_wall_ns / 1e6, event.lock_wait / 1e6,
+                    event.count, event.cache ? "yes" : "no", event.result, event.finished / 1e9);
 }
 static int w_vkCreateSwapchainKHR(void *device, const void *ci, const void *alloc, uint64_t *out)
 {
@@ -858,17 +870,24 @@ static int measure_pipeline_create(pfn_create_pipelines real, unsigned stage, vo
     const void *observed_ci = tl_pf_prepare(stage == TIMING_COMPUTE_PIPELINES, device, count, ci, &feedback_batch);
     bool measure = tl_ue4_sharp_graphics_enabled();
     int64_t start = measure ? monotonic_ns() : 0;
+    uint64_t cpu_start = measure ? pipeline_thread_cpu_ns() : 0;
     if (measure) atomic_fetch_add_explicit(&pipeline_inflight, 1, memory_order_relaxed);
     bool locked = tl_pc_enter();
     int64_t entered = measure ? monotonic_ns() : 0;
     int result = real ? real(device, cache, count, observed_ci, alloc, out) : -3;
+    int64_t driver_finished = measure ? monotonic_ns() : 0;
+    uint64_t cpu_end = cpu_start ? pipeline_thread_cpu_ns() : 0;
     if(real&&out)tl_pi_pipeline_objects(identity,device,out);
     if (real && count) tl_pc_changed(device, cache);
     tl_pc_leave(locked);
     if (measure) {
         uint64_t elapsed = record_host_timing(stage, start);
         tl_pi_completed(identity, stage == TIMING_COMPUTE_PIPELINES, elapsed, start + elapsed, cache != 0, result, observed_ci);
-        record_pipeline_event(stage, count, cache != 0, result, start + (int64_t)elapsed, elapsed, (uint64_t)(entered - start));
+        record_pipeline_event(stage, count, cache != 0, result, start + (int64_t)elapsed, elapsed,
+                              entered >= start ? (uint64_t)(entered - start) : 0,
+                              driver_finished >= entered ? (uint64_t)(driver_finished - entered) : 0,
+                              cpu_end >= cpu_start ? cpu_end - cpu_start : 0,
+                              cpu_start != 0 && cpu_end >= cpu_start);
         tl_thread_policy_pipeline_completed(start + (int64_t)elapsed, (int64_t)elapsed);
         atomic_fetch_sub_explicit(&pipeline_inflight, 1, memory_order_relaxed);
         atomic_fetch_add_explicit(cache ? &cached_pipeline_calls : &uncached_pipeline_calls, 1, memory_order_relaxed);
