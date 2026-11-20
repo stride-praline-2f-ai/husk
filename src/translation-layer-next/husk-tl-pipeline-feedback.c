@@ -47,7 +47,13 @@ int tl_pf_create_device(void *physical,const tl_pf_device_info *info,const void 
  names[info->extCount]=extension_name;
  tl_pf_device_info copy=*info;copy.extCount++;copy.exts=names;
  int result=create(physical,&copy,alloc,out);free(names);
- if(result==-7){pthread_mutex_lock(&mu);stats.declined_devices++;pthread_mutex_unlock(&mu);return create(physical,info,alloc,out);}
+ /* Only unsupported optional extension/feature negotiation may be retried.
+  * Device loss, OOM and initialization failures propagate unchanged. */
+ if(result==-7 || result==-8){
+  pthread_mutex_lock(&mu);stats.declined_devices++;pthread_mutex_unlock(&mu);
+  if(out)*out=NULL;
+  return create(physical,info,alloc,out);
+ }
  if(!result&&out&&*out){register_device(*out,true);pthread_mutex_lock(&mu);stats.appended_devices++;pthread_mutex_unlock(&mu);}
  return result;
 }
