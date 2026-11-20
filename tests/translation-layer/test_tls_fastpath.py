@@ -17,7 +17,7 @@ class FastTLS(unittest.TestCase):
         begin = src.index("#define MAX_TLS_MODULES 16")
         end = src.index("/* arg is the descriptor's second word:", begin)
         body = src[begin:end]
-        cls.assertTrue(isinstance(body, str))
+        assert isinstance(body, str)
         assert "_Thread_local tls_thread *tls_current" in body
         assert "pthread_setspecific(g_tls_key, t)" in body
         assert body.index("tls_thread *t = tls_current;") < body.index("pthread_once(&g_tls_once")
