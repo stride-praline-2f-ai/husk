@@ -18,6 +18,20 @@ static const unsigned limits[3]={64,96,96};
 static unsigned used[3];
 static uint32_t length;
 static uint64_t probes;
+/* Retain ONLY currently live Vulkan target handles and their view/framebuffer
+ * links. Metadata ownership stays with the guest; no GPU textures are copied.
+ * Explicit full inventory can additionally count renderpass use. */
+#define RI_IMAGES 512
+#define RI_VIEWS 1024
+#define RI_FRAMEBUFFERS 256
+typedef struct {void *device;uint64_t image;uint32_t format,usage,width,height;} ri_image;
+typedef struct {void *device;uint64_t view,image;} ri_view;
+typedef struct {void *device;uint64_t framebuffer;uint8_t flags;} ri_framebuffer;
+static ri_image live_images[RI_IMAGES];
+static ri_view live_views[RI_VIEWS];
+static ri_framebuffer live_framebuffers[RI_FRAMEBUFFERS];
+static tl_ri_lineage_stats lineage;
+
 typedef struct {uint32_t type;const void *next;uint32_t flags,image_type,format,width,height,depth,mips,layers,samples,tiling,usage;} image_info;
 typedef struct {uint32_t type;const void *next;uint64_t renderpass,framebuffer;int32_t x,y;uint32_t width,height;} begin_info;
 _Static_assert(offsetof(image_info,width)==28&&offsetof(image_info,usage)==56&&offsetof(begin_info,width)==40,"Vulkan image/render-area ABI");
@@ -32,6 +46,9 @@ bool tl_ri_area_active(void){return tl_ri_active()&&tl_ri_inventory_mode()>=2;}
 void tl_ri_activate(const char *project){
  atomic_store(&active,false);pthread_mutex_lock(&mu);
  memset(groups,0,sizeof(groups));memset(slots,0,sizeof(slots));memset(used,0,sizeof(used));length=0;probes=0;
+ memset(live_images,0,sizeof(live_images));memset(live_views,0,sizeof(live_views));
+ memset(live_framebuffers,0,sizeof(live_framebuffers));
+ lineage=(tl_ri_lineage_stats){.version=1,.size=sizeof(lineage)};
  atomic_store(&images,0);atomic_store(&areas,0);atomic_store(&capacity_drops,0);atomic_store(&contention_drops,0);
  atomic_store(&dropped_assets,0);atomic_store(&dropped_targets,0);atomic_store(&dropped_areas,0);
  atomic_store(&active,atomic_load(&requested)&&project&&!strcmp(project,"Dungeons"));pthread_mutex_unlock(&mu);
@@ -142,4 +159,103 @@ void tl_ri_metalfx_snapshot(tl_ri_metalfx_candidates *out)
  }
  pthread_mutex_unlock(&mu);
  *out=result;
+}
+
+/* ABI-compatible Vulkan 64-bit creation-info prefixes. Validate type before
+ * field access and bound guest-provided attachment counts. */
+typedef struct {uint32_t type;const void *next;uint32_t flags;uint64_t image;uint32_t view_type,format;} ri_view_create;
+typedef struct {uint32_t type;const void *next;uint32_t flags;uint64_t renderpass;uint32_t attachments;const uint64_t *views;uint32_t width,height,layers;} ri_fb_create;
+_Static_assert(offsetof(ri_view_create,image)==24&&offsetof(ri_view_create,format)==36&&offsetof(ri_fb_create,views)==40&&offsetof(ri_fb_create,width)==48,"Vulkan resource lineage ABI");
+
+static ri_image *ri_find_image(void *device,uint64_t image){
+ for(unsigned i=0;i<RI_IMAGES;i++)if(live_images[i].device==device&&live_images[i].image==image&&image)return &live_images[i];
+ return NULL;
+}
+static ri_view *ri_find_view(void *device,uint64_t view){
+ for(unsigned i=0;i<RI_VIEWS;i++)if(live_views[i].device==device&&live_views[i].view==view&&view)return &live_views[i];
+ return NULL;
+}
+void tl_ri_image_created(void *device,uint64_t image,const void *raw){
+ if(!tl_ri_active()||!raw||!image||!device)return;
+ const image_info *p=raw;
+ if(p->type!=14||!(p->usage&(0x8u|0x10u|0x20u)))return;
+ if(pthread_mutex_trylock(&mu)){atomic_fetch_add(&contention_drops,1);return;}
+ ri_image *slot=ri_find_image(device,image);
+ if(!slot)for(unsigned i=0;i<RI_IMAGES;i++)if(!live_images[i].image){slot=&live_images[i];break;}
+ if(slot){*slot=(ri_image){device,image,p->format,p->usage,p->width,p->height};lineage.tracked_target_images++;}
+ else lineage.dropped_records++;
+ pthread_mutex_unlock(&mu);
+}
+void tl_ri_image_destroyed(void *device,uint64_t image){
+ if(!tl_ri_active()||!image)return;
+ if(pthread_mutex_trylock(&mu)){atomic_fetch_add(&contention_drops,1);return;}
+ ri_image *slot=ri_find_image(device,image);if(slot)memset(slot,0,sizeof(*slot));
+ pthread_mutex_unlock(&mu);
+}
+void tl_ri_view_created(void *device,uint64_t view,const void *raw){
+ if(!tl_ri_active()||!raw||!view||!device)return;
+ const ri_view_create *p=raw;if(p->type!=15||!p->image)return;
+ if(pthread_mutex_trylock(&mu)){atomic_fetch_add(&contention_drops,1);return;}
+ ri_image *image=ri_find_image(device,p->image);
+ if(image){
+  ri_view *slot=ri_find_view(device,view);
+  if(!slot)for(unsigned i=0;i<RI_VIEWS;i++)if(!live_views[i].view){slot=&live_views[i];break;}
+  if(slot){*slot=(ri_view){device,view,p->image};lineage.tracked_target_views++;}
+  else lineage.dropped_records++;
+ } else lineage.missing_image_view_links++;
+ pthread_mutex_unlock(&mu);
+}
+void tl_ri_view_destroyed(void *device,uint64_t view){
+ if(!tl_ri_active()||!view)return;
+ if(pthread_mutex_trylock(&mu)){atomic_fetch_add(&contention_drops,1);return;}
+ ri_view *slot=ri_find_view(device,view);if(slot)memset(slot,0,sizeof(*slot));
+ pthread_mutex_unlock(&mu);
+}
+void tl_ri_framebuffer_created(void *device,uint64_t framebuffer,const void *raw){
+ if(!tl_ri_active()||!raw||!framebuffer||!device)return;
+ const ri_fb_create *p=raw;
+ if(p->type!=37||!p->views||!p->attachments||p->attachments>32)return;
+ if(pthread_mutex_trylock(&mu)){atomic_fetch_add(&contention_drops,1);return;}
+ uint8_t flags=0;
+ for(uint32_t i=0;i<p->attachments;i++){
+  ri_view *view=ri_find_view(device,p->views[i]);
+  ri_image *image=view?ri_find_image(device,view->image):NULL;
+  if(!image){lineage.missing_framebuffer_view_links++;continue;}
+  if(ri_depth_format(image->format)&&(image->usage&0x20u))flags|=1;
+  if(ri_vector_format(image->format)&&(image->usage&0x18u))flags|=2;
+ }
+ ri_framebuffer *slot=NULL;
+ for(unsigned i=0;i<RI_FRAMEBUFFERS;i++)if(live_framebuffers[i].device==device&&live_framebuffers[i].framebuffer==framebuffer){slot=&live_framebuffers[i];break;}
+ if(!slot)for(unsigned i=0;i<RI_FRAMEBUFFERS;i++)if(!live_framebuffers[i].framebuffer){slot=&live_framebuffers[i];break;}
+ if(slot){
+  *slot=(ri_framebuffer){device,framebuffer,flags};
+  lineage.tracked_framebuffers++;
+  if(flags&1)lineage.depth_framebuffers++;
+  if(flags&2)lineage.vector_like_framebuffers++;
+  if(flags==3)lineage.mixed_depth_vector_framebuffers++;
+ }else lineage.dropped_records++;
+ pthread_mutex_unlock(&mu);
+}
+void tl_ri_framebuffer_destroyed(void *device,uint64_t framebuffer){
+ if(!tl_ri_active()||!framebuffer)return;
+ if(pthread_mutex_trylock(&mu)){atomic_fetch_add(&contention_drops,1);return;}
+ for(unsigned i=0;i<RI_FRAMEBUFFERS;i++)if(live_framebuffers[i].device==device&&live_framebuffers[i].framebuffer==framebuffer){memset(&live_framebuffers[i],0,sizeof(live_framebuffers[i]));break;}
+ pthread_mutex_unlock(&mu);
+}
+void tl_ri_pass_begin(const void *raw){
+ if(!tl_ri_area_active()||!raw)return;
+ const begin_info *p=raw;if(p->type!=43||!p->framebuffer)return;
+ if(pthread_mutex_trylock(&mu)){atomic_fetch_add(&contention_drops,1);return;}
+ /* Opaque framebuffer handles are unique among live objects for a device;
+  * this explicit pass probe does not imply rendering really completed. */
+ for(unsigned i=0;i<RI_FRAMEBUFFERS;i++)if(live_framebuffers[i].framebuffer==p->framebuffer){
+  if(live_framebuffers[i].flags&1)lineage.used_depth_framebuffers++;
+  if(live_framebuffers[i].flags&2)lineage.used_vector_like_framebuffers++;
+  break;
+ }
+ pthread_mutex_unlock(&mu);
+}
+void tl_ri_lineage_snapshot(tl_ri_lineage_stats *out){
+ if(!out)return;
+ pthread_mutex_lock(&mu);*out=lineage;pthread_mutex_unlock(&mu);
 }
