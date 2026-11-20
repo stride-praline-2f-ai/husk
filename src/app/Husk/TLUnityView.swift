@@ -707,9 +707,15 @@ final class TLUnityUIView: UIView, UIKeyInput {
             husk_ue4_set_swapchain_images(Int32(execution.swapchainImages))
             husk_ue4_set_queue_options(Int32(execution.prefill), Int32(execution.commandBufferLimit))
             husk_ue4_set_initialization_parking(execution.initializationParking)
-            husk_ue4_set_driver_profiling(driverProfiling)
-            husk_ue4_set_pipeline_diagnostics(pipelineIdentification)
-            husk_ue4_set_pipeline_feedback(pipelineIdentification && pipelineFeedback)
+            // Diagnostic Dungeons builds need shader PSO identities and actual
+            // MoltenVK phase counters to distinguish shader compilation from
+            // GPU waiting. Driver tracking is extra CPU work; the always-on
+            // experiment is NOT a clean battery-life benchmark. GPU timestamp
+            // callbacks, per-frame captures and sync waits stay OFF.
+            let automaticCPUDriverEvidence = autoDungeonsLog
+            husk_ue4_set_driver_profiling(driverProfiling || automaticCPUDriverEvidence)
+            husk_ue4_set_pipeline_diagnostics(pipelineIdentification || automaticCPUDriverEvidence)
+            husk_ue4_set_pipeline_feedback((pipelineIdentification && pipelineFeedback) || automaticCPUDriverEvidence)
             husk_ue4_set_engine_only_limiter(engineOnlyLimiter)
             // Dungeons always observes allocation metadata, but full per-pass
             // inventory is explicit. Other UE4 titles keep their original default.
@@ -720,7 +726,7 @@ final class TLUnityUIView: UIView, UIKeyInput {
             // its first render target, and reject other project names.
             if autoDungeonsLog { tl_ri_activate("Dungeons") }
             else { tl_ri_activate(nil) }
-            if autoDungeonsLog { HuskLog.log("game-diagnostics", "automatic combined game log active; Vulkan inventory mode \(inventoryMode) (1=image-only, 2=full explicit); detailed GPU tracing remains off") }
+            if autoDungeonsLog { HuskLog.log("game-diagnostics", "automatic combined game log active; Vulkan inventory mode \(inventoryMode) (1=image-only, 2=full explicit); native MoltenVK phases, pipeline creation feedback and shader signatures ON; 15s Mach thread sampling off main; GPU timestamp callbacks/per-frame tracing OFF; profiling overhead makes this a DIAGNOSTIC build, not an unbiased energy test") }
             husk_crash_stage("ue4_fork_launch_options_applied")
             HuskLog.log("tl", "ue4: requested graphics preset: \(efficientGraphics ? "Sharp / Efficient" : (sharpGraphics ? "Sharp / High Quality" : "Game Default")), surface \(width)x\(height)")
             HuskLog.log("tl", "ue4 resolution: device \(UIDevice.current.model), display \(Int(UIScreen.main.bounds.width * UIScreen.main.scale))x\(Int(UIScreen.main.bounds.height * UIScreen.main.scale)), render scale \(contentScaleFactor), launch surface \(width)x\(height); launch-time selection, not runtime calibration")
