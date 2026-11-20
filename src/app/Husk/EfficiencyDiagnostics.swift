@@ -365,6 +365,8 @@ final class EfficiencyDiagnostics: ObservableObject {
         }
         var candidate = tl_ri_metalfx_candidates()
         tl_ri_metalfx_snapshot(&candidate)
+        var lineage = tl_ri_lineage_stats()
+        tl_ri_lineage_snapshot(&lineage)
         // Metadata can suggest scene attachments. It cannot establish shader
         // semantics, queue ownership, GPU completion, motion coordinates or
         // real depth. Never enable the interpolator from these counters.
@@ -407,6 +409,20 @@ final class EfficiencyDiagnostics: ObservableObject {
             "presenter_integrated": false,
             "scope": "Advisory Vulkan create-image format/usage requests only, grouped and bounded. Identical image formats can carry colour, velocity or unrelated data. No texture handles, actual pixels, camera parameters, render-pass identities or proven frame chronology. A plausible result does NOT enable native Apple frame generation."
         ]
+        let lineageReport: [String: Any] = [
+            "tracked_target_image_creations": lineage.tracked_target_images,
+            "tracked_target_view_creations": lineage.tracked_target_views,
+            "tracked_framebuffer_creations": lineage.tracked_framebuffers,
+            "framebuffers_with_depth_format": lineage.depth_framebuffers,
+            "framebuffers_with_vector_like_format": lineage.vector_like_framebuffers,
+            "framebuffers_with_both_format_types": lineage.mixed_depth_vector_framebuffers,
+            "render_pass_uses_depth_like": lineage.used_depth_framebuffers,
+            "render_pass_uses_vector_like": lineage.used_vector_like_framebuffers,
+            "missing_view_to_image_links": lineage.missing_image_view_links,
+            "missing_framebuffer_to_view_links": lineage.missing_framebuffer_view_links,
+            "registry_capacity_drops": lineage.dropped_records,
+            "scope": "Only live Vulkan image handles, image-view and framebuffer metadata; the normal image-only mode never intercepts render-pass calls. Neither format nor attachment presence proves UE4 motion vectors, camera transforms, Metal ownership or GPU completion."
+        ]
         return ["requested": s.requested, "active": s.active, "observed_image_creations": s.observed_images,
                 "observed_legacy_render_areas": s.observed_render_areas, "dropped_observations": s.dropped,
                 "dropped_capacity": s.dropped_capacity, "dropped_contention": s.dropped_contention,
@@ -416,7 +432,7 @@ final class EfficiencyDiagnostics: ObservableObject {
                 "hash_lookup_probes": s.hash_probes, "retained_asset_groups": s.asset_groups,
                 "retained_target_groups": s.target_groups, "retained_area_groups": s.area_groups,
                 "capacity_by_category": ["assets": 64, "targets": 96, "areas": 96],
-                "groups_since_launch": rows, "native_metalfx_frame_interpolation_preflight": framegenProbe, "plan_ids": ["M9", "GAP-03"],
+                "groups_since_launch": rows, "vulkan_resource_lineage": lineageReport, "native_metalfx_frame_interpolation_preflight": framegenProbe, "plan_ids": ["M9", "GAP-03"],
                 "scope": "Requested base fields/legacy render areas since launch; not actual scene/HUD pixels, executed GPU passes, texture identity or replay state; swapchain images and newer renderpass paths may be absent",
                 "metalfx_integration": "separate opt-in prototype; requested inventory does not prove internal scene resolution", "benefit_validation": "unverified"]
     }
