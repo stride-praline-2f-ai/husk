@@ -42,7 +42,7 @@ int exercise(int mode){
  if(n!=2||s.observed_images!=1||s.observed_render_areas!=2||g[0].width!=1784||g[1].count!=2)return 8;
  return 0;
 }
-int bounded(void){husk_ue4_set_render_inventory(true);tl_ri_activate("Dungeons");image_info p={.type=14,.height=100,.depth=1};for(unsigned i=1;i<=300;i++){p.width=i;tl_ri_image(&p);}tl_ri_stats s;tl_ri_group g[256];return tl_ri_snapshot(g,256,&s)==64&&s.asset_groups==64&&s.dropped_capacity==236&&s.dropped==236&&s.observed_images==300?0:1;}
+int bounded(void){husk_ue4_set_render_inventory(true);tl_ri_activate("Dungeons");image_info p={.type=14,.height=100,.depth=1};for(unsigned i=1;i<=300;i++){p.width=i;tl_ri_image(&p);}tl_ri_stats s;tl_ri_group g[256];return tl_ri_snapshot(g,256,&s)==64&&s.asset_groups==64&&s.dropped_capacity==236&&s.dropped_capacity_assets==236&&s.dropped_capacity_targets==0&&s.dropped_capacity_areas==0&&s.dropped==236&&s.observed_images==300?0:1;}
 int contended(void){husk_ue4_set_render_inventory(true);tl_ri_activate("Dungeons");image_info p={.type=14,.width=100,.height=100};pthread_mutex_lock(&mu);tl_ri_image(&p);pthread_mutex_unlock(&mu);tl_ri_stats s;tl_ri_snapshot(NULL,0,&s);return s.dropped==1&&s.dropped_contention==1&&s.observed_images==1?0:1;}
 int reserved(void){
  husk_ue4_set_render_inventory(true);tl_ri_activate("Dungeons");
@@ -77,6 +77,20 @@ int passive_dungeons_inventory(void){
  husk_ue4_set_render_inventory_mode(0);tl_ri_activate("Dungeons");
  return (tl_ri_active()||tl_ri_area_active()||overridden("vkCreateImage")||overridden("vkCmdBeginRenderPass"))?9:0;
 }
+int target_overflow_is_not_asset_overflow(void){
+ husk_ue4_set_render_inventory_mode(1);tl_ri_activate("Dungeons");
+ image_info p={.type=14,.height=640,.depth=1,.samples=1,.format=44,.usage=0x14};
+ for(unsigned i=1;i<=110;i++){p.width=i;tl_ri_image(&p);}
+ tl_ri_stats stats;tl_ri_snapshot(NULL,0,&stats);
+ tl_ri_metalfx_candidates candidates={0};tl_ri_metalfx_snapshot(&candidates);
+ if(stats.target_groups!=96||stats.asset_groups!=0||stats.dropped_capacity_targets!=14)return 1;
+ if(stats.dropped_capacity_assets||stats.dropped_capacity_areas||stats.dropped_contention)return 2;
+ if(candidates.lost_target_observations!=14||candidates.lost_asset_observations||
+    candidates.lost_render_area_observations||candidates.lost_contention_observations||
+    candidates.lost_observations!=14)return 3;
+ return 0;
+}
+
 int framegen_candidates(void){
  tl_ri_metalfx_candidates v={0};
  husk_ue4_set_render_inventory(false);tl_ri_activate("Dungeons");
@@ -105,6 +119,7 @@ int framegen_candidates(void){
  def test_success_failure_and_command_arguments_preserved(self):self.assertEqual(self.lib.exercise(1),0)
  def test_only_exact_dungeons_project_activates(self):self.assertEqual(self.lib.exercise(2),0)
  def test_registry_capacity_and_loss_are_disclosed(self):self.assertEqual(self.lib.bounded(),0)
+ def test_target_capacity_loss_distinguished_from_asset_overflow(self):self.assertEqual(self.lib.target_overflow_is_not_asset_overflow(),0)
  def test_assets_cannot_starve_targets_or_areas_and_existing_counts_survive(self):self.assertEqual(self.lib.reserved(),0)
  def test_render_thread_never_waits_for_diagnostic_mutex(self):self.assertEqual(self.lib.contended(),0)
  def test_native_metalfx_candidates_are_only_bounded_requested_metadata(self):self.assertEqual(self.lib.framegen_candidates(),0)
