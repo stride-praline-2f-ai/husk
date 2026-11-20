@@ -11,6 +11,7 @@ void tl_dp_set_api(int (*get_statistics)(void *, void *, size_t *), const char *
 void tl_dp_device(void *device);
 void tl_dp_forget(void *device);
 void tl_dp_report(void);
+void tl_dp_schedule_report(void); /* coalesced utility-QoS driver query, not on render/present */
 typedef struct {uint32_t phase,new_calls,total_calls;bool reset,estimated_total_valid,values_valid;double lifetime_average_ms,latest_ms,lifetime_max_ms,estimated_new_total_ms;} tl_dp_phase;
 typedef struct {uint64_t serial,previous_query_ns,queried_ns;uint32_t invalid_values;bool requested,compatible,available;} tl_dp_info;
 /* Copy the most recent already-collected query. Never queries the driver or
