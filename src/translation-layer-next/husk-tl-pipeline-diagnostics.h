@@ -34,6 +34,7 @@ void tl_pi_pipeline_objects(tl_pi_request request,void *device,const uint64_t *h
 tl_pi_request tl_pi_identify(bool compute, void *device, uint32_t count, const void *ci);
 void tl_pi_completed(tl_pi_request request, bool compute, uint64_t elapsed_ns, uint64_t finished_ns, bool cache, int result, const void *ci);
 void tl_pi_report(void);
+void tl_pi_schedule_report(void); /* coalesced utility-QoS log drain */
 /* Lifetime since game launch; one group per batch's first sampled partial key.
  * Durations may overlap. This cannot reconstruct pipelines or prove cache hits. */
 typedef struct { uint64_t signature, calls, slow_calls, total_ns, worst_ns, valid_feedback, application_hits, stage_feedback_valid, stage_application_hits; uint64_t shader_hashes[4]; uint32_t stage_bits[4], shader_stages, last_stage_valid_mask, last_stage_hit_mask; uint32_t coverage,full_core; uint64_t full_core_calls; } tl_pi_group;
