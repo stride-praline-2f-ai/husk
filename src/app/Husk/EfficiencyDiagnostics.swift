@@ -374,10 +374,14 @@ final class EfficiencyDiagnostics: ObservableObject {
             candidateStatus = "unsupported_apple_metalfx_interpolator"
         } else if !candidate.active {
             candidateStatus = "not_collected"
-        } else if candidate.retained_image_groups == 0 || candidate.lost_observations > 0 {
-            candidateStatus = "inconclusive_incomplete_image_observations"
         } else if candidate.readable_depth_groups > 0 && candidate.writable_vector_groups > 0 && candidate.readable_color_groups > 0 {
-            candidateStatus = "plausible_formats_only_engine_semantics_unverified"
+            // Unrelated asset overflow cannot negate observed render-target
+            // formats. This never establishes actual motion/depth semantics.
+            candidateStatus = candidate.lost_target_observations > 0 || candidate.lost_contention_observations > 0
+                ? "plausible_formats_partial_target_observations"
+                : "plausible_formats_only_engine_semantics_unverified"
+        } else if candidate.retained_image_groups == 0 || candidate.lost_target_observations > 0 || candidate.lost_contention_observations > 0 {
+            candidateStatus = "inconclusive_incomplete_target_observations"
         } else {
             candidateStatus = "required_image_format_candidates_not_observed"
         }
@@ -392,6 +396,10 @@ final class EfficiencyDiagnostics: ObservableObject {
             "readable_colour_groups": candidate.readable_color_groups,
             "retained_image_groups": candidate.retained_image_groups,
             "lost_observations": candidate.lost_observations,
+            "lost_asset_capacity_observations": candidate.lost_asset_observations,
+            "lost_target_capacity_observations": candidate.lost_target_observations,
+            "lost_render_area_capacity_observations": candidate.lost_render_area_observations,
+            "lost_contention_observations": candidate.lost_contention_observations,
             "native_metalfx_interpolation_admitted": false,
             "semantic_depth_motion_verified": false,
             "camera_projection_verified": false,
@@ -402,6 +410,9 @@ final class EfficiencyDiagnostics: ObservableObject {
         return ["requested": s.requested, "active": s.active, "observed_image_creations": s.observed_images,
                 "observed_legacy_render_areas": s.observed_render_areas, "dropped_observations": s.dropped,
                 "dropped_capacity": s.dropped_capacity, "dropped_contention": s.dropped_contention,
+                 "dropped_asset_capacity": s.dropped_capacity_assets,
+                 "dropped_target_capacity": s.dropped_capacity_targets,
+                 "dropped_render_area_capacity": s.dropped_capacity_areas,
                 "hash_lookup_probes": s.hash_probes, "retained_asset_groups": s.asset_groups,
                 "retained_target_groups": s.target_groups, "retained_area_groups": s.area_groups,
                 "capacity_by_category": ["assets": 64, "targets": 96, "areas": 96],
