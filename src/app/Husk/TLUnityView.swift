@@ -332,10 +332,14 @@ final class TLUnityUIView: UIView, UIKeyInput {
         tl_vk_spatial_snapshot(&spatial)
         var candidate = tl_ri_metalfx_candidates()
         tl_ri_metalfx_snapshot(&candidate)
+        let candidateFound = candidate.readable_depth_groups > 0
+            && candidate.writable_vector_groups > 0 && candidate.readable_color_groups > 0
         let status = !candidate.active ? "unavailable" :
-            candidate.lost_observations > 0 ? "incomplete" :
-            candidate.readable_depth_groups > 0 && candidate.writable_vector_groups > 0 && candidate.readable_color_groups > 0
-                ? "plausible format groups only" : "no complete format candidate"
+            candidateFound ? (candidate.lost_target_observations > 0 || candidate.lost_contention_observations > 0
+                ? "plausible formats, target data partially lost"
+                : "plausible formats (engine semantics unverified)") :
+            (candidate.lost_target_observations > 0 || candidate.lost_contention_observations > 0)
+                ? "inconclusive target inventory" : "no matching formats observed"
         // Mach task accounting is a process-scoped counter, not a CPU-core
         // placement/power measurement. Sample every 15 seconds, never enumerate
         // threads or attach command-buffer completion callbacks.
@@ -355,13 +359,15 @@ final class TLUnityUIView: UIView, UIKeyInput {
         let headroom = process.jetsam_bytes >= 0 ?
             "\(process.jetsam_bytes / 1048576) MiB" : "unavailable"
         HuskLog.log("game-diagnostics",
-            String(format: "host render %.1f FPS; process CPU %@; footprint %@, jetsam headroom %@; thermal class %ld; Low Power Mode %@; MetalFX spatial input %ux%u -> output %ux%u, configured %u, encoded %llu, failures %llu; Vulkan image-only depth-format groups %u, readable depth %u, velocity-like %u, readable velocity-like %u, colour %u; evidence %@; Apple frame interpolation OFF (semantic textures and presentation not verified)",
+            String(format: "host render %.1f FPS; process CPU %@; footprint %@, jetsam headroom %@; thermal class %ld; Low Power Mode %@; MetalFX spatial input %ux%u -> output %ux%u, configured %u, encoded %llu, failures %llu; Vulkan image-only depth-format groups %u, readable depth %u, velocity-like %u, readable velocity-like %u, colour %u; lost assets %llu, lost targets %llu, lock misses %llu; evidence %@; Apple frame interpolation OFF (semantic textures and presentation not verified)",
                    fps, cpuDescription, footprint, headroom, ProcessInfo.processInfo.thermalState.rawValue,
                    ProcessInfo.processInfo.isLowPowerModeEnabled ? "on" : "off",
                    spatial.input_width, spatial.input_height, spatial.output_width, spatial.output_height,
                    spatial.configured, spatial.encoded, spatial.failures,
                    candidate.depth_attachment_groups, candidate.readable_depth_groups, candidate.vector_format_groups,
-                   candidate.writable_vector_groups, candidate.readable_color_groups, status))
+                   candidate.writable_vector_groups, candidate.readable_color_groups,
+                    candidate.lost_asset_observations, candidate.lost_target_observations,
+                    candidate.lost_contention_observations, status))
         logMetalFXImageCandidates(candidate)
     }
 
@@ -401,7 +407,7 @@ final class TLUnityUIView: UIView, UIKeyInput {
         guard fingerprint != lastMetalFXInventoryFingerprint else { return }
         lastMetalFXInventoryFingerprint = fingerprint
         HuskLog.log("game-diagnostics",
-            "MetalFX resource candidates: image groups \(candidate.retained_image_groups), observation losses \(candidate.lost_observations), depth-like \(candidate.depth_attachment_groups) / readable \(candidate.readable_depth_groups), vector-like \(candidate.vector_format_groups) / readable \(candidate.writable_vector_groups); \(descriptions.isEmpty ? "none observed" : descriptions.joined(separator: " | ")); shown \(descriptions.count)/\(candidates.count), types NOT verified as real motion/depth; no interpolated frames produced")
+            "MetalFX resource candidates: image groups \(candidate.retained_image_groups), observation losses \(candidate.lost_observations) (asset capacity \(candidate.lost_asset_observations), target capacity \(candidate.lost_target_observations), lock misses \(candidate.lost_contention_observations)), depth-like \(candidate.depth_attachment_groups) / readable \(candidate.readable_depth_groups), vector-like \(candidate.vector_format_groups) / readable \(candidate.writable_vector_groups); \(descriptions.isEmpty ? "none observed" : descriptions.joined(separator: " | ")); shown \(descriptions.count)/\(candidates.count), types NOT verified as real motion/depth; no interpolated frames produced")
     }
     private func updateStats() {
         var p = husk_unity_perf()
