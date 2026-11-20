@@ -363,13 +363,76 @@ final class EfficiencyDiagnostics: ObservableObject {
              "width": g.width, "height": g.height, "depth": g.depth, "vulkan_format": g.format,
              "vulkan_usage": g.usage, "samples": g.samples, "count_since_launch": g.count]
         }
+        var candidate = tl_ri_metalfx_candidates()
+        tl_ri_metalfx_snapshot(&candidate)
+        var lineage = tl_ri_lineage_stats()
+        tl_ri_lineage_snapshot(&lineage)
+        // Metadata can suggest scene attachments. It cannot establish shader
+        // semantics, queue ownership, GPU completion, motion coordinates or
+        // real depth. Never enable the interpolator from these counters.
+        let nativeSupported = husk_native_metalfx_supported()
+        let candidateStatus: String
+        if !nativeSupported {
+            candidateStatus = "unsupported_apple_metalfx_interpolator"
+        } else if !candidate.active {
+            candidateStatus = "not_collected"
+        } else if candidate.readable_depth_groups > 0 && candidate.writable_vector_groups > 0 && candidate.readable_color_groups > 0 {
+            // Unrelated asset overflow cannot negate observed render-target
+            // formats. This never establishes actual motion/depth semantics.
+            candidateStatus = candidate.lost_target_observations > 0 || candidate.lost_contention_observations > 0
+                ? "plausible_formats_partial_target_observations"
+                : "plausible_formats_only_engine_semantics_unverified"
+        } else if candidate.retained_image_groups == 0 || candidate.lost_target_observations > 0 || candidate.lost_contention_observations > 0 {
+            candidateStatus = "inconclusive_incomplete_target_observations"
+        } else {
+            candidateStatus = "required_image_format_candidates_not_observed"
+        }
+        let framegenProbe: [String: Any] = [
+            "status": candidateStatus,
+            "native_apple_interpolator_supported_by_current_device": nativeSupported,
+            "depth_attachment_format_groups": candidate.depth_attachment_groups,
+            "readable_depth_format_groups": candidate.readable_depth_groups,
+            "velocity_like_format_groups": candidate.vector_format_groups,
+            "readable_writable_velocity_like_groups": candidate.writable_vector_groups,
+            "renderable_colour_groups": candidate.renderable_color_groups,
+            "readable_colour_groups": candidate.readable_color_groups,
+            "retained_image_groups": candidate.retained_image_groups,
+            "lost_observations": candidate.lost_observations,
+            "lost_asset_capacity_observations": candidate.lost_asset_observations,
+            "lost_target_capacity_observations": candidate.lost_target_observations,
+            "lost_render_area_capacity_observations": candidate.lost_render_area_observations,
+            "lost_contention_observations": candidate.lost_contention_observations,
+            "native_metalfx_interpolation_admitted": false,
+            "semantic_depth_motion_verified": false,
+            "camera_projection_verified": false,
+            "gpu_producer_consumer_sync_verified": false,
+            "presenter_integrated": false,
+            "scope": "Advisory Vulkan create-image format/usage requests only, grouped and bounded. Identical image formats can carry colour, velocity or unrelated data. No texture handles, actual pixels, camera parameters, render-pass identities or proven frame chronology. A plausible result does NOT enable native Apple frame generation."
+        ]
+        let lineageReport: [String: Any] = [
+            "tracked_target_image_creations": lineage.tracked_target_images,
+            "tracked_target_view_creations": lineage.tracked_target_views,
+            "tracked_framebuffer_creations": lineage.tracked_framebuffers,
+            "framebuffers_with_depth_format": lineage.depth_framebuffers,
+            "framebuffers_with_vector_like_format": lineage.vector_like_framebuffers,
+            "framebuffers_with_both_format_types": lineage.mixed_depth_vector_framebuffers,
+            "render_pass_uses_depth_like": lineage.used_depth_framebuffers,
+            "render_pass_uses_vector_like": lineage.used_vector_like_framebuffers,
+            "missing_view_to_image_links": lineage.missing_image_view_links,
+            "missing_framebuffer_to_view_links": lineage.missing_framebuffer_view_links,
+            "registry_capacity_drops": lineage.dropped_records,
+            "scope": "Only live Vulkan image handles, image-view and framebuffer metadata; the normal image-only mode never intercepts render-pass calls. Neither format nor attachment presence proves UE4 motion vectors, camera transforms, Metal ownership or GPU completion."
+        ]
         return ["requested": s.requested, "active": s.active, "observed_image_creations": s.observed_images,
                 "observed_legacy_render_areas": s.observed_render_areas, "dropped_observations": s.dropped,
                 "dropped_capacity": s.dropped_capacity, "dropped_contention": s.dropped_contention,
+                 "dropped_asset_capacity": s.dropped_capacity_assets,
+                 "dropped_target_capacity": s.dropped_capacity_targets,
+                 "dropped_render_area_capacity": s.dropped_capacity_areas,
                 "hash_lookup_probes": s.hash_probes, "retained_asset_groups": s.asset_groups,
                 "retained_target_groups": s.target_groups, "retained_area_groups": s.area_groups,
                 "capacity_by_category": ["assets": 64, "targets": 96, "areas": 96],
-                "groups_since_launch": rows, "plan_ids": ["M9", "GAP-03"],
+                "groups_since_launch": rows, "vulkan_resource_lineage": lineageReport, "native_metalfx_frame_interpolation_preflight": framegenProbe, "plan_ids": ["M9", "GAP-03"],
                 "scope": "Requested base fields/legacy render areas since launch; not actual scene/HUD pixels, executed GPU passes, texture identity or replay state; swapchain images and newer renderpass paths may be absent",
                 "metalfx_integration": "separate opt-in prototype; requested inventory does not prove internal scene resolution", "benefit_validation": "unverified"]
     }

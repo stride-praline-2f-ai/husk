@@ -34,6 +34,7 @@
 #include "husk-tl-driver-profile.h"
 #include "husk-tl-efficiency.h"
 #include "husk-tl-pipeline-diagnostics.h"
+#include "husk-tl-lifecycle.h"
 #include "husk-tl-pipeline-feedback.h"
 #include "husk-tl-gpu-timing.h"
 #include "husk-tl-render-inventory.h"
@@ -168,7 +169,7 @@ static atomic_bool spatial_prepared;
 static float spatial_touch_x=1.0f,spatial_touch_y=1.0f;
 void husk_ue4_set_spatial_upscaling(bool enabled){spatial_requested=enabled;}
 void husk_ue4_set_spatial_input_percent(int percent){
-    spatial_input_percent=(percent==80||percent==85||percent==90||percent==95)?percent:80;
+    spatial_input_percent=(percent==50||percent==60||percent==67||percent==80||percent==85||percent==90||percent==95)?percent:80;
 }
 bool tl_vk_spatial_active(void){return atomic_load_explicit(&spatial_prepared,memory_order_acquire);}
 void tl_vk_spatial_touch(float *x,float *y){
@@ -614,7 +615,7 @@ static int w_vkCreateImage(void *device,const void *ci,const void *alloc,uint64_
     typedef int (*fn)(void *,const void *,const void *,uint64_t *);
     fn real=V.lib?(fn)vk_symbol("vkCreateImage"):NULL;
     int result=real?real(device,ci,alloc,out):-3;
-    if(result==VK_SUCCESS&&out&&*out)tl_ri_image(ci);
+    if(result==VK_SUCCESS&&out&&*out){tl_ri_image(ci);tl_ri_image_created(device,*out,ci);}
     return result;
 }
 static void w_vkCmdBeginRenderPass(void *command,const void *info,uint32_t contents)
@@ -623,9 +624,43 @@ static void w_vkCmdBeginRenderPass(void *command,const void *info,uint32_t conte
     static _Atomic(fn) cached;
     fn real=atomic_load_explicit(&cached,memory_order_acquire);
     if(!real&&V.lib){real=(fn)vk_symbol("vkCmdBeginRenderPass");atomic_store_explicit(&cached,real,memory_order_release);}
-    if(real){real(command,info,contents);tl_ri_render_area(info);}
+    if(real){real(command,info,contents);tl_ri_render_area(info);tl_ri_pass_begin(info);}
 }
 
+/* Create/destroy only, never in the per-draw path. Target image views and
+ * framebuffer references are observed without stealing Metal ownership. */
+static int w_vkCreateImageView(void *device,const void *ci,const void *alloc,uint64_t *out){
+ typedef int(*fn)(void *,const void *,const void *,uint64_t *);
+ fn real=V.lib?(fn)vk_symbol("vkCreateImageView"):NULL;
+ int result=real?real(device,ci,alloc,out):-3;
+ if(result==VK_SUCCESS&&out&&*out)tl_ri_view_created(device,*out,ci);
+ return result;
+}
+static void w_vkDestroyImage(void *device,uint64_t image,const void *alloc){
+ typedef void(*fn)(void *,uint64_t,const void *);
+ fn real=V.lib?(fn)vk_symbol("vkDestroyImage"):NULL;
+ if(real)real(device,image,alloc);
+ tl_ri_image_destroyed(device,image);
+}
+static void w_vkDestroyImageView(void *device,uint64_t view,const void *alloc){
+ typedef void(*fn)(void *,uint64_t,const void *);
+ fn real=V.lib?(fn)vk_symbol("vkDestroyImageView"):NULL;
+ if(real)real(device,view,alloc);
+ tl_ri_view_destroyed(device,view);
+}
+static int w_vkCreateFramebuffer(void *device,const void *ci,const void *alloc,uint64_t *out){
+ typedef int(*fn)(void *,const void *,const void *,uint64_t *);
+ fn real=V.lib?(fn)vk_symbol("vkCreateFramebuffer"):NULL;
+ int result=real?real(device,ci,alloc,out):-3;
+ if(result==VK_SUCCESS&&out&&*out)tl_ri_framebuffer_created(device,*out,ci);
+ return result;
+}
+static void w_vkDestroyFramebuffer(void *device,uint64_t framebuffer,const void *alloc){
+ typedef void(*fn)(void *,uint64_t,const void *);
+ fn real=V.lib?(fn)vk_symbol("vkDestroyFramebuffer"):NULL;
+ if(real)real(device,framebuffer,alloc);
+ tl_ri_framebuffer_destroyed(device,framebuffer);
+}
 typedef int (*pfn_create_swapchain)(void *, const void *, const void *, uint64_t *);
 static int64_t monotonic_ns(void);
 enum { TIMING_ACQUIRE, TIMING_SUBMIT, TIMING_PRESENT, TIMING_SLEEP, TIMING_GRAPHICS_PIPELINES, TIMING_COMPUTE_PIPELINES, TIMING_COUNT };
@@ -636,12 +671,21 @@ static atomic_uint pipeline_inflight;
 static atomic_uint_fast64_t pipeline_window_max, pipeline_window_slow;
 static pthread_mutex_t pipeline_event_mu = PTHREAD_MUTEX_INITIALIZER;
 static struct pipeline_event {
-    uint64_t elapsed, lock_wait;
+    uint64_t elapsed, lock_wait, caller_cpu_ns, driver_wall_ns;
     int64_t finished;
     unsigned stage, count;
-    bool cache;
+    bool cache, cpu_valid;
     int result;
 } worst_pipeline;
+/* Two thread CPU clock reads per pipeline *creation*, not per draw/submit.
+ * Caller CPU is host CPU including MoltenVK driver code on this thread only.
+ * The difference with wall is non-CPU wait/deschedule and other-thread work,
+ * never proof of an exclusive compiler or GPU duration. */
+static uint64_t pipeline_thread_cpu_ns(void) {
+    struct timespec ts;
+    if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts) != 0 || ts.tv_sec < 0 || ts.tv_nsec < 0) return 0;
+    return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
+}
 static uint64_t record_host_timing(unsigned stage, int64_t start)
 {
     uint64_t elapsed = (uint64_t)(monotonic_ns() - start);
@@ -653,7 +697,8 @@ static uint64_t record_host_timing(unsigned stage, int64_t start)
 /* Keep one worst slow call per reporting period. Producers never wait for the
  * diagnostic mutex, and no pipeline thread writes a per-call log or waits GPU idle. */
 static void record_pipeline_event(unsigned stage, uint32_t count, bool cache, int result,
-                                  int64_t finished, uint64_t elapsed, uint64_t lock_wait)
+                                  int64_t finished, uint64_t elapsed, uint64_t lock_wait,
+                                  uint64_t driver_wall_ns, uint64_t caller_cpu_ns, bool cpu_valid)
 {
     uint_fast64_t old = atomic_load_explicit(&pipeline_window_max, memory_order_relaxed);
     while (elapsed > old && !atomic_compare_exchange_weak_explicit(&pipeline_window_max, &old, elapsed,
@@ -662,7 +707,7 @@ static void record_pipeline_event(unsigned stage, uint32_t count, bool cache, in
     atomic_fetch_add_explicit(&pipeline_window_slow, 1, memory_order_relaxed);
     if (pthread_mutex_trylock(&pipeline_event_mu)) return;
     if (elapsed > worst_pipeline.elapsed)
-        worst_pipeline = (struct pipeline_event){elapsed, lock_wait, finished, stage, count, cache, result};
+        worst_pipeline = (struct pipeline_event){elapsed, lock_wait, caller_cpu_ns, driver_wall_ns, finished, stage, count, cache, cpu_valid, result};
     pthread_mutex_unlock(&pipeline_event_mu);
 }
 static void report_pipeline_event(void)
@@ -671,9 +716,11 @@ static void report_pipeline_event(void)
     struct pipeline_event event = worst_pipeline; worst_pipeline = (struct pipeline_event){0};
     pthread_mutex_unlock(&pipeline_event_mu);
     if (event.elapsed)
-        tl_log_line("ue4 pipeline stall: worst observed %s call %.3f ms, store-lock wait %.3f ms, batch %u, cache %s, result %d, finished monotonic %.6f s; host duration, not exclusive frame/GPU time or verified cache miss",
+        tl_log_line("ue4 pipeline stall: worst %s call wall %.3f ms, caller-thread CPU %s%.3f ms, driver-call wall %.3f ms, store-lock wait %.3f ms, batch %u, cache %s, result %d, finished monotonic %.6f s; caller CPU INCLUSIVE of native driver, wall may include other-thread compilation/waits; neither is GPU time nor a proven cache miss",
                     event.stage == TIMING_GRAPHICS_PIPELINES ? "graphics" : "compute", event.elapsed / 1e6,
-                    event.lock_wait / 1e6, event.count, event.cache ? "yes" : "no", event.result, event.finished / 1e9);
+                    event.cpu_valid ? "" : "unavailable/", event.caller_cpu_ns / 1e6,
+                    event.driver_wall_ns / 1e6, event.lock_wait / 1e6,
+                    event.count, event.cache ? "yes" : "no", event.result, event.finished / 1e9);
 }
 static int w_vkCreateSwapchainKHR(void *device, const void *ci, const void *alloc, uint64_t *out)
 {
@@ -715,6 +762,7 @@ static int w_vkGetSwapchainImagesKHR(void *device,uint64_t swapchain,uint32_t *c
 typedef int (*pfn_acquire)(void *, uint64_t, uint64_t, uint64_t, uint64_t, uint32_t *);
 static int w_vkAcquireNextImageKHR(void *device, uint64_t swapchain, uint64_t timeout, uint64_t sem, uint64_t fence, uint32_t *index)
 {
+    tl_lifecycle_gpu_gate_wait();
     static pfn_acquire real;
     static atomic_int bad, seen;
     if (!real && V.lib) real = (pfn_acquire)vk_symbol("vkAcquireNextImageKHR");
@@ -724,13 +772,16 @@ static int w_vkAcquireNextImageKHR(void *device, uint64_t swapchain, uint64_t ti
     int r = real ? real(device, swapchain, timeout, sem, fence, index) : -3;
     if (measure) record_host_timing(TIMING_ACQUIRE, start);
     if (r != VK_SUCCESS && atomic_fetch_add(&bad, 1) < 20) tl_log_line("vulkan: vkAcquireNextImageKHR -> %d", r);
-    else if (atomic_fetch_add(&seen, 1) < 2) tl_log_line("vulkan: vkAcquireNextImageKHR -> %d (image %u)", r, index ? *index : 0);
+    else if (r == VK_SUCCESS && atomic_load_explicit(&seen,memory_order_relaxed)<2 &&
+             atomic_fetch_add_explicit(&seen,1,memory_order_relaxed)<2)
+        tl_log_line("vulkan: vkAcquireNextImageKHR -> %d (image %u)", r, index ? *index : 0);
     return r;
 }
 
 typedef int (*pfn_queue_submit)(void *, uint32_t, const void *, uint64_t);
 static int w_vkQueueSubmit(void *queue, uint32_t count, const void *submits, uint64_t fence)
 {
+    tl_lifecycle_gpu_gate_wait();
     static _Atomic(pfn_queue_submit) cached;
     pfn_queue_submit real = atomic_load_explicit(&cached, memory_order_acquire);
     if (!real && V.lib) {
@@ -816,23 +867,31 @@ static int w_vkGetPipelineCacheData(void *device, uint64_t cache, size_t *size, 
 typedef int (*pfn_create_pipelines)(void *, uint64_t, uint32_t, const void *, const void *, uint64_t *);
 static int measure_pipeline_create(pfn_create_pipelines real, unsigned stage, void *device, uint64_t cache, uint32_t count, const void *ci, const void *alloc, uint64_t *out)
 {
+    tl_lifecycle_gpu_gate_wait();
     TL_CP_SCOPE(stage==TIMING_COMPUTE_PIPELINES?TL_CP_COMPUTE:TL_CP_GRAPHICS);
     tl_pi_request identity = tl_pi_identify(stage == TIMING_COMPUTE_PIPELINES, device, count, ci);
     tl_pf_batch feedback_batch;
     const void *observed_ci = tl_pf_prepare(stage == TIMING_COMPUTE_PIPELINES, device, count, ci, &feedback_batch);
     bool measure = tl_ue4_sharp_graphics_enabled();
     int64_t start = measure ? monotonic_ns() : 0;
+    uint64_t cpu_start = measure ? pipeline_thread_cpu_ns() : 0;
     if (measure) atomic_fetch_add_explicit(&pipeline_inflight, 1, memory_order_relaxed);
     bool locked = tl_pc_enter();
     int64_t entered = measure ? monotonic_ns() : 0;
     int result = real ? real(device, cache, count, observed_ci, alloc, out) : -3;
+    int64_t driver_finished = measure ? monotonic_ns() : 0;
+    uint64_t cpu_end = cpu_start ? pipeline_thread_cpu_ns() : 0;
     if(real&&out)tl_pi_pipeline_objects(identity,device,out);
     if (real && count) tl_pc_changed(device, cache);
     tl_pc_leave(locked);
     if (measure) {
         uint64_t elapsed = record_host_timing(stage, start);
         tl_pi_completed(identity, stage == TIMING_COMPUTE_PIPELINES, elapsed, start + elapsed, cache != 0, result, observed_ci);
-        record_pipeline_event(stage, count, cache != 0, result, start + (int64_t)elapsed, elapsed, (uint64_t)(entered - start));
+        record_pipeline_event(stage, count, cache != 0, result, start + (int64_t)elapsed, elapsed,
+                              entered >= start ? (uint64_t)(entered - start) : 0,
+                              driver_finished >= entered ? (uint64_t)(driver_finished - entered) : 0,
+                              cpu_end >= cpu_start ? cpu_end - cpu_start : 0,
+                              cpu_start != 0 && cpu_end >= cpu_start);
         tl_thread_policy_pipeline_completed(start + (int64_t)elapsed, (int64_t)elapsed);
         atomic_fetch_sub_explicit(&pipeline_inflight, 1, memory_order_relaxed);
         atomic_fetch_add_explicit(cache ? &cached_pipeline_calls : &uncached_pipeline_calls, 1, memory_order_relaxed);
@@ -889,6 +948,11 @@ static void w_vkDestroyDevice(void *device, const void *alloc)
     tl_gput_native_forget(device);
     typedef void (*fn)(void *, const void *);
     fn real = V.lib ? (fn)vk_symbol("vkDestroyDevice") : NULL;
+    /* A normal foreground exit may never trigger the iOS pause checkpoint.
+     * Save the native cache while this device and its VkPipelineCache handles
+     * are still valid. This is teardown-only: NEVER put a serialized cache
+     * readback or exclusive checkpoint lock on the render/submit path. */
+    tl_pc_checkpoint();
     tl_pc_forget_device(device, real, alloc);
 }
 
@@ -1016,6 +1080,10 @@ static void pace_efficient_frame(void)
                     (unsigned long long)atomic_load_explicit(&cache_host_seed_bytes, memory_order_relaxed),
                     pipeline_ns / 1e6, pipeline_max / 1e6, (unsigned long long)pipeline_slow, inflight);
         report_pipeline_event();
+        /* Bounded (max eight/interval) native PSO identity + actual
+         * application-cache feedback. This happens on the 10s reporting
+         * cadence, never on each rendered frame. */
+        tl_pi_report();
         if (wait_samples) tl_log_line("[M4/M9 pacing-wait] requested %.3f ms average, actual %.3f ms average, max overshoot %.3f ms (%llu sleeps); current-thread host wait, not engine/GPU duration",
             wait_requested_ns / (1e6 * wait_samples), wait_actual_ns / (1e6 * wait_samples),
             wait_excess_max_ns / 1e6, (unsigned long long)wait_samples);
@@ -1066,6 +1134,7 @@ static int w_vkGetPastPresentationTimingGOOGLE(void *device,uint64_t swap,uint32
 typedef int (*pfn_queue_present)(void *, const void *);
 static int w_vkQueuePresentKHR(void *queue, const void *info)
 {
+    tl_lifecycle_gpu_gate_wait();
     TL_CP_SCOPE(TL_CP_PRESENT);
     static _Atomic(pfn_queue_present) cached;
     pfn_queue_present real=atomic_load_explicit(&cached,memory_order_acquire);
@@ -1076,8 +1145,14 @@ static int w_vkQueuePresentKHR(void *queue, const void *info)
 #endif
     if (V.probe_frames && (n == 3 || n == 60 || n == 400 || n == 3000)) { probe_frame(queue, info, n); log_layer_state(g_swapchain_layer, "present"); }
     tl_pt_copy owned;const void *forward=info;
+    /* Ordinary Dungeons presents have no extension chain and neither timing
+     * correction nor monitoring. Forward the exact guest struct directly:
+     * skip per-frame chain walks, stack cloning and unrelated clock work.
+     * Timing-chain and diagnostic paths keep their original validation. */
+    bool plain_present = info && !((const tl_pt_info *)info)->next
+                         && !tl_pt_requested() && !tl_pt_monitoring();
     tl_pt_clock clock=tl_pt_requested()?present_clock():(tl_pt_clock){0};
-    if(!tl_pt_prepare(info,&owned,clock,&forward)){
+    if(!plain_present && !tl_pt_prepare(info,&owned,clock,&forward)){
         static atomic_uint rejected;
         if(atomic_fetch_add(&rejected,1)<8)tl_log_line("[M4/M6 present-clock] unsupported timing chain/count; no guest mutation or driver call; result -7");
         return -7;
@@ -1374,11 +1449,42 @@ static void w_vkGetPhysicalDeviceMemoryProperties2KHR(void *pd, vk_mem_props2 *p
 }
 
 static pfn_create_device g_real_create_device;
+/* The game does not request VK_EXT_metal_objects itself. Enable this
+ * MoltenVK-only export capability for the Dungeons diagnostic bridge,
+ * without changing the guest-facing list or touching any texture.
+ * On extension-not-present, retry the exact original create info. */
+static int create_with_optional_metal_export(void *pd,const vk_device_ci *ci,const void *alloc,void **out){
+    static const char metal_ext[]="VK_EXT_metal_objects";
+    if(!ci||!tl_ri_active()||metal4_backend||ci->extCount>256||!g_real_enum_dev_ext||
+       !real_dev_ext(pd,metal_ext))
+        return g_real_create_device(pd,ci,alloc,out);
+    for(uint32_t i=0;i<ci->extCount;i++)if(ci->exts[i]&&!strcmp(ci->exts[i],metal_ext)){
+        int r=g_real_create_device(pd,ci,alloc,out);
+        if(!r)tl_log_line("vulkan: native Metal objects export extension requested by guest; actual UE4 motion/depth NOT verified");
+        return r;
+    }
+    const char *ext[257];
+    for(uint32_t i=0;i<ci->extCount;i++)ext[i]=ci->exts[i];
+    ext[ci->extCount]=metal_ext;
+    vk_device_ci copy=*ci;
+    copy.extCount++;
+    copy.exts=ext;
+    int result=g_real_create_device(pd,&copy,alloc,out);
+    if(result!=VK_SUCCESS){
+        /* Optional capability must NEVER prevent Dungeons launching, including
+         * drivers returning a feature/initialization error instead of -7. */
+        tl_log_line("vulkan: optional Metal export rejected (%d); retrying untouched guest device extensions", result);
+        if(out)*out=NULL;
+        return g_real_create_device(pd,ci,alloc,out);
+    }
+    if(result==VK_SUCCESS)tl_log_line("vulkan: native Metal object export capability enabled; Vulkan image/view lineage is advisory, NO GPU texture export or interpolation active");
+    return result;
+}
 static int w_vkCreateDevice(void *pd, const vk_device_ci *ci, const void *alloc, void **out)
 {
     if (!g_real_create_device) return -3;
     if (!dxvk_game()) {
-        int result = tl_pf_create_device(pd, ci, alloc, out, g_real_create_device, g_real_enum_dev_ext);
+        int result = tl_pf_create_device(pd, ci, alloc, out, create_with_optional_metal_export, g_real_enum_dev_ext);
         if (result == VK_SUCCESS && out && *out) {
             tl_sb_device(pd,*out);
         tl_dp_device(*out);
@@ -1468,6 +1574,11 @@ static const struct { const char *name; void *fn; } k_over[] = {
     { "vkGetPastPresentationTimingGOOGLE", w_vkGetPastPresentationTimingGOOGLE },
     { "vkQueueSubmit", w_vkQueueSubmit },
     { "vkCreateImage", w_vkCreateImage },
+    { "vkDestroyImage", w_vkDestroyImage },
+    { "vkCreateImageView", w_vkCreateImageView },
+    { "vkDestroyImageView", w_vkDestroyImageView },
+    { "vkCreateFramebuffer", w_vkCreateFramebuffer },
+    { "vkDestroyFramebuffer", w_vkDestroyFramebuffer },
     { "vkCmdBeginRenderPass", w_vkCmdBeginRenderPass },
     { "vkGetDeviceQueue", w_vkGetDeviceQueue },
     { "vkGetDeviceQueue2", w_vkGetDeviceQueue2 },
@@ -1510,7 +1621,11 @@ static const struct { const char *name; void *fn; } k_over[] = {
 static void *overridden(const char *name)
 {
     /* Default-off inventory does not interpose per-render-pass calls at all. */
-    if ((!strcmp(name,"vkCreateImage") || !strcmp(name,"vkCmdBeginRenderPass")) && !tl_ri_active()) return NULL;
+    if ((!strcmp(name,"vkCreateImage")||!strcmp(name,"vkDestroyImage")||
+         !strcmp(name,"vkCreateImageView")||!strcmp(name,"vkDestroyImageView")||
+         !strcmp(name,"vkCreateFramebuffer")||!strcmp(name,"vkDestroyFramebuffer"))
+         && !tl_ri_active()) return NULL;
+    if (!strcmp(name,"vkCmdBeginRenderPass") && !tl_ri_area_active()) return NULL;
     for (size_t i = 0; i < sizeof(k_over) / sizeof(k_over[0]); i++) if (!strcmp(k_over[i].name, name)) return k_over[i].fn;
     return NULL;
 }

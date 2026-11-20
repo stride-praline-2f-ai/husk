@@ -192,6 +192,32 @@ class GraphicsTests(unittest.TestCase):
         self.assertEqual([p.read_bytes() for p in self.paths], [original] * 4)
         self.assertEqual(self.command(b"-custom"), "-custom")
 
+    def test_android_vulkan_pso_cache_background_precompile_requests_are_reversible(self):
+        wanted = ("r.ShaderPipelineCache.Enabled=1",
+                  "r.ShaderPipelineCache.StartupMode=2",
+                  "r.ShaderPipelineCache.BackgroundBatchSize=2",
+                  "r.ShaderPipelineCache.BackgroundBatchTime=1.0",
+                  "r.Vulkan.PipelineCacheFromShaderPipelineCache=1")
+        original = b"[User]\nQuality=local\n"
+        for p in self.paths:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_bytes(original)
+        self.lib.husk_ue4_set_sharp_graphics(True)
+        self.lib.husk_ue4_set_efficiency(True, 60)
+        self.assertTrue(self.prepare())
+        args = self.command(b"-vulkan -original=1")
+        for flag in wanted:
+            self.assertIn("[SystemSettings]:" + flag, args)
+            for p in self.paths:
+                self.assertEqual(p.read_bytes().count(flag.encode()), 1)
+        self.assertTrue(self.prepare())
+        for p in self.paths:
+            self.assertEqual(p.read_bytes().count(b"r.ShaderPipelineCache.Enabled=1"), 1)
+        self.lib.husk_ue4_set_sharp_graphics(False)
+        self.assertTrue(self.prepare())
+        self.assertEqual([p.read_bytes() for p in self.paths], [original] * 4)
+        self.assertEqual(self.command(b"-original=1"), "-original=1")
+
     def test_frame_limit_is_scoped_and_responds_to_heat(self):
         self.lib.husk_ue4_set_efficiency(True, 60)
         self.assertEqual(self.lib.tl_ue4_effective_frame_limit(0), 0)

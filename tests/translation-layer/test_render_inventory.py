@@ -22,7 +22,15 @@ static void *get(void*lib,const char*name){(void)lib;if(!strcmp(name,"vkCreateIm
 #define dlsym get
 #define vk_symbol(name) get(V.lib,name)
 '''+wrappers+r'''
-static const struct{const char*name;void*fn;}k_over[]={{"vkCreateImage",w_vkCreateImage},{"vkCmdBeginRenderPass",w_vkCmdBeginRenderPass}};
+static const struct{const char*name;void*fn;}k_over[]={
+ {"vkCreateImage",w_vkCreateImage},
+ {"vkDestroyImage",w_vkDestroyImage},
+ {"vkCreateImageView",w_vkCreateImageView},
+ {"vkDestroyImageView",w_vkDestroyImageView},
+ {"vkCreateFramebuffer",w_vkCreateFramebuffer},
+ {"vkDestroyFramebuffer",w_vkDestroyFramebuffer},
+ {"vkCmdBeginRenderPass",w_vkCmdBeginRenderPass}
+};
 '''+lookup+r'''
 int exercise(int mode){
  husk_ue4_set_render_inventory(mode!=0);tl_ri_activate(mode==2?"Other":"Dungeons");status=calls=begins=errors=0;
@@ -42,7 +50,7 @@ int exercise(int mode){
  if(n!=2||s.observed_images!=1||s.observed_render_areas!=2||g[0].width!=1784||g[1].count!=2)return 8;
  return 0;
 }
-int bounded(void){husk_ue4_set_render_inventory(true);tl_ri_activate("Dungeons");image_info p={.type=14,.height=100,.depth=1};for(unsigned i=1;i<=300;i++){p.width=i;tl_ri_image(&p);}tl_ri_stats s;tl_ri_group g[256];return tl_ri_snapshot(g,256,&s)==64&&s.asset_groups==64&&s.dropped_capacity==236&&s.dropped==236&&s.observed_images==300?0:1;}
+int bounded(void){husk_ue4_set_render_inventory(true);tl_ri_activate("Dungeons");image_info p={.type=14,.height=100,.depth=1};for(unsigned i=1;i<=300;i++){p.width=i;tl_ri_image(&p);}tl_ri_stats s;tl_ri_group g[256];return tl_ri_snapshot(g,256,&s)==64&&s.asset_groups==64&&s.dropped_capacity==236&&s.dropped_capacity_assets==236&&s.dropped_capacity_targets==0&&s.dropped_capacity_areas==0&&s.dropped==236&&s.observed_images==300?0:1;}
 int contended(void){husk_ue4_set_render_inventory(true);tl_ri_activate("Dungeons");image_info p={.type=14,.width=100,.height=100};pthread_mutex_lock(&mu);tl_ri_image(&p);pthread_mutex_unlock(&mu);tl_ri_stats s;tl_ri_snapshot(NULL,0,&s);return s.dropped==1&&s.dropped_contention==1&&s.observed_images==1?0:1;}
 int reserved(void){
  husk_ue4_set_render_inventory(true);tl_ri_activate("Dungeons");
@@ -55,12 +63,101 @@ int reserved(void){
  if(s.hash_probes>4000||s.observed_images!=302||s.observed_render_areas!=1)return 2;
  return 0;
 }
+
+int passive_dungeons_inventory(void){
+ husk_ue4_set_render_inventory_mode(1);tl_ri_activate("Dungeons");
+ if(tl_ri_inventory_mode()!=1||!tl_ri_active()||tl_ri_area_active())return 1;
+ if(overridden("vkCreateImage")!=(void *)w_vkCreateImage)return 2;
+ if(overridden("vkCmdBeginRenderPass")!=NULL)return 3;
+ image_info p={.type=14,.width=912,.height=640,.depth=1,.samples=1,.format=126,.usage=0x24};
+ tl_ri_image(&p);
+ begin_info rp={.type=43,.width=912,.height=640};
+ tl_ri_render_area(&rp);
+ tl_ri_metalfx_candidates v;tl_ri_metalfx_snapshot(&v);
+ if(!v.active||v.readable_depth_groups!=1||v.retained_image_groups!=1)return 4;
+ tl_ri_stats stats;tl_ri_snapshot(NULL,0,&stats);
+ if(stats.observed_render_areas||stats.observed_images!=1)return 5;
+ husk_ue4_set_render_inventory(true);tl_ri_activate("Dungeons");
+ if(tl_ri_inventory_mode()!=2||!tl_ri_area_active())return 6;
+ if(overridden("vkCmdBeginRenderPass")!=(void *)w_vkCmdBeginRenderPass)return 7;
+ tl_ri_render_area(&rp);tl_ri_snapshot(NULL,0,&stats);
+ if(stats.observed_render_areas!=1)return 8;
+ husk_ue4_set_render_inventory_mode(0);tl_ri_activate("Dungeons");
+ return (tl_ri_active()||tl_ri_area_active()||overridden("vkCreateImage")||overridden("vkCmdBeginRenderPass"))?9:0;
+}
+int target_overflow_is_not_asset_overflow(void){
+ husk_ue4_set_render_inventory_mode(1);tl_ri_activate("Dungeons");
+ image_info p={.type=14,.height=640,.depth=1,.samples=1,.format=44,.usage=0x14};
+ for(unsigned i=1;i<=110;i++){p.width=i;tl_ri_image(&p);}
+ tl_ri_stats stats;tl_ri_snapshot(NULL,0,&stats);
+ tl_ri_metalfx_candidates candidates={0};tl_ri_metalfx_snapshot(&candidates);
+ if(stats.target_groups!=96||stats.asset_groups!=0||stats.dropped_capacity_targets!=14)return 1;
+ if(stats.dropped_capacity_assets||stats.dropped_capacity_areas||stats.dropped_contention)return 2;
+ if(candidates.lost_target_observations!=14||candidates.lost_asset_observations||
+    candidates.lost_render_area_observations||candidates.lost_contention_observations||
+    candidates.lost_observations!=14)return 3;
+ return 0;
+}
+
+int framegen_lineage(void){
+ husk_ue4_set_render_inventory_mode(1);tl_ri_activate("Dungeons");
+ image_info d={.type=14,.width=912,.height=640,.depth=1,.samples=1,.format=126,.usage=0x24};
+ image_info v=d;v.format=83;v.usage=0x14;
+ tl_ri_image_created((void*)7,101,&d);tl_ri_image_created((void*)7,102,&v);
+ ri_view_create dv={.type=15,.image=101,.format=126};
+ ri_view_create vv={.type=15,.image=102,.format=83};
+ tl_ri_view_created((void*)7,201,&dv);tl_ri_view_created((void*)7,202,&vv);
+ uint64_t attachments[2]={201,202};
+ ri_fb_create fb={.type=37,.renderpass=301,.attachments=2,.views=attachments,.width=912,.height=640,.layers=1};
+ tl_ri_framebuffer_created((void*)7,401,&fb);
+ tl_ri_lineage_stats stats;tl_ri_lineage_snapshot(&stats);
+ if(stats.version!=1||stats.size!=sizeof(stats)||stats.tracked_target_images!=2||
+    stats.tracked_target_views!=2||stats.tracked_framebuffers!=1||stats.depth_framebuffers!=1||
+    stats.vector_like_framebuffers!=1||stats.mixed_depth_vector_framebuffers!=1)return 1;
+ begin_info b={.type=43,.framebuffer=401,.width=912,.height=640};
+ tl_ri_pass_begin(&b);tl_ri_lineage_snapshot(&stats);
+ if(stats.used_depth_framebuffers||stats.used_vector_like_framebuffers)return 2; /* passive: no per-frame probes */
+ husk_ue4_set_render_inventory_mode(2); /* switch for test only; real game restarts */
+ tl_ri_pass_begin(&b);tl_ri_lineage_snapshot(&stats);
+ if(stats.used_depth_framebuffers!=1||stats.used_vector_like_framebuffers!=1)return 3;
+ tl_ri_view_destroyed((void*)7,201);tl_ri_image_destroyed((void*)7,101);
+ tl_ri_framebuffer_destroyed((void*)7,401);
+ tl_ri_activate("Dungeons");tl_ri_lineage_snapshot(&stats);
+ if(stats.tracked_target_images||stats.tracked_target_views||stats.tracked_framebuffers)return 4;
+ return 0;
+}
+int framegen_candidates(void){
+ tl_ri_metalfx_candidates v={0};
+ husk_ue4_set_render_inventory(false);tl_ri_activate("Dungeons");
+ tl_ri_metalfx_snapshot(&v);
+ if(v.version!=1||v.size!=sizeof(v)||v.active||v.readable_depth_groups||v.writable_vector_groups)return 1;
+ husk_ue4_set_render_inventory(true);tl_ri_activate("Dungeons");
+ image_info p={.type=14,.width=1088,.height=768,.depth=1,.samples=1,.format=126,.usage=0x24};
+ tl_ri_image(&p);tl_ri_image(&p); /* same depth group */
+ p.format=83;p.usage=0x14;tl_ri_image(&p); /* motion-like RG16F, not verified motion */
+ p.format=44;p.usage=0x14;tl_ri_image(&p); /* ordinary colour */
+ p.format=127;p.usage=0x24;tl_ri_image(&p); /* stencil-only: not depth */
+ p.format=103;p.usage=0x10;tl_ri_image(&p); /* unsampleable motion-like format */
+ tl_ri_metalfx_snapshot(&v);
+ if(!v.active||v.depth_attachment_groups!=1||v.readable_depth_groups!=1)return 2;
+ if(v.vector_format_groups!=2||v.writable_vector_groups!=1)return 3;
+ if(v.renderable_color_groups!=3||v.readable_color_groups!=2)return 4;
+ if(v.retained_image_groups!=5||v.lost_observations!=0)return 5;
+ tl_ri_activate("Other");tl_ri_metalfx_snapshot(&v);
+ if(v.active||v.retained_image_groups||v.readable_depth_groups||v.writable_vector_groups)return 6;
+ return 0;
+}
+
 '''
   (p/'test.c').write_text(harness);subprocess.run([os.environ.get('CC','cc'),'-std=c11','-Wall','-Wextra','-Werror','-shared','-fPIC','-pthread','-I',str(ROOT/'src/translation-layer-next'),str(p/'test.c'),'-o',str(p/'test.so')],check=True);cls.lib=ctypes.CDLL(str(p/'test.so'))
  def test_disabled_lookup_does_not_interpose_or_read_input(self):self.assertEqual(self.lib.exercise(0),0)
  def test_success_failure_and_command_arguments_preserved(self):self.assertEqual(self.lib.exercise(1),0)
  def test_only_exact_dungeons_project_activates(self):self.assertEqual(self.lib.exercise(2),0)
  def test_registry_capacity_and_loss_are_disclosed(self):self.assertEqual(self.lib.bounded(),0)
+ def test_target_capacity_loss_distinguished_from_asset_overflow(self):self.assertEqual(self.lib.target_overflow_is_not_asset_overflow(),0)
  def test_assets_cannot_starve_targets_or_areas_and_existing_counts_survive(self):self.assertEqual(self.lib.reserved(),0)
  def test_render_thread_never_waits_for_diagnostic_mutex(self):self.assertEqual(self.lib.contended(),0)
+ def test_native_metalfx_candidates_are_only_bounded_requested_metadata(self):self.assertEqual(self.lib.framegen_candidates(),0)
+ def test_vulkan_target_view_framebuffer_lineage_is_bounded_and_passive_by_default(self):self.assertEqual(self.lib.framegen_lineage(),0)
+ def test_automatic_dungeons_diagnostic_is_image_only_and_manual_can_collect_renderpasses(self):self.assertEqual(self.lib.passive_dungeons_inventory(),0)
 if __name__=='__main__':unittest.main()

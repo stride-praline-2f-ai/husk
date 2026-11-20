@@ -46,7 +46,17 @@ static const char *const values[] = {
     "r.PostProcessAAQuality=4", "r.ShadowQuality=5",
     "r.Shadow.MaxResolution=2048", "r.Shadow.CSM.MaxCascades=4",
     "r.MotionBlurQuality=0", "r.DefaultFeature.MotionBlur=0", "r.DepthOfFieldQuality=0",
-    "r.SceneColorFringeQuality=0"
+    "r.SceneColorFringeQuality=0",
+    /* UE4 Android/Vulkan PSO cache is distinct from MoltenVK's driver blob.
+     * Reuse a game-bundled PSO file if supplied; spread its precompilation
+     * over background batches instead of a large foreground burst. These
+     * CVar requests are harmlessly ignored on game versions without support;
+     * no offline PSO file is invented or replayed. */
+    "r.ShaderPipelineCache.Enabled=1",
+    "r.ShaderPipelineCache.StartupMode=2",
+    "r.ShaderPipelineCache.BackgroundBatchSize=2",
+    "r.ShaderPipelineCache.BackgroundBatchTime=1.0",
+    "r.Vulkan.PipelineCacheFromShaderPipelineCache=1"
 };
 
 /* Keep native geometry/texture sharpness, spend less on shadows and effects.
@@ -61,7 +71,17 @@ static const char *const efficient_values[] = {
     "r.PostProcessAAQuality=4", "r.ShadowQuality=3",
     "r.Shadow.MaxResolution=1024", "r.Shadow.CSM.MaxCascades=2",
     "r.MotionBlurQuality=0", "r.DefaultFeature.MotionBlur=0", "r.DepthOfFieldQuality=0",
-    "r.SceneColorFringeQuality=0"
+    "r.SceneColorFringeQuality=0",
+    /* UE4 Android/Vulkan PSO cache is distinct from MoltenVK's driver blob.
+     * Reuse a game-bundled PSO file if supplied; spread its precompilation
+     * over background batches instead of a large foreground burst. These
+     * CVar requests are harmlessly ignored on game versions without support;
+     * no offline PSO file is invented or replayed. */
+    "r.ShaderPipelineCache.Enabled=1",
+    "r.ShaderPipelineCache.StartupMode=2",
+    "r.ShaderPipelineCache.BackgroundBatchSize=2",
+    "r.ShaderPipelineCache.BackgroundBatchTime=1.0",
+    "r.Vulkan.PipelineCacheFromShaderPipelineCache=1"
 };
 _Static_assert(sizeof(values) == sizeof(efficient_values), "preset size mismatch");
 #define BASE_VALUE_COUNT (sizeof(values) / sizeof(values[0]))

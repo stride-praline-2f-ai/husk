@@ -1,8 +1,8 @@
 name: Build Husk Duo IPA on GitHub-hosted Xcode 27
 on:
   push:
-    branches: [main]
-    paths: ['.github/workflows/build-husk-ipa.yml', 'source/**', 'vendor/**']
+    branches: [main, 'feature/apple-native-metalfx-rebuild']
+    paths: ['.github/workflows/build-husk-ipa.yml', 'source/**', 'vendor/**', 'src/**', 'patches/**', 'tests/**', 'scripts/**']
   workflow_dispatch:
 permissions:
   contents: write
@@ -27,6 +27,17 @@ jobs:
         run: |
           set -euo pipefail
           cp .github/ci/write_status.py "$RUNNER_TEMP/husk-build-status.py"
+          if [ "${GITHUB_REF_NAME}" = "feature/apple-native-metalfx-rebuild" ]; then
+            # The optimized source branch intentionally omits bulky pinned
+            # release-input files; read these exact assets from production main
+            # without changing or merging the feature source.
+            git fetch --no-tags origin main
+            mkdir -p vendor source
+            for asset in vendor/HuskMoltenVK-verified.zip.b64 source/build.json source/husk.bundle.b64; do
+              git show "origin/main:$asset" > "$asset"
+              test -s "$asset"
+            done
+          fi
           python3 - <<'DRIVER'
           import base64,hashlib,os
           from pathlib import Path
@@ -54,10 +65,25 @@ jobs:
           git fetch --no-tags origin "$HUSK_SOURCE"
           git checkout --detach "$HUSK_SOURCE"
           test "$(git rev-parse HEAD^{tree})" = "$(cat "$RUNNER_TEMP/husk-source-tree")"
+          # The feature branch contains changes made after the pinned source
+          # bundle. For this dedicated experimental build, compile exactly the
+          # triggering commit, NEVER the old bundled source and NEVER publish
+          # the experimental HEAD into optimized or main.
+          if [ "${GITHUB_REF_NAME}" = "feature/apple-native-metalfx-rebuild" ]; then
+            git checkout --detach "${GITHUB_SHA}"
+            export HUSK_SOURCE="$(git rev-parse HEAD)"
+            export HUSK_SOURCE_TREE="$(git rev-parse HEAD^{tree})"
+            printf 'HUSK_SOURCE=%s\nHUSK_SOURCE_TREE=%s\n' "$HUSK_SOURCE" "$HUSK_SOURCE_TREE" >> "$GITHUB_ENV"
+            printf '%s' "$HUSK_SOURCE" > "$RUNNER_TEMP/husk-source-sha"
+            printf '%s' "$HUSK_SOURCE_TREE" > "$RUNNER_TEMP/husk-source-tree"
+            echo "BUILDING EXACT FEATURE HEAD $HUSK_SOURCE $HUSK_SOURCE_TREE"
+          fi
           mkdir -p build/logs
-          # The connected GitHub app can finish ref publication if the runner token lacks workflow-write scope.
-          if ! git push origin HEAD:refs/heads/optimized > build/logs/source-publication.log 2>&1; then
-            echo "Source objects sent; connected GitHub tool will finish branch publication."
+          if [ "${GITHUB_REF_NAME}" = "main" ]; then
+            # Only the production manifest path may update optimized.
+            if ! git push origin HEAD:refs/heads/optimized > build/logs/source-publication.log 2>&1; then
+              echo "Source objects sent; connected GitHub tool will finish branch publication."
+            fi
           fi
           python3 "$RUNNER_TEMP/husk-build-status.py"
       - name: Check generated-frame sequence quality before rebuilding drivers
@@ -152,6 +178,7 @@ jobs:
           # python3 tests/translation-layer/test_comparison_campaign.py -v
           # python3 tests/translation-layer/test_external_efficiency.py -v
           # python3 tests/translation-layer/test_spatial.py -v
+          # python3 tests/translation-layer/test_native_metalfx_duo.py -v
           # python3 tests/translation-layer/test_spatial_lifetime.py -v
           # python3 tests/translation-layer/test_frame_evidence.py -v
           # python3 tests/translation-layer/test_framegen_enforcement.py -v

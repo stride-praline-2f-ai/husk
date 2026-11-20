@@ -134,55 +134,38 @@ struct TLAppSettings: Codable, Equatable {
     var nativePipelineArchiveMode = 0
     var nativeArchiveVerification = false
     var execution = HuskExecutionOptions()
+    // Dungeons' ARM64 library initialization can wait on translated bionic
+    // pthread_once/lazy objects. Park competing threads instead of running
+    // repeated sched_yield loops; changing this never lowers the FPS cap.
+    var dungeonsJITLowPowerWait = true
     var pipelineIdentification = false
     var pipelineFeedback = false
     var automaticDuoProfile = true
     var a20EfficiencyWorkers = true
-    // Prefer the real source-built Metal 4 path on new installations only when
-    // its packaged frame-generation bridge has passed the binary manifest gate.
-    // Explicit saved choices and unsupported packages keep their own settings.
-    static func prefersMetal4Framegen(_ caps: Metal4DriverCapabilities) -> Bool {
-        caps.frameGeneration && caps.nativeArchives
+    // Old saved Metal 4 and Husk optical-flow fields remain decodable solely
+    // for migration. They are never selected or run by the Apple-only route.
+    var frameGeneration = false
+    var metal4Renderer = false
+    var enhancedMetal4 = false
+    // User preference: request Apple's actual MetalFX interpolator when the
+    // game supplies colour/depth/motion and an ordered Metal command buffer.
+    var nativeAppleFrameInterpolation = true
+    mutating func selectMetal4(_ enabled: Bool, bridgeAvailable: Bool = false) {
+        metal4Renderer = false; enhancedMetal4 = false; frameGeneration = false
     }
-    var frameGeneration = TLAppSettings.prefersMetal4Framegen(Metal4DriverCapabilities.current)
-    var metal4Renderer = TLAppSettings.prefersMetal4Framegen(Metal4DriverCapabilities.current)
-    var enhancedMetal4 = TLAppSettings.prefersMetal4Framegen(Metal4DriverCapabilities.current)
-    mutating func selectMetal4(_ enabled: Bool, bridgeAvailable: Bool = Metal4DriverCapabilities.current.frameGeneration) {
-        metal4Renderer = enabled
-        if enabled && frameGeneration {
-            if bridgeAvailable { enhancedMetal4 = true } else { frameGeneration = false }
-        }
-        disableMetal4FramegenConflicts()
+    mutating func selectFrameGeneration(_ enabled: Bool, bridgeAvailable: Bool = false) {
+        frameGeneration = false
     }
-    mutating func selectFrameGeneration(_ enabled: Bool, bridgeAvailable: Bool = Metal4DriverCapabilities.current.frameGeneration) {
-        frameGeneration = enabled
-        if enabled && metal4Renderer {
-            if bridgeAvailable { enhancedMetal4 = true } else { metal4Renderer = false }
-        }
-        disableMetal4FramegenConflicts()
-    }
-    mutating func selectEnhancedMetal4(_ enabled: Bool, bridgeAvailable: Bool = Metal4DriverCapabilities.current.nativeArchives) {
-        enhancedMetal4 = enabled && bridgeAvailable
-        if !enhancedMetal4 && metal4Renderer { frameGeneration = false }
-        disableMetal4FramegenConflicts()
-    }
-    private mutating func disableMetal4FramegenConflicts() {
-        guard metal4Renderer && enhancedMetal4 && frameGeneration else { return }
-        // MetalFX spatial belongs to MoltenVK; clock/limiter and queue experiments
-        // distort the 30-rendered / 60-output presentation path.
-        spatialUpscaling = false
-        clockPresentation = false
-        feedbackClockCorrection = false
-        engineOnlyLimiter = false
-        vulkanSubmission = .driverDefault
-        execution = .init()
+    mutating func selectEnhancedMetal4(_ enabled: Bool, bridgeAvailable: Bool = false) {
+        metal4Renderer = false; enhancedMetal4 = false; frameGeneration = false
     }
     // DUNGEONS_SIMPLE_POLICY_BEGIN
     func dungeonsFrameChoice(automaticActive: Bool) -> Int {
-        frameGeneration ? 120 : (automaticActive ? 60 : efficientFrameRate.rawValue)
+        automaticActive ? 60 : efficientFrameRate.rawValue
     }
     mutating func selectDungeonsFrameChoice(_ value: Int, bridgeAvailable: Bool) {
-        selectFrameGeneration(value == 120, bridgeAvailable: bridgeAvailable)
+        // 120 was Husk's retired colour-flow mode, not Apple MetalFX.
+        frameGeneration = false
         if value == 30 { efficientFrameRate = .cool; automaticDuoProfile = false }
         if value == 60 { efficientFrameRate = .smooth }
     }
@@ -204,18 +187,16 @@ struct TLAppSettings: Codable, Equatable {
             automaticDuoProfile = false
         }
     }
-    var dungeonsRendererChoice: Int { metal4Renderer ? (enhancedMetal4 ? 0 : 1) : 2 }
+    var dungeonsRendererChoice: Int { 2 }
     mutating func selectDungeonsRendererChoice(_ value: Int, bridgeAvailable: Bool) {
-        if value == 2 { selectMetal4(false, bridgeAvailable: bridgeAvailable) }
-        else {
-            selectMetal4(true, bridgeAvailable: bridgeAvailable)
-            selectEnhancedMetal4(value == 0, bridgeAvailable: bridgeAvailable)
-        }
+        selectMetal4(false)
     }
     // DUNGEONS_SIMPLE_POLICY_END
     var sharedMemoryReserve = true
     var spatialUpscaling = false
     var spatialInputPercent = 80
+    // Independent Duo preset: preserves other device/manual upscaling choices.
+    var duoSpatialPreset = DuoDisplayPolicy.inputPercent
     var renderTargetInventory = false
     var driverPhaseProfiling = false
     var workerScheduling: WorkerScheduling = .balanced
@@ -252,6 +233,12 @@ struct TLAppSettings: Codable, Equatable {
         usesSharpGraphics(for: app) && (unrealGraphics == .automatic || unrealGraphics == .efficientHigh)
     }
 
+    func effectiveExecution(for app: TLApp) -> HuskExecutionOptions {
+        var selected = execution.safe
+        if isDungeons(app) { selected.initializationParking = dungeonsJITLowPowerWait }
+        return selected
+    }
+
     func supportsDuoAutomatic(for app: TLApp) -> Bool {
         automaticDuoProfile && usesEfficientGraphics(for: app) && isDungeons(app)
     }
@@ -274,6 +261,18 @@ struct TLAppSettings: Codable, Equatable {
             Int32((screen.bounds.height * screen.scale).rounded()),
             UIDevice.current.userInterfaceIdiom == .pad, Int32(efficientResolution == .custom ? customResolutionPercent : efficientResolution.rawValue))
         return screen.scale * CGFloat(fraction)
+    }
+
+    @MainActor func fullscreenSpatialInputEstimate(for app: TLApp) -> String {
+        let size = UIScreen.main.bounds.size
+        let scale = renderScale(for: app)
+        let width = Int((max(size.width, size.height) * scale).rounded()) & ~7
+        let height = Int((min(size.width, size.height) * scale).rounded()) & ~7
+        let percent = duoAutomaticActive(for: app) ? duoSpatialPreset : spatialInputPercent
+        // Match the eight-pixel-aligned native Vulkan scaling contract.
+        let inputWidth = ((width * percent + 400) / 800) * 8
+        let inputHeight = ((height * percent + 400) / 800) * 8
+        return "\(inputWidth) × \(inputHeight) → \(width) × \(height)"
     }
 
     @MainActor func fullscreenResolutionEstimate(for app: TLApp) -> String {
@@ -313,6 +312,7 @@ struct TLAppSettings: Codable, Equatable {
         clockPresentation = try c.decodeIfPresent(Bool.self, forKey: .clockPresentation) ?? false
         feedbackClockCorrection = try c.decodeIfPresent(Bool.self, forKey: .feedbackClockCorrection) ?? false
         execution = (try c.decodeIfPresent(HuskExecutionOptions.self, forKey: .execution) ?? .init()).safe
+        dungeonsJITLowPowerWait = try c.decodeIfPresent(Bool.self, forKey: .dungeonsJITLowPowerWait) ?? true
         nativeArchiveVerification = try c.decodeIfPresent(Bool.self, forKey: .nativeArchiveVerification) ?? false
         let archiveMode = try c.decodeIfPresent(Int.self, forKey: .nativePipelineArchiveMode) ?? 0
         nativePipelineArchiveMode = [0,1,2].contains(archiveMode) ? archiveMode : 0
@@ -320,18 +320,17 @@ struct TLAppSettings: Codable, Equatable {
         pipelineFeedback = try c.decodeIfPresent(Bool.self, forKey: .pipelineFeedback) ?? false
         automaticDuoProfile = try c.decodeIfPresent(Bool.self, forKey: .automaticDuoProfile) ?? true
         a20EfficiencyWorkers = try c.decodeIfPresent(Bool.self, forKey: .a20EfficiencyWorkers) ?? true
-        let preferredMetal4 = Self.prefersMetal4Framegen(Metal4DriverCapabilities.current)
-        metal4Renderer = try c.decodeIfPresent(Bool.self, forKey: .metal4Renderer) ?? preferredMetal4
-        enhancedMetal4 = try c.decodeIfPresent(Bool.self, forKey: .enhancedMetal4) ?? preferredMetal4
-        // A saved MoltenVK choice must not silently enable its separate FG path.
-        frameGeneration = try c.decodeIfPresent(Bool.self, forKey: .frameGeneration)
-            ?? (preferredMetal4 && metal4Renderer && enhancedMetal4)
-        frameGeneration = DuoDisplayPolicy.usesFrameGeneration(metal4: metal4Renderer, requested: frameGeneration,
-            metal4Bridge: enhancedMetal4 && Metal4DriverCapabilities.current.frameGeneration)
+        // Ignore stale persisted renderer/old-FG flags, preserving app data.
+        metal4Renderer = false
+        enhancedMetal4 = false
+        frameGeneration = false
+        nativeAppleFrameInterpolation = try c.decodeIfPresent(Bool.self, forKey: .nativeAppleFrameInterpolation) ?? true
         sharedMemoryReserve = try c.decodeIfPresent(Bool.self, forKey: .sharedMemoryReserve) ?? true
         spatialUpscaling = try c.decodeIfPresent(Bool.self, forKey: .spatialUpscaling) ?? false
         let inputPercent = try c.decodeIfPresent(Int.self, forKey: .spatialInputPercent) ?? 80
-        spatialInputPercent = [80, 85, 90, 95].contains(inputPercent) ? inputPercent : 80
+        spatialInputPercent = [50,60,67,80,85,90,95].contains(inputPercent) ? inputPercent : 80
+        let duoPercent = try c.decodeIfPresent(Int.self, forKey: .duoSpatialPreset) ?? DuoDisplayPolicy.inputPercent
+        duoSpatialPreset = [50,60,67,80].contains(duoPercent) ? duoPercent : DuoDisplayPolicy.inputPercent
         renderTargetInventory = try c.decodeIfPresent(Bool.self, forKey: .renderTargetInventory) ?? false
         driverPhaseProfiling = try c.decodeIfPresent(Bool.self, forKey: .driverPhaseProfiling) ?? false
         workerScheduling = try c.decodeIfPresent(WorkerScheduling.self, forKey: .workerScheduling) ?? .balanced
@@ -348,7 +347,6 @@ struct TLAppSettings: Codable, Equatable {
         haptics = try c.decodeIfPresent(Bool.self, forKey: .haptics) ?? true
         geode = try c.decodeIfPresent(Bool.self, forKey: .geode) ?? false
         window = try c.decodeIfPresent(WindowMode.self, forKey: .window) ?? .auto
-        disableMetal4FramegenConflicts()
     }
 
     private static func url(_ id: String) -> URL {
@@ -459,7 +457,6 @@ struct TLAppSettingsView: View {
                 }, set: { settings.selectDungeonsFrameChoice($0, bridgeAvailable: Metal4DriverCapabilities.current.frameGeneration) })) {
                     Text("60 FPS").tag(60)
                     Text("30 FPS").tag(30)
-                    Text("30 → 60 · Metal Frame Generation (Beta)").tag(120)
                 }.disabled(!settings.usesEfficientGraphics(for: app))
                 Picker("Resolution", selection: Binding(get: { settings.duoAutomaticActive(for: app) ? 0 : settings.dungeonsResolutionChoice }, set: { settings.selectDungeonsResolutionChoice($0) })) {
                     Text("Automatic").tag(0)
@@ -475,16 +472,19 @@ struct TLAppSettingsView: View {
                     }.disabled(!settings.usesEfficientGraphics(for: app))
                 }
                 LabeledContent("Output estimate", value: settings.fullscreenResolutionEstimate(for: app))
-                LabeledContent("Renderer", value: settings.metal4Renderer ? (settings.enhancedMetal4 ? "Metal 4" : "Metal 4 Compatibility") : "MoltenVK")
+                if settings.duoAutomaticActive(for: app) {
+                    LabeledContent("Apple MetalFX input → output", value: settings.fullscreenSpatialInputEstimate(for: app))
+                }
+                LabeledContent("Renderer", value: "Vulkan → Apple Metal (MoltenVK)")
+                LabeledContent("Apple frame interpolation", value: "Awaiting engine motion/depth bridge")
             } header: { Text(app.label) } footer: {
-                Text(settings.frameGeneration
-                     ? "30 rendered FPS → 60 output target. Generated images can contain artifacts; rejected motion repeats a real image. Graphics changes require a full restart."
-                     : "Graphics changes apply after fully closing and reopening Husk. Output size is an estimate; diagnostics report the actual launch.")
+                Text("Original Husk frame generation has been retired. Native Apple interpolation will not run until real scene motion/depth buffers are available. Until then, gameplay uses real rendered frames.")
             }
             Section {
                 NavigationLink("Controls & display") { dungeonsControls }
                 NavigationLink("Advanced") { dungeonsAdvancedSettings }
-                NavigationLink("Diagnostics") { dungeonsDiagnostics }
+                Text("Game diagnostics run automatically. While playing, tap Log in the top bar to view native, graphics, performance and MetalFX evidence together; Copy full log includes the entire session.")
+                    .font(.footnote).foregroundStyle(.secondary)
                 NavigationLink("App details & storage") { dungeonsDetails }
             }
         }
@@ -528,30 +528,36 @@ struct TLAppSettingsView: View {
     private var dungeonsAdvancedSettings: some View {
         HuskForm {
             Section {
-                Picker("Renderer", selection: Binding(get: { settings.dungeonsRendererChoice }, set: {
-                    settings.selectDungeonsRendererChoice($0, bridgeAvailable: Metal4DriverCapabilities.current.nativeArchives)
-                })) {
-                    if #available(iOS 26.0, *), Metal4DriverCapabilities.current.nativeArchives { Text("Metal 4").tag(0) }
-                    if #available(iOS 26.0, *), FileManager.default.fileExists(atPath: (Bundle.main.privateFrameworksPath ?? "") + "/KosmicKrisp.framework/KosmicKrisp") { Text("Metal 4 Compatibility").tag(1) }
-                    Text("MoltenVK").tag(2)
-                }
-                if !settings.metal4Renderer {
-                    Toggle("MetalFX upscaling", isOn: Binding(get: { settings.duoAutomaticActive(for: app) || settings.spatialUpscaling }, set: { settings.spatialUpscaling = $0 }))
-                        .disabled(settings.duoAutomaticActive(for: app))
-                    if settings.spatialUpscaling || settings.duoAutomaticActive(for: app) {
-                        Picker("Input scale", selection: Binding(get: { settings.duoAutomaticActive(for: app) ? DuoDisplayPolicy.inputPercent : settings.spatialInputPercent }, set: { settings.spatialInputPercent = $0 })) {
-                            ForEach([80,85,90,95], id: \.self) { Text("\($0)% of output dimensions").tag($0) }
-                        }.disabled(settings.duoAutomaticActive(for: app))
+                if settings.duoAutomaticActive(for: app) {
+                    Picker("Duo MetalFX preset", selection: $settings.duoSpatialPreset) {
+                        Text("Balanced · 60% · 60 FPS target").tag(60)
+                        Text("Max battery · 50% · 60 FPS target").tag(50)
+                        Text("Quality · 67% · 60 FPS target").tag(67)
+                        Text("Extra sharp · 80% · 60 FPS target").tag(80)
+                    }
+                    LabeledContent("Render → output", value: settings.fullscreenSpatialInputEstimate(for: app))
+                    Text("Apple MetalFX spatial scaling is enabled by automatic device tuning. FPS is real game rendering, not generated frames.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                } else {
+                    Toggle("Apple MetalFX spatial upscaling", isOn: $settings.spatialUpscaling)
+                    if settings.spatialUpscaling {
+                        Picker("Input scale", selection: $settings.spatialInputPercent) {
+                            ForEach([50,60,67,80,85,90,95], id: \.self) { Text("\($0)% of output dimensions").tag($0) }
+                        }
                     }
                 }
-                if !settings.metal4Renderer || settings.enhancedMetal4 {
-                    Picker("Native pipeline cache", selection: Binding(get: { settings.nativePipelineArchiveMode == 2 && !(settings.duoAutomaticActive(for: app) && !settings.metal4Renderer) }, set: { settings.nativePipelineArchiveMode = $0 ? 2 : 0 })) {
-                        Text("Off").tag(false); Text("On").tag(true)
-                    }.disabled(settings.duoAutomaticActive(for: app) && !settings.metal4Renderer)
+                Toggle("Prefer native Apple frame interpolation", isOn: $settings.nativeAppleFrameInterpolation)
+                Text("Requires genuine Unreal Engine depth, motion vectors and scene colour. Requested by default, but inactive until the engine bridge is available. No image-derived substitutes.")
+                    .font(.footnote).foregroundStyle(.secondary)
+                Picker("Native pipeline cache", selection: Binding(get: { settings.nativePipelineArchiveMode == 2 }, set: { settings.nativePipelineArchiveMode = $0 ? 2 : 0 })) {
+                    Text("Off").tag(false); Text("On").tag(true)
                 }
                 Toggle("Shared game memory", isOn: $settings.sharedMemoryReserve)
+                Toggle("Park idle native JIT waits", isOn: $settings.dungeonsJITLowPowerWait)
+                Text("Uses native condition-variable sleeps instead of CPU-spinning during contested Unreal library/object initialization. Does not change executable memory, graphics, or the 60 FPS target. Disable and restart if startup or gameplay regresses.")
+                    .font(.footnote).foregroundStyle(.secondary)
             } header: { Text("Graphics & Memory") } footer: {
-                Text("MetalFX uses a smaller input before scaling to the selected output and is available only with MoltenVK. Native caches reuse compatible pipelines; first-use compilation can remain. Shared memory requires supported hardware and installed helper extensions.")
+                Text("MetalFX's spatial pass scales the whole rendered image, including any in-game HUD, so text clarity is not guaranteed at 50%. Native frame interpolation remains unavailable without genuine engine motion/depth. Switching resolutions or folding requires swapchain recreation; restart the game when changing presets.")
             }
             Section {
                 if DuoDisplayPolicy.metrics(screen: .main).isInner {
@@ -562,9 +568,7 @@ struct TLAppSettingsView: View {
                     }
                 }
                 if settings.duoAutomaticActive(for: app) {
-                    Text(settings.metal4Renderer
-                         ? "Active: automatic workers and driver-default queues. MetalFX and clock experiments are off for Metal 4. Diagnostics remain available."
-                         : "Active: automatic workers, driver-default queues and MetalFX 80% on MoltenVK. Diagnostics remain available.")
+                    Text("Automatic workers, driver-default queues and native Apple MetalFX spatial scaling where supported. Legacy frame generation and Metal 4 are not used.")
                 }
                 Button("Saved graphics experiments") { profilesSheet = true }
                     .sheet(isPresented: $profilesSheet) { EfficiencyProfilesView(settings: $settings, game: app.packageName ?? app.label) }
@@ -597,19 +601,24 @@ struct TLAppSettingsView: View {
             }
             Section {
                 Toggle("Render-target inventory", isOn: $settings.renderTargetInventory)
+                if settings.renderTargetInventory {
+                    Text("Opt-in Vulkan image formats and sizes only. This can identify possible depth/motion-buffer candidates, not prove that they contain Unreal velocity or depth. Export the performance report after gameplay; restart to begin or stop collection.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
                 Toggle("Driver phase profiling", isOn: $settings.driverPhaseProfiling)
+                    .disabled(settings.duoAutomaticActive(for: app))
                 Picker("Pipeline detail", selection: Binding(get: { settings.pipelineIdentification ? (settings.pipelineFeedback ? 2 : 1) : 0 }, set: {
                     settings.pipelineIdentification = $0 > 0; settings.pipelineFeedback = $0 == 2
                 })) {
                     Text("Off").tag(0); Text("Identification").tag(1); Text("Identification & feedback").tag(2)
-                }
+                }.disabled(settings.duoAutomaticActive(for: app))
                 Toggle("Verify native archive reuse", isOn: $settings.nativeArchiveVerification)
-                    .disabled(settings.nativePipelineArchiveMode != 2 || (settings.metal4Renderer && !settings.enhancedMetal4))
+                    .disabled(settings.duoAutomaticActive(for: app) || settings.nativePipelineArchiveMode != 2 || (settings.metal4Renderer && !settings.enhancedMetal4))
             } header: { Text("Detailed Collection") } footer: {
                 Text(settings.duoAutomaticActive(for: app)
-                     ? "Automatic device tuning overrides detailed launch collection. Turn it off in Advanced to use these saved options. Capture, sharing and performance reports remain accessible."
+                     ? "Render-target inventory is available as a one-shot diagnostic with Automatic Duo tuning. Other detailed launch collection remains overridden. Disable inventory and restart after exporting."
                      : "Detailed collection adds overhead and needs a full restart. Leave it off during normal play.")
-            }.disabled(settings.duoAutomaticActive(for: app))
+            }
         }.navigationTitle("Diagnostics")
     }
 
@@ -679,26 +688,6 @@ struct TLAppSettingsView: View {
                     }
                     }
                     LabeledContent("Active Preset", value: settings.usesEfficientGraphics(for: app) ? "Sharp / Efficient" : (settings.usesSharpGraphics(for: app) ? "Sharp / High Quality" : "Game Default"))
-                    if #available(iOS 26.0, *), FileManager.default.fileExists(atPath: (Bundle.main.privateFrameworksPath ?? "") + "/KosmicKrisp.framework/KosmicKrisp") {
-                        if isDungeons {
-                            Picker("Renderer", selection: Binding(get: { settings.dungeonsRendererChoice }, set: {
-                                settings.selectDungeonsRendererChoice($0, bridgeAvailable: Metal4DriverCapabilities.current.nativeArchives)
-                            })) {
-                                if Metal4DriverCapabilities.current.nativeArchives { Text("Metal 4").tag(0) }
-                                Text("Metal 4 · Compatibility").tag(1)
-                                Text("MoltenVK").tag(2)
-                            }
-                        } else {
-                        Toggle("Metal 4 Vulkan (Beta)", isOn: Binding(get: { settings.metal4Renderer }, set: { settings.selectMetal4($0) }))
-                        Text("Separate KosmicKrisp renderer at the selected output resolution. Turn off to restore MoltenVK and MetalFX. Restart required.")
-                            .font(.footnote).foregroundStyle(.secondary)
-                        if settings.metal4Renderer && Metal4DriverCapabilities.current.nativeArchives {
-                            Toggle("Metal 4 Enhancements (Experimental)", isOn: Binding(get: { settings.enhancedMetal4 }, set: { settings.selectEnhancedMetal4($0) }))
-                            Text("Source-built renderer with bounded shader-library reuse, optional native pipeline archives and frame generation. Archive Enabled is in Optional Experiments. Turn this off to restore the published Metal 4 driver. Restart required.")
-                                .font(.footnote).foregroundStyle(.secondary)
-                        }
-                        }
-                    }
                     Toggle("Shared Game Memory", isOn: $settings.sharedMemoryReserve)
                     Text("Borrows extra game memory on iPhone when supported. Keep app extensions when installing; an additional App ID may be needed. Restart required.")
                         .font(.footnote).foregroundStyle(.secondary)
@@ -711,7 +700,7 @@ struct TLAppSettingsView: View {
                                     Text("Uses the runtime performance-core count for the normal-priority worker allowance; extra eligible workers use lower priority only after stable gameplay. Turn off to restore Balanced without changing resolution or MetalFX. Restart required.")
                                         .font(.footnote).foregroundStyle(.secondary)
                                 }
-                                Text(settings.frameGeneration ? (settings.metal4Renderer ? "Metal 4 uses the selected output target: 30 rendered FPS → 60 presented-image target. Generated images differ from 60 real FPS. Restart required." : "Reduced output with MetalFX 80%. Frame Generation requests 30 rendered FPS and targets 60 presented images; input latency and image quality differ from 60 real FPS. Restart required.") : (settings.metal4Renderer ? "Metal 4 beta uses the reduced output target at 60 real FPS without the MoltenVK spatial pass. Detailed profiling stays off. Restart required." : "Reduced inner-screen output, MetalFX 80%, 60 FPS and Driver Default. Supported A20 devices can favour efficiency cores for extra workers with automatic performance rollback; other chips retain Balanced. Detailed profiling stays off. Restart required."))
+                                Text("Automatic native Apple MetalFX spatial scaling where available. No KosmicKrisp or Husk colour-flow frame generation. Native interpolation requires genuine game buffers.")
                                     .font(.footnote).foregroundStyle(.secondary)
                             }
                         }
@@ -1004,7 +993,7 @@ private struct TLGameAdvancedSettingsView: View {
             } header: {
                 Text("Pipeline Cache & Diagnostics")
             } footer: {
-                Text("Archive Enabled stores native pipeline work. Metal 4 Enhancements automatically checkpoints native archives and reuses compatible pipelines; MoltenVK preparation is in Efficiency Test. Verify Reuse reports archive lookups, while Identification and Feedback add diagnostics. Leave detailed diagnostics off outside a short test.")
+                Text("Archive Enabled stores native pipeline work where supported. MoltenVK preparation is in Efficiency Test. Leave detailed diagnostics off outside a short test.")
             }
 
             Section {

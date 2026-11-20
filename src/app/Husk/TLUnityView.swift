@@ -6,6 +6,62 @@ import AVFoundation
 import Metal
 import UniformTypeIdentifiers
 
+
+/* Lightweight hot-thread attribution for the automatic *combined game log*.
+ * One task_threads scan per ~15 s, on utility QoS; no suspend, callstack, GPU
+ * instrumentation, thread priority change or separate report. A terminated
+ * thread has no delta here: sums must NOT be equated with process-total CPU. */
+private final class DungeonsThreadCPUReporter {
+    private let queue = DispatchQueue(label: "com.husk.dungeons.cpu-threads", qos: .utility)
+    private var previous: [UInt64: Double] = [:]
+    private var previousAt: Double?
+    func capture() {
+        queue.async { [self] in
+            let began = ProcessInfo.processInfo.systemUptime
+            var rows = Array(repeating: tl_em_thread(), count: 128)
+            var stats = tl_em_thread_stats()
+            let count = rows.withUnsafeMutableBufferPointer { buffer in
+                tl_em_thread_sample(buffer.baseAddress, UInt32(buffer.count), &stats)
+            }
+            let at = ProcessInfo.processInfo.systemUptime
+            guard stats.result == 0 else {
+                HuskLog.log("game-diagnostics", "CPU hot threads unavailable (Mach result \(stats.result)); process CPU remains sampled separately")
+                return
+            }
+            var current: [UInt64: Double] = [:]
+            var hot: [(name: String, cpu: Double)] = []
+            let elapsed = previousAt.map { at - $0 } ?? 0
+            for var record in rows.prefix(Int(count)) {
+                let consumed = record.user_seconds + record.system_seconds
+                guard consumed.isFinite && consumed >= 0 else { continue }
+                current[record.identity] = consumed
+                if elapsed > 2, let old = previous[record.identity], consumed >= old {
+                    let name = withUnsafePointer(to: &record.name) { ptr in
+                        ptr.withMemoryRebound(to: CChar.self, capacity: 64) { String(cString: $0) }
+                    }
+                    hot.append((name: name.isEmpty ? "unnamed" : name, cpu: consumed - old))
+                }
+            }
+            previous = current
+            previousAt = at
+            guard elapsed > 2 else {
+                HuskLog.log("game-diagnostics", "CPU hot-thread sampler baseline: \(count)/\(stats.enumerated) live threads; next ~15s snapshot provides per-thread deltas")
+                return
+            }
+            hot.sort { $0.cpu > $1.cpu }
+            let top = hot.prefix(6).map {
+                String(format: "%@ %.1f%%core", $0.name, 100 * $0.cpu / elapsed)
+            }.joined(separator: " | ")
+            let accounted = hot.reduce(0.0) { $0 + $1.cpu }
+            let overheadMS = (ProcessInfo.processInfo.systemUptime - began) * 1000
+            HuskLog.log("game-diagnostics", String(format:
+                "CPU hot threads (%.1fs): top6 %@; still-live matched CPU %.1f%%core; matched %ld/%ld sampled, enumerated %u, truncated %@, scan %.2f ms; INCOMPLETE for terminated/unseen threads, host+guest shared process, not CPU P/E placement, GPU time or watts",
+                elapsed, top.isEmpty ? "no matching threads" : top, 100 * accounted / elapsed,
+                hot.count, count, stats.enumerated, stats.truncated ? "yes" : "no", overheadMS))
+        }
+    }
+}
+
 /// The engines the native runtime drives. Both draw into a CAMetalLayer through ANGLE. Starting a different APK
 /// stops the current session first.
 enum TLNativeEngine {
@@ -41,6 +97,7 @@ final class TLUnityUIView: UIView, UIKeyInput {
 
     private let requestedScale: CGFloat
     private let automaticDuoProfile: Bool
+    private let autoDungeonsLog: Bool
     private let a20EfficiencyWorkers: Bool
     private let metal4Renderer: Bool
     private let enhancedMetal4: Bool
@@ -119,9 +176,10 @@ final class TLUnityUIView: UIView, UIKeyInput {
     /// Called when three fingers tap at once: the way back to the interface while it is hidden.
     var onThreeFingerTap: (() -> Void)?
 
-    init(apk: String, extraApks: [String] = [], dataDir: String, engine: TLNativeEngine, portrait: Bool = false, scale: CGFloat = 2, sharpGraphics: Bool = false, efficientGraphics: Bool = false, efficientFrameLimit: Int = 60, threadPolicy: Int = 0, submissionMode: Int = 0, driverProfiling: Bool = false, pipelineIdentification: Bool = false, engineOnlyLimiter: Bool = false, renderTargetInventory: Bool = false, pipelineFeedback: Bool = false, spatialUpscaling: Bool = false, spatialInputPercent: Int = 80, clockPresentation: Bool = false, feedbackClockCorrection: Bool = false, nativePipelineArchiveMode: Int = 0, nativeArchiveVerification: Bool = false, execution: HuskExecutionOptions = .init(), automaticDuoProfile: Bool = false, a20EfficiencyWorkers: Bool = true, metal4Renderer: Bool = false, enhancedMetal4: Bool = false, frameGeneration: Bool = false) {
+    init(apk: String, extraApks: [String] = [], dataDir: String, engine: TLNativeEngine, portrait: Bool = false, scale: CGFloat = 2, sharpGraphics: Bool = false, efficientGraphics: Bool = false, efficientFrameLimit: Int = 60, threadPolicy: Int = 0, submissionMode: Int = 0, driverProfiling: Bool = false, pipelineIdentification: Bool = false, engineOnlyLimiter: Bool = false, renderTargetInventory: Bool = false, pipelineFeedback: Bool = false, spatialUpscaling: Bool = false, spatialInputPercent: Int = 80, clockPresentation: Bool = false, feedbackClockCorrection: Bool = false, nativePipelineArchiveMode: Int = 0, nativeArchiveVerification: Bool = false, execution: HuskExecutionOptions = .init(), autoDungeonsLog: Bool = false, automaticDuoProfile: Bool = false, a20EfficiencyWorkers: Bool = true, metal4Renderer: Bool = false, enhancedMetal4: Bool = false, frameGeneration: Bool = false) {
         self.requestedScale = scale
         self.automaticDuoProfile = automaticDuoProfile
+        self.autoDungeonsLog = autoDungeonsLog
         self.a20EfficiencyWorkers = a20EfficiencyWorkers
         self.apk = apk
         self.sharpGraphics = sharpGraphics
@@ -132,9 +190,12 @@ final class TLUnityUIView: UIView, UIKeyInput {
         self.driverProfiling = driverProfiling
         self.pipelineIdentification = pipelineIdentification
         self.pipelineFeedback = pipelineFeedback
-        self.enhancedMetal4 = enhancedMetal4 && Metal4DriverCapabilities.current.nativeArchives
-        self.frameGeneration = DuoDisplayPolicy.usesFrameGeneration(metal4: metal4Renderer, requested: frameGeneration, metal4Bridge: self.enhancedMetal4 && Metal4DriverCapabilities.current.frameGeneration)
-        self.metal4Renderer = metal4Renderer
+        // The native Apple pipeline does not route through KosmicKrisp or
+        // Husk's colour-flow interpolator. Keep legacy parameters for ABI
+        // compatibility with callers, but make them inert.
+        self.enhancedMetal4 = false
+        self.frameGeneration = false
+        self.metal4Renderer = false
         self.spatialUpscaling = spatialUpscaling
         self.spatialInputPercent = spatialInputPercent
         self.clockPresentation = clockPresentation
@@ -308,6 +369,114 @@ final class TLUnityUIView: UIView, UIKeyInput {
     }
 
     private var frameGenerationRate = FrameGenerationRate()
+    private var lastDiagnosticsLogAt: TimeInterval = -.infinity
+    private var appleInterpolatorSupported: Bool?
+    private var previousProcessCPUSample: (at: TimeInterval, seconds: Double)?
+    private var lastMetalFXInventoryFingerprint = ""
+    // Sample live host-thread CPU on a utility serial queue, at most once per
+    // existing 15-second game-log window. Mach enumeration must NOT stall UIKit
+    // or enter the render, Vulkan, or guest-translated hot paths.
+    private static let dungeonsThreadReporter = DungeonsThreadCPUReporter()
+    /// Passive snapshots only. No CPU thread sampling, GPU callbacks, per-frame
+    /// renderpass interception, readback or extra Metal command buffers.
+    private func logDungeonsHealth(_ fps: Double) {
+        guard autoDungeonsLog, engine == .ue4, launched else { return }
+        let now = ProcessInfo.processInfo.systemUptime
+        guard now - lastDiagnosticsLogAt >= 15 else { return }
+        lastDiagnosticsLogAt = now
+        if appleInterpolatorSupported == nil {
+            appleInterpolatorSupported = husk_native_metalfx_supported()
+            HuskLog.log("game-diagnostics", "Apple native frame interpolator hardware supported: \(appleInterpolatorSupported == true); NOT active: genuine UE4 motion/depth, GPU frame leases and dual presentation have not been connected")
+        }
+        var spatial = tl_spatial_stats()
+        tl_vk_spatial_snapshot(&spatial)
+        var candidate = tl_ri_metalfx_candidates()
+        tl_ri_metalfx_snapshot(&candidate)
+        var lineage = tl_ri_lineage_stats()
+        tl_ri_lineage_snapshot(&lineage)
+        let candidateFound = candidate.readable_depth_groups > 0
+            && candidate.writable_vector_groups > 0 && candidate.readable_color_groups > 0
+        let status = !candidate.active ? "unavailable" :
+            candidateFound ? (candidate.lost_target_observations > 0 || candidate.lost_contention_observations > 0
+                ? "plausible formats, target data partially lost"
+                : "plausible formats (engine semantics unverified)") :
+            (candidate.lost_target_observations > 0 || candidate.lost_contention_observations > 0)
+                ? "inconclusive target inventory" : "no matching formats observed"
+        // Mach task accounting is a process-scoped counter, not a CPU-core
+        // placement/power measurement. Sample every 15 seconds, never enumerate
+        // threads or attach command-buffer completion callbacks.
+        var process = tl_em_process()
+        tl_em_process_sample(true, &process)
+        var cpuDescription = "unavailable"
+        if process.cpu_seconds >= 0 {
+            if let previous = previousProcessCPUSample, now > previous.at,
+               process.cpu_seconds >= previous.seconds {
+                let oneCore = 100 * (process.cpu_seconds - previous.seconds) / (now - previous.at)
+                cpuDescription = String(format: "%.1f%% of one core", oneCore)
+            }
+            previousProcessCPUSample = (now, process.cpu_seconds)
+        }
+        let footprint = process.footprint_bytes >= 0 ?
+            "\(process.footprint_bytes / 1048576) MiB" : "unavailable"
+        let headroom = process.jetsam_bytes >= 0 ?
+            "\(process.jetsam_bytes / 1048576) MiB" : "unavailable"
+        HuskLog.log("game-diagnostics",
+            String(format: "host render %.1f FPS; process CPU %@; footprint %@, jetsam headroom %@; thermal class %ld; Low Power Mode %@; MetalFX spatial input %ux%u -> output %ux%u, configured %u, encoded %llu, failures %llu; Vulkan image-only depth-format groups %u, readable depth %u, velocity-like %u, readable velocity-like %u, colour %u; lost assets %llu, lost targets %llu, lock misses %llu; live Vulkan lineage created targets %llu, target views %llu, framebuffer links %llu (depth %llu, vector-like %llu, both %llu), missing links %llu/%llu, overflow %llu; evidence %@; Apple frame interpolation OFF (semantic textures and presentation not verified)",
+                   fps, cpuDescription, footprint, headroom, ProcessInfo.processInfo.thermalState.rawValue,
+                   ProcessInfo.processInfo.isLowPowerModeEnabled ? "on" : "off",
+                   spatial.input_width, spatial.input_height, spatial.output_width, spatial.output_height,
+                   spatial.configured, spatial.encoded, spatial.failures,
+                   candidate.depth_attachment_groups, candidate.readable_depth_groups, candidate.vector_format_groups,
+                   candidate.writable_vector_groups, candidate.readable_color_groups,
+                    candidate.lost_asset_observations, candidate.lost_target_observations,
+                    candidate.lost_contention_observations,
+                    lineage.tracked_target_images, lineage.tracked_target_views, lineage.tracked_framebuffers,
+                    lineage.depth_framebuffers, lineage.vector_like_framebuffers,
+                    lineage.mixed_depth_vector_framebuffers,
+                    lineage.missing_image_view_links, lineage.missing_framebuffer_view_links,
+                    lineage.dropped_records, status))
+        logMetalFXImageCandidates(candidate)
+        Self.dungeonsThreadReporter.capture()
+    }
+
+    /// Read only the existing bounded Vulkan creation inventory, not texture
+    /// contents. Change-only reporting, with at most twelve image categories,
+    /// avoids per-frame logging and keeps the Dungeons game log self-contained.
+    private func logMetalFXImageCandidates(_ candidate: tl_ri_metalfx_candidates) {
+        guard candidate.active else { return }
+        var groups = Array(repeating: tl_ri_group(), count: 256)
+        let count = groups.withUnsafeMutableBufferPointer {
+            tl_ri_snapshot($0.baseAddress, UInt32($0.count), nil)
+        }
+        let rows = groups.prefix(Int(count)).filter { $0.kind == 0 }
+        let depthFormats: Set<UInt32> = [124, 125, 126, 128, 129, 130]
+        let vectorFormats: Set<UInt32> = [83, 97, 103]
+        let candidates = rows.filter {
+            (depthFormats.contains($0.format) && $0.usage & 0x20 != 0)
+            || (vectorFormats.contains($0.format) && $0.usage & 0x18 != 0)
+        }.sorted {
+            // Prioritise textures that can be sampled later and match a
+            // reasonable game frame extent; keep stable sorting otherwise.
+            let lhs = (($0.usage & 0x4 != 0) ? 1 : 0) + (($0.width >= 256 && $0.height >= 256) ? 1 : 0)
+            let rhs = (($1.usage & 0x4 != 0) ? 1 : 0) + (($1.width >= 256 && $1.height >= 256) ? 1 : 0)
+            if lhs != rhs { return lhs > rhs }
+            if $0.width != $1.width { return $0.width > $1.width }
+            if $0.height != $1.height { return $0.height > $1.height }
+            return $0.format < $1.format
+        }
+        let descriptions = candidates.prefix(12).map { g in
+            let label = depthFormats.contains(g.format) ? "depth-like" : "vector-like"
+            return "\(label) \(g.width)x\(g.height) VkFormat=\(g.format) usage=0x\(String(g.usage, radix: 16)) samples=\(g.samples)"
+        }
+        // Frame counts change continuously, so deliberately exclude them
+        // from the fingerprint. Only resource discovery/loss changes produce
+        // another detail line; no flooding on a stable frame loop.
+        let fingerprint = "\(candidate.retained_image_groups):\(candidate.lost_observations):\(candidate.readable_depth_groups):\(candidate.writable_vector_groups):" + descriptions.joined(separator: ";")
+        guard fingerprint != lastMetalFXInventoryFingerprint else { return }
+        lastMetalFXInventoryFingerprint = fingerprint
+        HuskLog.log("game-diagnostics",
+            "MetalFX resource candidates: image groups \(candidate.retained_image_groups), observation losses \(candidate.lost_observations) (asset capacity \(candidate.lost_asset_observations), target capacity \(candidate.lost_target_observations), lock misses \(candidate.lost_contention_observations)), depth-like \(candidate.depth_attachment_groups) / readable \(candidate.readable_depth_groups), vector-like \(candidate.vector_format_groups) / readable \(candidate.writable_vector_groups); \(descriptions.isEmpty ? "none observed" : descriptions.joined(separator: " | ")); shown \(descriptions.count)/\(candidates.count), types NOT verified as real motion/depth; no interpolated frames produced")
+    }
     private func updateStats() {
         var p = husk_unity_perf()
         husk_unity_perf_snapshot(&p)
@@ -325,6 +494,7 @@ final class TLUnityUIView: UIView, UIKeyInput {
         }
         stats.text = text
         onStats?(text)
+        if autoDungeonsLog { logDungeonsHealth(Double(p.fps)) }
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -429,20 +599,24 @@ final class TLUnityUIView: UIView, UIKeyInput {
                                                      performanceCores: topology.performance, efficiencyCores: topology.efficiency)
         HuskLog.log("tl", "[NX18-HENGE-A20-v1] worker topology: total \(cpuCount), performance \(topology.performance), efficiency \(topology.efficiency); zero means unavailable; allowance \(automaticFastWorkerBudget), no core affinity")
         submissionMode = DuoDisplayPolicy.submission
-        // MetalFX spatial is a MoltenVK-only stage. Do not enable it in
-        // automatic tuning when Metal 4 + native frame generation is selected.
-        spatialUpscaling = !metal4Renderer
-        spatialInputPercent = DuoDisplayPolicy.inputPercent
+        // The existing spatial scaler uses Apple's MetalFX API through
+        // MoltenVK. It needs no Metal 4 renderer or synthetic frame generator.
+        spatialUpscaling = true
+        // Keep the per-game Duo preset propagated from TLAppSettings. It
+        // remains selectable even with automatic device tuning enabled.
+        // Preserve the independent native/JIT-thread parking choice while
+        // clearing GPU queue experiments. Waiting threads can sleep without
+        // compromising 60 real rendered FPS or active gameplay priority.
+        let keepJITLowPowerWait = execution.initializationParking
         execution = .init()
+        execution.initializationParking = keepJITLowPowerWait
         engineOnlyLimiter = false; clockPresentation = false; feedbackClockCorrection = false
-        driverProfiling = false; pipelineIdentification = false; pipelineFeedback = false; renderTargetInventory = false
-        if !(metal4Renderer && enhancedMetal4) {
-            nativePipelineArchiveMode = 0; nativeArchiveVerification = false
-        }
-        let rendering = metal4Renderer
-            ? (frameGeneration ? "Metal 4 requests 30 rendered → 60 output target" : "Metal 4 requests 60 rendered FPS")
-            : (frameGeneration ? "MetalFX 80%, 30 rendered → 60 output target" : "MetalFX 80%, 60 rendered FPS")
-        HuskLog.log("tl", "Automatic Duo inner-screen starting profile: reduced output, \(rendering), worker mode \(threadPolicy), normal-priority worker allowance \(automaticFastWorkerBudget), Driver Default; QoS hints, not core affinity; visual/energy optimum unverified")
+        // Keep the user-requested, default-OFF render-target inventory available
+        // for a one-shot native MetalFX feasibility diagnosis. It is bounded,
+        // records Vulkan metadata only, and never changes command encoding.
+        driverProfiling = false; pipelineIdentification = false; pipelineFeedback = false
+        nativePipelineArchiveMode = 0; nativeArchiveVerification = false
+        HuskLog.log("tl", "Automatic Duo inner-screen starting profile: Apple MetalFX spatial \(spatialInputPercent)% requested through MoltenVK; 60 real FPS, worker mode \(threadPolicy), normal-priority worker allowance \(automaticFastWorkerBudget); native frame interpolation requires genuine engine motion/depth and presentation integration")
     }
 
     private func launch(width: Int, height: Int) {
@@ -515,12 +689,11 @@ final class TLUnityUIView: UIView, UIKeyInput {
         case .ue4:
             // Unreal draws with Vulkan, which on this device is MoltenVK, a framework of the app's own.
             husk_ue4_set_diagnostic_session(HuskLog.sessionID)
-            if let capture = FramegenDiagnostics.consume(apk: apk) {
-                husk_ue4_set_framegen_capture_directory(capture)
-            } else { husk_ue4_set_framegen_capture_directory(nil) }
-            husk_ue4_set_frame_generation(frameGeneration)
-            husk_ue4_set_clock_presentation(frameGeneration ? false : clockPresentation)
-            husk_ue4_set_feedback_clock(frameGeneration ? false : feedbackClockCorrection)
+            // Retired: no custom optical-flow framegen and no legacy capture.
+            husk_ue4_set_framegen_capture_directory(nil)
+            husk_ue4_set_frame_generation(false)
+            husk_ue4_set_clock_presentation(clockPresentation)
+            husk_ue4_set_feedback_clock(feedbackClockCorrection)
             husk_ue4_set_native_archive(Int32(nativePipelineArchiveMode))
             husk_ue4_set_native_archive_verification(nativeArchiveVerification)
             husk_ue4_set_spatial_upscaling(spatialUpscaling)
@@ -534,53 +707,50 @@ final class TLUnityUIView: UIView, UIKeyInput {
             husk_ue4_set_swapchain_images(Int32(execution.swapchainImages))
             husk_ue4_set_queue_options(Int32(execution.prefill), Int32(execution.commandBufferLimit))
             husk_ue4_set_initialization_parking(execution.initializationParking)
-            husk_ue4_set_driver_profiling(driverProfiling)
-            husk_ue4_set_pipeline_diagnostics(pipelineIdentification)
-            husk_ue4_set_pipeline_feedback(pipelineIdentification && pipelineFeedback)
+            // Diagnostic Dungeons builds need shader PSO identities and actual
+            // MoltenVK phase counters to distinguish shader compilation from
+            // GPU waiting. Driver tracking is extra CPU work; the always-on
+            // experiment is NOT a clean battery-life benchmark. GPU timestamp
+            // callbacks, per-frame captures and sync waits stay OFF.
+            let automaticCPUDriverEvidence = autoDungeonsLog
+            husk_ue4_set_driver_profiling(driverProfiling || automaticCPUDriverEvidence)
+            husk_ue4_set_pipeline_diagnostics(pipelineIdentification || automaticCPUDriverEvidence)
+            husk_ue4_set_pipeline_feedback((pipelineIdentification && pipelineFeedback) || automaticCPUDriverEvidence)
             husk_ue4_set_engine_only_limiter(engineOnlyLimiter)
-            husk_ue4_set_render_inventory(renderTargetInventory)
+            // Dungeons always observes allocation metadata, but full per-pass
+            // inventory is explicit. Other UE4 titles keep their original default.
+            let inventoryMode: UInt32 = renderTargetInventory ? 2 : (autoDungeonsLog ? 1 : 0)
+            husk_ue4_set_render_inventory_mode(inventoryMode)
+            // Runtime activation is separate from requesting interception.
+            // Do it before the guest resolves Vulkan entrypoints or creates
+            // its first render target, and reject other project names.
+            if autoDungeonsLog { tl_ri_activate("Dungeons") }
+            else { tl_ri_activate(nil) }
+            if autoDungeonsLog { HuskLog.log("game-diagnostics", "automatic combined game log active; Vulkan inventory mode \(inventoryMode) (1=image-only, 2=full explicit); native MoltenVK phases, pipeline creation feedback and shader signatures ON; 15s Mach thread sampling off main; GPU timestamp callbacks/per-frame tracing OFF; profiling overhead makes this a DIAGNOSTIC build, not an unbiased energy test") }
             husk_crash_stage("ue4_fork_launch_options_applied")
             HuskLog.log("tl", "ue4: requested graphics preset: \(efficientGraphics ? "Sharp / Efficient" : (sharpGraphics ? "Sharp / High Quality" : "Game Default")), surface \(width)x\(height)")
             HuskLog.log("tl", "ue4 resolution: device \(UIDevice.current.model), display \(Int(UIScreen.main.bounds.width * UIScreen.main.scale))x\(Int(UIScreen.main.bounds.height * UIScreen.main.scale)), render scale \(contentScaleFactor), launch surface \(width)x\(height); launch-time selection, not runtime calibration")
             var selectedDriverPath = "UNAVAILABLE"
             if let fw = Bundle.main.privateFrameworksPath {
                 let candidate = fw + "/HuskMoltenVK.framework/HuskMoltenVK"
-                let experimental = (spatialUpscaling || nativePipelineArchiveMode != 0 || frameGeneration) && FileManager.default.fileExists(atPath: candidate)
-                var selected = experimental ? candidate : fw + "/MoltenVK.framework/MoltenVK"
-                if metal4Renderer {
-                    let metal4 = fw + (enhancedMetal4 ? "/HuskKosmicKrisp.framework/HuskKosmicKrisp" : "/KosmicKrisp.framework/KosmicKrisp")
-                    if #available(iOS 26.0, *), FileManager.default.fileExists(atPath: metal4),
-                       husk_metal4_preflight() {
-                        selected = metal4
-                        // Both Metal4 drivers preserve the selected extent.
-                        // Only the source-built enhancement has Husk archives/FG.
-                        husk_ue4_set_spatial_upscaling(false)
-                        if !enhancedMetal4 {
-                            husk_ue4_set_native_archive(0)
-                            husk_ue4_set_native_archive_verification(false)
-                        }
-                        husk_ue4_set_clock_presentation(false)
-                        husk_ue4_set_feedback_clock(false)
-                        HuskLog.log("tl", enhancedMetal4 ? "[M3/M9 METAL4] source-built enhancements requested; native archive/framegen configure calls decide activation; selected output retained" : "[M3/M9 METAL4] published KosmicKrisp beta requested; selected output retained; source-built enhancements OFF")
-                    } else {
-                        HuskLog.log("tl", "[M3/M9 METAL4] beta unavailable on this OS/device/package; existing MoltenVK path retained")
-                    }
-                }
+                let experimental = (spatialUpscaling || nativePipelineArchiveMode != 0)
+                    && FileManager.default.fileExists(atPath: candidate)
+                let selected = experimental ? candidate : fw + "/MoltenVK.framework/MoltenVK"
                 husk_ue4_set_vulkan(selected)
                 selectedDriverPath = selected
-                let usingMetal4 = selected.hasSuffix("KosmicKrisp.framework/KosmicKrisp") || selected.hasSuffix("HuskKosmicKrisp.framework/HuskKosmicKrisp")
-                husk_crash_stage(usingMetal4 ? "ue4_metal4_selected" : (experimental ? "ue4_experimental_moltenvk_selected" : "ue4_original_moltenvk_selected"))
-                HuskLog.log("tl", "[M3/M9 renderer] selected \(usingMetal4 ? "KosmicKrisp Metal 4 beta" : (experimental ? "pinned experimental MoltenVK" : "original MoltenVK")); spatial requested \(spatialUpscaling && !usingMetal4), frame generation requested \(frameGeneration); native preflight decides activation")
+                husk_crash_stage(experimental ? "ue4_experimental_moltenvk_selected" : "ue4_original_moltenvk_selected")
+                HuskLog.log("tl", "[APPLE-METALFX] MoltenVK driver selected; native spatial requested \(spatialUpscaling); KosmicKrisp and retired colour-flow interpolation disabled")
             }
             husk_crash_stage("ue4_native_runtime_launch_enter")
             started = husk_ue4_launch(apk, dataDir, layerPtr, Int32(width), Int32(height), angle, ca)
-            let activeMetal4 = started && tl_vk_is_metal4()
+            let activeMetal4 = false // Retired renderer is never selected.
             let effective: [String: Any] = ["host_session_id": HuskLog.sessionID,
                 "host_monotonic_seconds": ProcessInfo.processInfo.systemUptime,
                 "started": started, "launch_width": width, "launch_height": height,
                 "selected_driver_path": selectedDriverPath, "metal4_active": activeMetal4,
-                "frame_generation_requested": frameGeneration, "requested_rendered_fps": frameGeneration ? 30 : efficientFrameLimit,
-                "requested_output_fps": frameGeneration ? 60 : efficientFrameLimit,
+                "frame_generation_requested": false, "requested_rendered_fps": efficientFrameLimit,
+                "requested_output_fps": efficientFrameLimit,
+                "native_apple_interpolation_active": false, "native_apple_interpolation_reason": "Missing engine depth/motion handoff and presentation bridge",
                 "worker_policy": threadPolicy, "automatic_fast_worker_budget": automaticFastWorkerBudget,
                 "submission_mode": submissionMode, "prefill": execution.prefill, "command_buffer_limit": execution.commandBufferLimit,
                 "swapchain_images": execution.swapchainImages, "initialization_parking": execution.initializationParking,
@@ -588,7 +758,7 @@ final class TLUnityUIView: UIView, UIKeyInput {
                 "clock_presentation_requested_after_overrides": clockPresentation && !frameGeneration && !activeMetal4,
                 "clock_feedback_requested_after_overrides": feedbackClockCorrection && !frameGeneration && !activeMetal4,
                 "archive_mode_requested_after_overrides": activeMetal4 && !enhancedMetal4 ? 0 : nativePipelineArchiveMode,
-                "scope": "Host launch after device/renderer overrides. Native FG active/failure counters are separate. Engine runtime CVars and actual worker core placement remain unavailable."]
+                "scope": "Apple MetalFX spatial uses the MoltenVK driver where available; native frame interpolation is not activated without genuine UE4 depth/motion and a synchronised present stage."]
             FramegenDiagnostics.recordLaunch(apk: apk, values: effective)
             if let bytes = try? JSONSerialization.data(withJSONObject: effective, options: [.sortedKeys]), let line = String(data: bytes, encoding: .utf8) {
                 HuskLog.log("framegen-config", line)
@@ -1061,6 +1231,7 @@ struct TLUnityScreen: UIViewRepresentable {
     var nativePipelineArchiveMode: Int = 0
     var nativeArchiveVerification: Bool = false
     var execution = HuskExecutionOptions()
+    var autoDungeonsLog = false
     var automaticDuoProfile = false
     var a20EfficiencyWorkers = true
     var metal4Renderer = false
@@ -1074,9 +1245,9 @@ struct TLUnityScreen: UIViewRepresentable {
     private static var shared: [String: TLUnityUIView] = [:]
 
     /// The game's one view, made the first time it is asked for.
-    static func view(apk: String, extraApks: [String], dataDir: String, engine: TLNativeEngine, portrait: Bool, scale: CGFloat, sharpGraphics: Bool = false, efficientGraphics: Bool = false, efficientFrameLimit: Int = 60, threadPolicy: Int = 0, submissionMode: Int = 0, driverProfiling: Bool = false, pipelineIdentification: Bool = false, engineOnlyLimiter: Bool = false, renderTargetInventory: Bool = false, pipelineFeedback: Bool = false, spatialUpscaling: Bool = false, spatialInputPercent: Int = 80, clockPresentation: Bool = false, feedbackClockCorrection: Bool = false, nativePipelineArchiveMode: Int = 0, nativeArchiveVerification: Bool = false, execution: HuskExecutionOptions = .init(), automaticDuoProfile: Bool = false, a20EfficiencyWorkers: Bool = true, metal4Renderer: Bool = false, enhancedMetal4: Bool = false, frameGeneration: Bool = false) -> TLUnityUIView {
+    static func view(apk: String, extraApks: [String], dataDir: String, engine: TLNativeEngine, portrait: Bool, scale: CGFloat, sharpGraphics: Bool = false, efficientGraphics: Bool = false, efficientFrameLimit: Int = 60, threadPolicy: Int = 0, submissionMode: Int = 0, driverProfiling: Bool = false, pipelineIdentification: Bool = false, engineOnlyLimiter: Bool = false, renderTargetInventory: Bool = false, pipelineFeedback: Bool = false, spatialUpscaling: Bool = false, spatialInputPercent: Int = 80, clockPresentation: Bool = false, feedbackClockCorrection: Bool = false, nativePipelineArchiveMode: Int = 0, nativeArchiveVerification: Bool = false, execution: HuskExecutionOptions = .init(), autoDungeonsLog: Bool = false, automaticDuoProfile: Bool = false, a20EfficiencyWorkers: Bool = true, metal4Renderer: Bool = false, enhancedMetal4: Bool = false, frameGeneration: Bool = false) -> TLUnityUIView {
         if let view = shared[apk] { return view }
-        let view = TLUnityUIView(apk: apk, extraApks: extraApks, dataDir: dataDir, engine: engine, portrait: portrait, scale: scale, sharpGraphics: sharpGraphics, efficientGraphics: efficientGraphics, efficientFrameLimit: efficientFrameLimit, threadPolicy: threadPolicy, submissionMode: submissionMode, driverProfiling: driverProfiling, pipelineIdentification: pipelineIdentification, engineOnlyLimiter: engineOnlyLimiter, renderTargetInventory: renderTargetInventory, pipelineFeedback: pipelineFeedback, spatialUpscaling: spatialUpscaling, spatialInputPercent: spatialInputPercent, clockPresentation: clockPresentation, feedbackClockCorrection: feedbackClockCorrection, nativePipelineArchiveMode: nativePipelineArchiveMode, nativeArchiveVerification: nativeArchiveVerification, execution: execution, automaticDuoProfile: automaticDuoProfile, a20EfficiencyWorkers: a20EfficiencyWorkers, metal4Renderer: metal4Renderer, enhancedMetal4: enhancedMetal4, frameGeneration: frameGeneration)
+        let view = TLUnityUIView(apk: apk, extraApks: extraApks, dataDir: dataDir, engine: engine, portrait: portrait, scale: scale, sharpGraphics: sharpGraphics, efficientGraphics: efficientGraphics, efficientFrameLimit: efficientFrameLimit, threadPolicy: threadPolicy, submissionMode: submissionMode, driverProfiling: driverProfiling, pipelineIdentification: pipelineIdentification, engineOnlyLimiter: engineOnlyLimiter, renderTargetInventory: renderTargetInventory, pipelineFeedback: pipelineFeedback, spatialUpscaling: spatialUpscaling, spatialInputPercent: spatialInputPercent, clockPresentation: clockPresentation, feedbackClockCorrection: feedbackClockCorrection, nativePipelineArchiveMode: nativePipelineArchiveMode, nativeArchiveVerification: nativeArchiveVerification, execution: execution, autoDungeonsLog: autoDungeonsLog, automaticDuoProfile: automaticDuoProfile, a20EfficiencyWorkers: a20EfficiencyWorkers, metal4Renderer: metal4Renderer, enhancedMetal4: enhancedMetal4, frameGeneration: frameGeneration)
         shared[apk] = view
         return view
     }
@@ -1088,7 +1259,7 @@ struct TLUnityScreen: UIViewRepresentable {
             view.transform = .identity
             view.onStats = onStats; view.onThreeFingerTap = onThreeFingerTap; return view
         }
-        let view = TLUnityUIView(apk: apk, extraApks: extraApks, dataDir: dataDir, engine: engine, portrait: portrait, scale: scale, sharpGraphics: sharpGraphics, efficientGraphics: efficientGraphics, efficientFrameLimit: efficientFrameLimit, threadPolicy: threadPolicy, submissionMode: submissionMode, driverProfiling: driverProfiling, pipelineIdentification: pipelineIdentification, engineOnlyLimiter: engineOnlyLimiter, renderTargetInventory: renderTargetInventory, pipelineFeedback: pipelineFeedback, spatialUpscaling: spatialUpscaling, spatialInputPercent: spatialInputPercent, clockPresentation: clockPresentation, feedbackClockCorrection: feedbackClockCorrection, nativePipelineArchiveMode: nativePipelineArchiveMode, nativeArchiveVerification: nativeArchiveVerification, execution: execution, automaticDuoProfile: automaticDuoProfile, a20EfficiencyWorkers: a20EfficiencyWorkers, metal4Renderer: metal4Renderer, enhancedMetal4: enhancedMetal4, frameGeneration: frameGeneration)
+        let view = TLUnityUIView(apk: apk, extraApks: extraApks, dataDir: dataDir, engine: engine, portrait: portrait, scale: scale, sharpGraphics: sharpGraphics, efficientGraphics: efficientGraphics, efficientFrameLimit: efficientFrameLimit, threadPolicy: threadPolicy, submissionMode: submissionMode, driverProfiling: driverProfiling, pipelineIdentification: pipelineIdentification, engineOnlyLimiter: engineOnlyLimiter, renderTargetInventory: renderTargetInventory, pipelineFeedback: pipelineFeedback, spatialUpscaling: spatialUpscaling, spatialInputPercent: spatialInputPercent, clockPresentation: clockPresentation, feedbackClockCorrection: feedbackClockCorrection, nativePipelineArchiveMode: nativePipelineArchiveMode, nativeArchiveVerification: nativeArchiveVerification, execution: execution, autoDungeonsLog: autoDungeonsLog, automaticDuoProfile: automaticDuoProfile, a20EfficiencyWorkers: a20EfficiencyWorkers, metal4Renderer: metal4Renderer, enhancedMetal4: enhancedMetal4, frameGeneration: frameGeneration)
         view.onStats = onStats
         view.onThreeFingerTap = onThreeFingerTap
         view.javaChromeClearance = javaChromeClearance
@@ -1112,6 +1283,7 @@ final class TLUnityModel: ObservableObject {
     private var pollInterval: TimeInterval = 0
     private var polling = false
     private var logVisible = false
+    private var unifiedLog = false
     private var logRevision: UInt64 = 0
 
     func start() {
@@ -1134,12 +1306,22 @@ final class TLUnityModel: ObservableObject {
 
     func stop() { polling = false; timer?.invalidate(); timer = nil }
 
-    func setLogVisible(_ visible: Bool) {
+    func setLogVisible(_ visible: Bool, unified: Bool = false) {
+        if unifiedLog != unified { logText = ""; logRevision = 0 }
+        unifiedLog = unified
         logVisible = visible
         if visible { refreshLog() }
     }
 
     private func refreshLog() {
+        if unifiedLog {
+            // One live Dungeons log: native Vulkan/UE4/JNI/QEMU lines plus
+            // host Swift/MetalFX/thermal summaries in received order.
+            // Materialise only when visible, bounded by HuskLog's ring.
+            let text = HuskLog.recentLines(1200).joined(separator: "\n")
+            if text != logText { logText = text }
+            return
+        }
         guard let c = husk_tl_attempt_log_if_changed(&logRevision) else { return }
         defer { free(c) }
         let text = String(cString: c)
@@ -1210,7 +1392,7 @@ struct TLCocosAttemptView: View {
     @State private var uiHidden: Bool
     /// The line saying how to get the interface back, shown for a few seconds after it goes.
     @State private var hint = false
-    private var showLog: Bool { get { showLogSetting && devInfo && !settings.isDungeons(app) } nonmutating set { showLogSetting = newValue } }
+    private var showLog: Bool { get { showLogSetting && (settings.isDungeons(app) || devInfo) } nonmutating set { showLogSetting = newValue } }
 
     init(app: TLApp) {
         self.app = app
@@ -1250,7 +1432,7 @@ struct TLCocosAttemptView: View {
                     // The game always has the whole screen: it is told its size once, as it starts, so nothing may take space from it.
                     // The bar and the log are drawn over it instead, and hiding them shows everything underneath.
                     TLUnityScreen(apk: apk, extraApks: Array(app.apks.dropFirst()), dataDir: dataDir, engine: engine, portrait: portrait,
-                                  scale: settings.renderScale(for: app), sharpGraphics: settings.usesSharpGraphics(for: app), efficientGraphics: settings.usesEfficientGraphics(for: app), efficientFrameLimit: settings.efficientFrameRate.rawValue, threadPolicy: settings.workerScheduling.rawValue, submissionMode: settings.vulkanSubmission.rawValue, driverProfiling: settings.driverPhaseProfiling, pipelineIdentification: settings.pipelineIdentification, engineOnlyLimiter: settings.engineOnlyLimiter, renderTargetInventory: settings.renderTargetInventory, pipelineFeedback: settings.pipelineFeedback, spatialUpscaling: settings.spatialUpscaling, spatialInputPercent: settings.spatialInputPercent, clockPresentation: settings.clockPresentation, feedbackClockCorrection: settings.feedbackClockCorrection, nativePipelineArchiveMode: settings.nativePipelineArchiveMode, nativeArchiveVerification: settings.nativeArchiveVerification, execution: settings.execution, automaticDuoProfile: settings.supportsDuoAutomatic(for: app), a20EfficiencyWorkers: settings.a20EfficiencyWorkers, metal4Renderer: settings.metal4Renderer, enhancedMetal4: settings.enhancedMetal4, frameGeneration: settings.frameGeneration, javaChromeClearance: engine == .java && !uiHidden ? chromeClearance.top : nil, onStats: { stats = $0 }, onThreeFingerTap: { toggleInterface() })
+                                  scale: settings.renderScale(for: app), sharpGraphics: settings.usesSharpGraphics(for: app), efficientGraphics: settings.usesEfficientGraphics(for: app), efficientFrameLimit: settings.efficientFrameRate.rawValue, threadPolicy: settings.workerScheduling.rawValue, submissionMode: settings.vulkanSubmission.rawValue, driverProfiling: settings.driverPhaseProfiling, pipelineIdentification: settings.pipelineIdentification, engineOnlyLimiter: settings.engineOnlyLimiter, renderTargetInventory: settings.renderTargetInventory, pipelineFeedback: settings.pipelineFeedback, spatialUpscaling: settings.spatialUpscaling, spatialInputPercent: settings.duoAutomaticActive(for: app) ? settings.duoSpatialPreset : settings.spatialInputPercent, clockPresentation: settings.clockPresentation, feedbackClockCorrection: settings.feedbackClockCorrection, nativePipelineArchiveMode: settings.nativePipelineArchiveMode, nativeArchiveVerification: settings.nativeArchiveVerification, execution: settings.effectiveExecution(for: app), autoDungeonsLog: settings.isDungeons(app), automaticDuoProfile: settings.supportsDuoAutomatic(for: app), a20EfficiencyWorkers: settings.a20EfficiencyWorkers, metal4Renderer: settings.metal4Renderer, enhancedMetal4: settings.enhancedMetal4, frameGeneration: settings.frameGeneration, javaChromeClearance: engine == .java && !uiHidden ? chromeClearance.top : nil, onStats: { stats = $0 }, onThreeFingerTap: { toggleInterface() })
                         .background(Color.black)
                     .overlay {
                         // A game whose menus answer only a controller: with none paired, one on the glass. Hiding the bar leaves
@@ -1311,11 +1493,11 @@ struct TLCocosAttemptView: View {
             if uiHidden { showHint() }
             CrashReport.gameStarted(app)
             padLayout = PadLayout.load(app.id)
-            model.setLogVisible(showLog && !uiHidden)
+            model.setLogVisible(showLog && !uiHidden, unified: settings.isDungeons(app))
             model.start()
         }
-        .onChange(of: showLog) { model.setLogVisible($0 && !uiHidden) }
-        .onChange(of: uiHidden) { model.setLogVisible(showLog && !$0) }
+        .onChange(of: showLog) { model.setLogVisible($0 && !uiHidden, unified: settings.isDungeons(app)) }
+        .onChange(of: uiHidden) { model.setLogVisible(showLog && !$0, unified: settings.isDungeons(app)) }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in model.stop() }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in model.start() }
         // What happened, for the library: ten seconds of frames is a game that plays; a refusal is one that did not start.
@@ -1442,7 +1624,7 @@ struct TLCocosAttemptView: View {
             if settings.showStats, model.state == Int32(HUSK_UNITY_RUNNING) {
                 Text(stats).font(.technical(11)).foregroundStyle(.white.opacity(0.7)).lineLimit(1)
             }
-            if devInfo && !settings.isDungeons(app) {
+            if devInfo || settings.isDungeons(app) {
                 Button { withAnimation(.snappy(duration: 0.25)) { showLog.toggle() } } label: {
                     Text(showLog ? "Hide log" : "Log").font(.system(size: 12, weight: .semibold))
                 }
@@ -1458,10 +1640,22 @@ struct TLCocosAttemptView: View {
     private var logPanel: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("ATTEMPT LOG").font(.technical(10, weight: .bold)).foregroundStyle(Theme.textDim)
+                Text(settings.isDungeons(app) ? "GAME LOG & DIAGNOSTICS" : "ATTEMPT LOG").font(.technical(10, weight: .bold)).foregroundStyle(Theme.textDim)
                 Spacer()
-                Button { UIPasteboard.general.string = model.logText } label: {
-                    Label("Copy", systemImage: "doc.on.doc").font(.system(size: 11))
+                Button {
+                    if settings.isDungeons(app) {
+                        // The viewer intentionally retains a bounded tail for
+                        // responsiveness; the unified on-disk log has every
+                        // line, including launch and startup context.
+                        HuskLog.flushNow()
+                        UIPasteboard.general.string = (try? String(contentsOf: HuskLog.logFileURL, encoding: .utf8))
+                            ?? model.logText
+                    } else {
+                        UIPasteboard.general.string = model.logText
+                    }
+                } label: {
+                    Label(settings.isDungeons(app) ? "Copy full log" : "Copy", systemImage: "doc.on.doc")
+                        .font(.system(size: 11))
                 }
             }
             .padding(.horizontal, 10).padding(.vertical, 6)

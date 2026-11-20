@@ -2,7 +2,11 @@
 #include "husk-tl-spatial.h"
 bool tl_spatial_dimensions(int width,int height,int percent,tl_spatial_config *out) {
     if(!out||width<64||height<64||width>8192||height>8192||percent<50||percent>=100)return false;
-    int w=(width*percent/100)&~7,h=(height*percent/100)&~7;
+    /* Round to the nearest 8-pixel boundary instead of flooring both axes.
+     * 1816x1280 Duo output: 50%=912x640, 60%=1088x768,
+     * 67%=1216x856. This avoids gratuitous aspect-ratio drift.
+     */
+    int w=((width*percent+400)/800)*8,h=((height*percent+400)/800)*8;
     if(w<64||h<64||w>=width||h>=height)return false;
     double ratio=(double)w*height/((double)h*width);
     if(ratio<0.99||ratio>1.01)return false;

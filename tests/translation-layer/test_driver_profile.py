@@ -77,10 +77,14 @@ int exercise_busy_mutex(void){unsigned before=api_calls;pthread_mutex_lock(&prof
         device_prefix = vulkan[start:vulkan.index('    uint32_t base[N_FEATURES]',start)]
         source += r'''
 #define VK_SUCCESS 0
+#define VK_ERROR_EXTENSION_NOT_PRESENT (-7)
 #include "husk-tl-pipeline-feedback.h"
 typedef tl_pf_device_info vk_device_ci;
 typedef tl_pf_create_fn pfn_create_device;
 static tl_pf_enum_fn g_real_enum_dev_ext;
+static bool metal4_backend=false;
+static bool tl_ri_active(void){return false;}
+static bool real_dev_ext(void *pd,const char *name){(void)pd;(void)name;return false;}
 static struct { void *lib; } V = {.lib=(void *)1};
 static int create_status, forwarded, store_devices;
 static bool dxvk_game(void){return false;}

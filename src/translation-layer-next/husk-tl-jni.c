@@ -26,6 +26,9 @@ static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
 static int g_trace;
 static const tl_jhle *g_hle[32];
 static int g_nhle;
+/* Registration/forgotten-class revision invalidates per-thread virtual HLE cache.
+ * Registration is a launch-time operation, as for the existing g_hle tables. */
+static atomic_uint g_virtual_hle_revision = 1;
 
 void tl_jni_set_trace(int level) { g_trace = level; }
 
@@ -221,7 +224,7 @@ static void parse_sig(tl_jmeth *m)
 
 void tl_jni_register_hle(const tl_jhle *table)
 {
-    if (g_nhle < 32) g_hle[g_nhle++] = table;
+    if (g_nhle < 32) { g_hle[g_nhle++] = table; atomic_fetch_add_explicit(&g_virtual_hle_revision,1,memory_order_release); }
 }
 
 /* Whether Husk's C side implements anything of the class: a method in an HLE table, or natives registered on it. */
@@ -469,6 +472,34 @@ void tl_jni_clear(void) { t_pending = NULL; }
 
 /* --------------------------------------------------------------- calling */
 
+/* The same subclass/method is commonly invoked repeatedly from native code.
+ * A single thread-local entry avoids rescanning every HLE table on each
+ * virtual JNI invocation. The miss path is exactly the original superclass
+ * walk. Neither a negative result nor an inherited implementation is
+ * assumed valid across a registry/class-reset revision. */
+typedef struct {
+    const tl_jclass *receiver;
+    const tl_jmeth *method;
+    tl_jclass *owner;
+    tl_jhle_fn override;
+    unsigned revision;
+} tl_virtual_hle_cache;
+static _Thread_local tl_virtual_hle_cache g_virtual_cache;
+static tl_jhle_fn virtual_hle_override(tl_jclass *receiver, tl_jmeth *method, tl_jclass **owner)
+{
+    unsigned revision=atomic_load_explicit(&g_virtual_hle_revision,memory_order_acquire);
+    if(g_virtual_cache.receiver==receiver&&g_virtual_cache.method==method&&g_virtual_cache.revision==revision){
+        *owner=g_virtual_cache.owner;return g_virtual_cache.override;
+    }
+    tl_jclass *found=NULL;tl_jhle_fn override=NULL;
+    for(tl_jclass *k=receiver;k&&k!=method->cls;k=k->super){
+        override=hle_find(k->name,method->name,method->sig);
+        if(override){found=k;break;}
+    }
+    g_virtual_cache=(tl_virtual_hle_cache){receiver,method,found,override,revision};
+    *owner=found;return override;
+}
+
 static void jni_ExceptionDescribe(void *env);
 static jvalue g_zero;
 
@@ -481,11 +512,11 @@ static jvalue invoke(jobj *self, tl_jmeth *m, bool nonvirtual, const jvalue *arg
     c.ret.j = 0;
     tl_jhle_fn fn = m->fn;
     if (!nonvirtual && self && self->cls && self->cls != m->cls) {
-        /* virtual dispatch: an override in a subclass's implementation wins */
-        for (tl_jclass *k = self->cls; k && k != m->cls; k = k->super) {
-            tl_jhle_fn o = hle_find(k->name, m->name, m->sig);
-            if (o) { fn = o; c.cls = k; break; }
-        }
+        /* Same virtual semantics, with a revision-checked thread-local
+         * one-entry cache. A nonvirtual JNI call never uses this cache. */
+        tl_jclass *owner=NULL;
+        tl_jhle_fn o=virtual_hle_override(self->cls,m,&owner);
+        if(o){fn=o;c.cls=owner;}
     }
     if (fn) {
         if (g_trace >= 2) tl_log_line("jni: call %s.%s%s", m->cls->name, m->name, m->sig);
@@ -1282,6 +1313,7 @@ void tl_jni_forget_if(bool (*drop)(tl_jclass *jc, void *user), void *user)
         }
     }
     pthread_mutex_unlock(&g_lock);
+    atomic_fetch_add_explicit(&g_virtual_hle_revision,1,memory_order_release);
 }
 
 tl_jclass *tl_jni_find_declared(const char *name)

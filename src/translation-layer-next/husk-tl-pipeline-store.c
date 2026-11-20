@@ -20,7 +20,10 @@
 _Static_assert(offsetof(tl_pc_create_info, size) == 24 && offsetof(tl_pc_create_info, data) == 32, "Vulkan 64-bit cache ABI");
 #define MAX_DEVICES 8
 #define MAX_CACHES 64
-#define MAX_BYTES (32u * 1024u * 1024u)
+/* Large Dungeons worlds can accumulate more compiled shader variants than
+ * 32 MiB. Bounded 96 MiB protects cache continuity without unbounded
+ * foreground memory use. Serialization is still pause/teardown-only. */
+#define MAX_BYTES (96u * 1024u * 1024u)
 static struct device {
     void *handle;
     uint8_t header[32];
@@ -234,6 +237,8 @@ void tl_pc_checkpoint(void)
                     free(data); data = NULL;
                 }
             }
+            if(size>MAX_BYTES)
+                tl_log_line("ue4 cache store: serialized driver blob exceeds 96 MiB cap; skipping checkpoint instead of corrupting current cache");
             api.destroy(d.handle, combined, NULL);
         }
         pthread_rwlock_unlock(&access_lock);
